@@ -63,8 +63,7 @@ export function VmPage() {
               </Card>
             }
           >
-            {/* a new QEMU (after a reboot) gets a new connection by itself */}
-            <VmConsole key={vm.since ?? ''} name={name} />
+            <VmConsole name={name} />
           </Suspense>
         ) : (
           <Card title="Console">

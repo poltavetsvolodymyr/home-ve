@@ -8,6 +8,10 @@ import { VmKeys } from './VmKeys'
 
 type Status = 'connecting' | 'connected' | 'closed'
 
+/** After a lost connection (a reboot: QEMU goes and a new one comes), try again every 2 s for a minute. */
+const retryMs = 2000
+const maxRetries = 30
+
 /**
  * The VM's screen (noVNC over /api/vms/{name}/console). Scaled to fit; click it to type with a real keyboard.
  * A phone has none that noVNC can capture, so there's a panel of keys (arrows, Esc, F-keys, Ctrl…) and a
@@ -18,6 +22,8 @@ export default function VmConsole({ name }: { name: string }) {
   const rfb = useRef<RFB | null>(null)
   const [status, setStatus] = useState<Status>('connecting')
   const [attempt, setAttempt] = useState(0)
+  // connection attempts in a row that failed or dropped; a successful connect resets it
+  const failures = useRef(0)
   const [text, setText] = useState('')
   const [mods, setMods] = useState<Modifier[]>([])
 
@@ -27,10 +33,21 @@ export default function VmConsole({ name }: { name: string }) {
     const r = new RFB(screen.current, consoleUrl(name), { wsProtocols: ['binary'] })
     r.scaleViewport = true
     r.resizeSession = false
-    r.addEventListener('connect', () => setStatus('connected'))
-    r.addEventListener('disconnect', () => setStatus('closed'))
+    let retry: number | undefined
+    let leaving = false // our own disconnect below (another tab, another VM) is no reason to retry
+    r.addEventListener('connect', () => {
+      failures.current = 0
+      setStatus('connected')
+    })
+    r.addEventListener('disconnect', () => {
+      if (leaving) return
+      setStatus('closed')
+      if (++failures.current <= maxRetries) retry = window.setTimeout(() => setAttempt(a => a + 1), retryMs)
+    })
     rfb.current = r
     return () => {
+      leaving = true
+      window.clearTimeout(retry)
       r.disconnect()
       rfb.current = null
     }
@@ -72,7 +89,12 @@ export default function VmConsole({ name }: { name: string }) {
             <Maximize size={16} aria-hidden />
           </button>
           {status === 'closed' && (
-            <button onClick={() => setAttempt(a => a + 1)}>
+            <button
+              onClick={() => {
+                failures.current = 0
+                setAttempt(a => a + 1)
+              }}
+            >
               <RotateCcw size={15} aria-hidden /> Reconnect
             </button>
           )}
