@@ -38,7 +38,7 @@ vm@<имя>.service (root)
 | Что | Как разрешено | Чего нельзя |
 |---|---|---|
 | start / stop / restart / kill VM | polkit, `deploy/vm/50-home-backend.rules`: только `vm@<имя>.service` и только эти четыре действия | любые другие юниты, enable/disable, правка юнитов |
-| кнопка Update | тот же polkit: только `start` для `home-update.service`. Юнит от root запускает `update.sh` | выбрать, что запускать: команда зашита в юнит, бэкенд может только нажать «старт» |
+| кнопка Update | тот же polkit: только `restart` для `home-update.service`. Юнит от root запускает `update.sh` | выбрать, что запускать: команда зашита в юнит, бэкенд может только перезапустить юнит |
 | настройки VM | `/etc/vm` принадлежит `root:home-backend` с правами 0775, в юните `ReadWritePaths=/etc/vm` | писать куда-то ещё: `ProtectSystem=strict` |
 | консоль | `vnc.sock` после старта VM получает группу `home-backend` и права 0660 (`ExecStartPost` в `vm@.service`) | `qmp.sock`, `qga.sock`, `console.sock`: 0600, только root. QMP умеет почти всё, вплоть до чтения файлов хоста |
 | журнал VM | группа `systemd-journal` | — |
@@ -110,7 +110,7 @@ Cli/                       home-backend hash-password / set-password
 | `SystemStatus` | (на Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp из /sys/class/hwmon) |
 | `Vms` | VMs, страница VM | `GET /api/vms`, `GET /api/vms/{имя}`, `POST /api/vms/{имя}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{имя}/config`, `GET /api/vms/{имя}/logs`, `GET /api/vms/{имя}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
 | `Logs` | (вкладка Logs у VM) | — | `JournalctlSource`: `journalctl -o json -u vm@<имя>.service` |
-| `Update` | Settings (шестерёнка в шапке) | `GET /api/host/update`, `POST /api/host/update` | `SystemctlUpdateRunner`: `systemctl start/show home-update.service` + его журнал; `MockUpdateRunner` |
+| `Update` | Settings (шестерёнка в шапке) | `GET /api/host/update`, `POST /api/host/update` | `SystemctlUpdateRunner`: `systemctl restart/show home-update.service` + его журнал; `MockUpdateRunner` |
 
 Внутри `Vms`:
 

@@ -6,9 +6,13 @@ public static class UpdateUnit
     public const string Name = "home-update.service";
 
     public static readonly string[] ShowArguments =
-        ["show", "--no-pager", "--timestamp=unix", "--property=ActiveState,Result,ExecMainStartTimestamp,ExecMainExitTimestamp", Name];
+        ["show", "--no-pager", "--timestamp=unix", "--property=ActiveState,SubState,Result,ExecMainStartTimestamp,ExecMainExitTimestamp", Name];
 
-    public static readonly string[] StartArguments = ["start", "--no-block", Name];
+    /// <summary>
+    /// restart, not start: the unit has RemainAfterExit=yes, so after a run it stays "active (exited)", where a start
+    /// would do nothing. (Without RemainAfterExit systemd unloads a finished oneshot and forgets when it ran.)
+    /// </summary>
+    public static readonly string[] StartArguments = ["restart", "--no-block", Name];
 
     /// <param name="output">Key=Value lines; timestamps as <c>@&lt;unix seconds&gt;</c>, empty when there is none.</param>
     public static (string State, DateTimeOffset? StartedAt, DateTimeOffset? FinishedAt) ParseShow(string output)
@@ -22,7 +26,8 @@ public static class UpdateUnit
         var finished = Timestamp(kv.GetValueOrDefault("ExecMainExitTimestamp"));
         var state = kv.GetValueOrDefault("ActiveState", "inactive") switch
         {
-            "activating" or "active" or "reloading" => "running",
+            "activating" or "reloading" or "deactivating" => "running",
+            "active" when kv.GetValueOrDefault("SubState") != "exited" => "running",
             "failed" => "failed",
             _ when started is null => "never",
             _ => kv.GetValueOrDefault("Result") == "success" ? "succeeded" : "failed",

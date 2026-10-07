@@ -1,5 +1,5 @@
 # Updates the VM web UI: /opt/home-ve/deploy/update.sh (git pull, then install.sh) as root.
-# The "Update" button on the Settings page starts it; polkit lets home-backend start this unit and nothing
+# The "Update" button on the Settings page (re)starts it; polkit lets home-backend restart this unit and nothing
 # more (vm/50-home-backend.rules). A unit of its own, so the update outlives the backend, which install.sh restarts.
 [Unit]
 Description=Update the VM web UI (git pull + install.sh)
@@ -11,4 +11,7 @@ Type=oneshot
 # git and ssh (the deploy key in /root/.ssh) look for root's files here; services start without HOME
 Environment=HOME=/root
 ExecStart=/opt/home-ve/deploy/update.sh
+# after a run the unit stays "active (exited)" with its start and end time; without this systemd unloads a
+# finished oneshot and the page can't tell it ever ran. The button therefore restarts the unit.
+RemainAfterExit=yes
 TimeoutStartSec=15min

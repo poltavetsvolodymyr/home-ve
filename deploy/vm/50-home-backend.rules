@@ -1,4 +1,4 @@
-// The web UI's backend (user home-backend) may start, stop, restart and kill the VM units, and start
+// The web UI's backend (user home-backend) may start, stop, restart and kill the VM units, and restart
 // home-update.service (the Update button: deploy/update.sh as root). Nothing else.
 // polkit asks this for every systemctl call it makes; anything not allowed here falls through to "no".
 polkit.addRule(function (action, subject) {
@@ -9,7 +9,7 @@ polkit.addRule(function (action, subject) {
             ["start", "stop", "restart", "kill"].indexOf(verb) >= 0) {
             return polkit.Result.YES;
         }
-        if (unit == "home-update.service" && verb == "start") {
+        if (unit == "home-update.service" && verb == "restart") {
             return polkit.Result.YES;
         }
     }

@@ -25,6 +25,7 @@ public class UpdateUnitTests
     {
         Assert.Equal(("running", Start, null), Parse("""
             ActiveState=activating
+            SubState=start
             Result=success
             ExecMainStartTimestamp=@1791378000
             ExecMainExitTimestamp=
@@ -34,8 +35,10 @@ public class UpdateUnitTests
     [Fact]
     public void Finished_runs_say_how_they_ended()
     {
+        // RemainAfterExit=yes: a successful run stays active (exited)
         Assert.Equal(("succeeded", Start, Start.AddSeconds(42)), Parse("""
-            ActiveState=inactive
+            ActiveState=active
+            SubState=exited
             Result=success
             ExecMainStartTimestamp=@1791378000
             ExecMainExitTimestamp=@1791378042

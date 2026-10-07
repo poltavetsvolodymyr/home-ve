@@ -181,7 +181,7 @@ nginx -t && systemctl reload nginx
 `home-update.service`: это `update.sh` от root отдельной службой, поэтому обновление доживает до конца,
 хотя `install.sh` по ходу перезапускает бэкенд. Страница показывает статус и вывод скрипта, а после
 успешного обновления предлагает перезагрузить себя (мог прийти новый фронт). Из консоли:
-`systemctl start home-update` и `journalctl -u home-update -n 50`.
+`systemctl restart home-update` и `journalctl -u home-update -n 50`.
 
 Кнопка появится после первого обновления руками: юнит `home-update.service` и правило polkit для него
 ставит `install.sh`.

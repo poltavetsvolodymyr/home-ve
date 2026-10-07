@@ -26,7 +26,7 @@ public static class UpdateFeature
         catch (Exception ex) when (HostCommandFailure.Is(ex)) { return HostCommandFailure.ToProblem(ex); }
     }
 
-    /// <summary>Starting it while it runs is harmless: systemd keeps the one run going.</summary>
+    /// <summary>Starting it while it runs changes nothing: the one run goes on.</summary>
     private static async Task<Results<Ok<UpdateStatus>, ProblemHttpResult>> StartAsync(IUpdateRunner runner, CancellationToken ct)
     {
         try

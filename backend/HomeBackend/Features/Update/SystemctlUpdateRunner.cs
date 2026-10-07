@@ -23,5 +23,10 @@ public sealed class SystemctlUpdateRunner(IJournalSource journal) : IUpdateRunne
         return new UpdateStatus(state, started, finished, log);
     }
 
-    public Task StartAsync(CancellationToken ct) => ProcessRunner.RunAsync("systemctl", UpdateUnit.StartArguments, ct);
+    /// <summary>A restart while it runs would cut install.sh off halfway, so a running update is left alone.</summary>
+    public async Task StartAsync(CancellationToken ct)
+    {
+        var (state, _, _) = UpdateUnit.ParseShow(await ProcessRunner.RunAsync("systemctl", UpdateUnit.ShowArguments, ct));
+        if (state != "running") await ProcessRunner.RunAsync("systemctl", UpdateUnit.StartArguments, ct);
+    }
 }
