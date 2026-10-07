@@ -1,0 +1,37 @@
+/* ISO images page. */
+
+.iso-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .iso-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.iso-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--grid);
+}
+.iso-row:first-of-type {
+  border-top: 0;
+}
+.iso-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.iso-name,
+.iso-url {
+  overflow-wrap: anywhere;
+}
+.iso-progress,
+.iso-url {
+  margin: 6px 0 0;
+}

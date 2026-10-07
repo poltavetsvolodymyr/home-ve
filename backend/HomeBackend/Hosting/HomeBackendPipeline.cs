@@ -1,6 +1,7 @@
 using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
 using HomeBackend.Features.Host;
+using HomeBackend.Features.Isos;
 using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
 using HomeBackend.Security;
@@ -46,7 +47,8 @@ public static class HomeBackendPipeline
         app.MapGroup("/api").RequireAuthorization()
             .MapHostEndpoints()
             .MapUpdateEndpoints()
-            .MapVmsEndpoints();
+            .MapVmsEndpoints()
+            .MapIsoEndpoints();
 
         return app;
     }

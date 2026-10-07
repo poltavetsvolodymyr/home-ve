@@ -20,6 +20,9 @@ public sealed class TestApp : IAsyncLifetime
     /// <summary>Where the "running" mock VMs keep their sockets (vm-&lt;name&gt;/vnc.sock), for console tests.</summary>
     public string RuntimeDir => Path.Combine(_dataDir, "run");
 
+    /// <summary>The ISO directory; tests drop files into it.</summary>
+    public string IsoDir => Path.Combine(_dataDir, "iso");
+
     public async ValueTask InitializeAsync()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -29,6 +32,7 @@ public sealed class TestApp : IAsyncLifetime
             ["HomeBackend:Urls:0"] = "http://127.0.0.1:0",
             ["HomeBackend:DataDir"] = _dataDir,
             ["HomeBackend:VmRuntimeDir"] = RuntimeDir,
+            ["HomeBackend:IsoDir"] = IsoDir,
         });
         builder.AddHomeBackend();
 

@@ -47,7 +47,9 @@ h2 {
 
 /* --- controls ------------------------------------------------------------ */
 
+/* a.button: a link that looks like a button (New VM, ISO images) */
 button,
+.button,
 select,
 input {
   font: inherit;
@@ -59,16 +61,16 @@ input {
   min-height: 32px;
 }
 /* an icon and its label sit on one centre line */
-button {
+button,
+.button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-}
-button {
   cursor: pointer;
 }
 button:hover,
+.button:hover,
 select:hover {
   background: var(--surface-2);
 }
@@ -76,13 +78,15 @@ button:disabled {
   opacity: 0.55;
   cursor: default;
 }
-button.primary {
+button.primary,
+.button.primary {
   background: var(--accent);
   border-color: transparent;
   color: #fff;
   font-weight: 600;
 }
-button.primary:hover:not(:disabled) {
+button.primary:hover:not(:disabled),
+.button.primary:hover {
   filter: brightness(1.08);
 }
 :focus-visible {

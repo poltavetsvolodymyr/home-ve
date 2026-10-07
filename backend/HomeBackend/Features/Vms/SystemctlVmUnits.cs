@@ -5,6 +5,9 @@ public static class SystemctlVmUnits
 {
     public static string Unit(string name) => $"vm@{name}.service";
 
+    /// <summary>Root oneshot that deletes a stopped VM's disk (deploy/vm/vm-disk-remove).</summary>
+    public static string DiskRemoveUnit(string name) => $"vm-disk-remove@{name}.service";
+
     public static string[] ShowArguments(IReadOnlyList<string> names) =>
         ["show", "--no-pager", "--property=ActiveState,SubState,ActiveEnterTimestampMonotonic,MainPID", .. names.Select(Unit)];
 

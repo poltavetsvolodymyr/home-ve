@@ -1,4 +1,4 @@
-import { get, post, put } from '@/shared/api/http'
+import { del, get, post, put } from '@/shared/api/http'
 import type { LogEntry } from './logLevel'
 
 // Mirrors backend/HomeBackend/Features/Vms/{VmConfig,VmState,VmsFeature}.cs
@@ -20,6 +20,10 @@ export interface VmConfig {
   nets: VmNet[]
   /** started at boot */
   autostart: boolean
+  /** GiB the disk gets when vm-run creates it at the first start; null for disks made by hand */
+  diskSizeGb: number | null
+  /** ISO file in the CD drive; null when empty */
+  cdrom: string | null
 }
 
 export type VmState = 'running' | 'starting' | 'stopping' | 'stopped' | 'failed'
@@ -40,7 +44,15 @@ export interface Vm {
 export type VmAction = 'start' | 'shutdown' | 'reboot' | 'poweroff'
 
 /** Body of PUT /api/vms/{name}/config: everything but the name and the disk. */
-export type VmSettings = Omit<VmConfig, 'name' | 'disk'>
+export type VmSettings = Omit<VmConfig, 'name' | 'disk' | 'diskSizeGb'>
+
+/** Body of POST /api/vms. */
+export interface VmCreate extends VmSettings {
+  name: string
+  diskSizeGb: number
+  /** start it right away, to install from the ISO in the console */
+  start: boolean
+}
 
 const vmPath = (name: string) => `/api/vms/${encodeURIComponent(name)}`
 
@@ -48,6 +60,9 @@ export const fetchVms = () => get<Vm[]>('/api/vms')
 export const fetchVm = (name: string) => get<Vm>(vmPath(name))
 export const runVmAction = (name: string, action: VmAction) => post<Vm>(`${vmPath(name)}/${action}`)
 export const saveVmSettings = (name: string, settings: VmSettings) => put<Vm>(`${vmPath(name)}/config`, settings)
+export const createVm = (vm: VmCreate) => post<Vm>('/api/vms', vm)
+/** Only a stopped VM; with `disk` its disk is deleted too. */
+export const deleteVm = (name: string, disk: boolean) => del(`${vmPath(name)}${disk ? '?disk=true' : ''}`)
 export const fetchBridges = () => get<string[]>('/api/bridges')
 export const fetchVmLogs = (name: string, lines: number) => get<LogEntry[]>(`${vmPath(name)}/logs?lines=${lines}`)
 

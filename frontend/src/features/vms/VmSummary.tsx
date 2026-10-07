@@ -22,7 +22,18 @@ export function VmSummary({ vm }: { vm?: Vm }) {
           <dt>Memory</dt>
           <dd>{c ? `${c.memoryMb} MiB` : <Skeleton width="5em" />}</dd>
           <dt>Disk</dt>
-          <dd className="mono">{c ? c.disk : <Skeleton width="9em" />}</dd>
+          <dd>
+            {c ? (
+              <>
+                <span className="mono">{c.disk}</span>
+                {c.diskSizeGb && <span className="muted"> · {c.diskSizeGb} GiB</span>}
+              </>
+            ) : (
+              <Skeleton width="9em" />
+            )}
+          </dd>
+          <dt>CD drive</dt>
+          <dd>{c ? c.cdrom ? <span className="mono">{c.cdrom}</span> : 'empty' : <Skeleton width="6em" />}</dd>
           {c ? (
             c.nets.map((n, i) => (
               <div key={n.mac} className="kv-row">

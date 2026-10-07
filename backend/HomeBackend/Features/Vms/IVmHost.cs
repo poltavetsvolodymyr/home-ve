@@ -6,8 +6,16 @@ public interface IVmHost
     /// <summary>Every VM with a valid config, by name. Broken files are skipped and logged.</summary>
     IReadOnlyList<VmConfig> ReadConfigs();
 
-    /// <summary>Replaces a VM's config file.</summary>
+    /// <summary>Replaces a VM's config file, or creates it.</summary>
     void WriteConfig(VmConfig config);
+
+    /// <summary>Whether <c>&lt;name&gt;.conf</c> exists, broken or not.</summary>
+    bool ConfigExists(string name);
+
+    void DeleteConfig(string name);
+
+    /// <summary>Deletes the thin volume named after the VM (vm-disk-remove@&lt;name&gt;.service, as root). The VM must be stopped.</summary>
+    Task RemoveDiskAsync(string name, CancellationToken ct);
 
     /// <summary>The unit state of each VM, in the order given.</summary>
     Task<IReadOnlyList<VmUnitState>> ReadUnitsAsync(IReadOnlyList<string> names, CancellationToken ct);

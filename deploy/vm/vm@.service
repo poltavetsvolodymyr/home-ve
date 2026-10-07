@@ -11,9 +11,10 @@ RuntimeDirectory=vm-%i
 # sockets for root only; the console one is handed to the web UI below
 UMask=0077
 ExecStart=/usr/local/sbin/vm-run %i
-# QEMU makes vnc.sock a moment after it starts: wait for it, then let home-backend connect.
-# "-" = should that fail, the VM still runs, just without a console in the web UI.
-ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 600 ]; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"'
+# QEMU makes vnc.sock a moment after it starts (after vm-run created a new disk: a few seconds): wait for
+# it, then let home-backend connect. Stops waiting when vm-run gives up. "-" = should that fail, the VM
+# still runs, just without a console in the web UI.
+ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 600 ] && kill -0 "$$MAINPID" 2>/dev/null; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"'
 # press the power button and wait for the guest to shut itself down
 ExecStop=/bin/sh -c '/usr/local/sbin/qmp %i system_powerdown; while kill -0 "$$MAINPID" 2>/dev/null; do sleep 1; done'
 TimeoutStopSec=150

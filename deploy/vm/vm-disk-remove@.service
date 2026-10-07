@@ -1,0 +1,8 @@
+# Deletes the disk of the stopped VM %i (its thin volume in the pool "data"): deploy/vm/vm-disk-remove.
+# The web UI starts it when a VM is deleted together with its disk; polkit allows home-backend just that.
+[Unit]
+Description=Delete the disk of VM %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-disk-remove %i

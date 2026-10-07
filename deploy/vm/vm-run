@@ -5,11 +5,16 @@
 # parsed, never sourced: only the keys below, every value checked against the same rules as the
 # backend's VmConfigFile.cs, and the disk must be a thin volume in the pool "data" (not, say, the
 # host's own root volume). Anything off and the VM does not start.
+#
+# A new VM's disk doesn't exist yet: vm-run creates it (DISK_SIZE GiB, thin, in the pool), but only one
+# named after the VM. An ISO in the CD drive (CDROM) comes from home-backend's own directory, and is
+# checked after opening it, so a symlink can't slip a host file into the VM.
 # "check || die" on purpose: die exits, so it never runs after a passing check
 # shellcheck disable=SC2015
 set -eu
 
 POOL=data
+ISO_DIR=/var/lib/home-backend/iso
 
 die() {
   echo "vm-run: $*" >&2
@@ -27,7 +32,7 @@ conf=/etc/vm/$name.conf
 run=/run/vm-$name
 [ -f "$conf" ] || die "no $conf"
 
-cpus='' memory='' disk='' nets=''
+cpus='' memory='' disk='' nets='' disk_size='' cdrom=''
 # read trims the spaces around a line; the last line may lack its newline
 while read -r line || [ -n "$line" ]; do
   case $line in '' | '#'*) continue ;; esac
@@ -39,6 +44,8 @@ while read -r line || [ -n "$line" ]; do
     DISK) disk=$value ;;
     NET) nets="$nets$value
 " ;;
+    DISK_SIZE) disk_size=$value ;;
+    CDROM) cdrom=$value ;;
     AUTOSTART) ;; # read by vm-autostart
     *) die "$conf: unknown key $key" ;;
   esac
@@ -51,6 +58,14 @@ matches "$memory" '[1-9][0-9]{2,5}' && [ "$memory" -ge 128 ] && [ "$memory" -le 
 # the disk: /dev/<group>/<volume>, a thin volume in $POOL
 matches "$disk" '/dev/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*' || die "DISK must be /dev/<group>/<volume>, not '$disk'"
 lv=${disk#/dev/}
+if ! lvs -- "$lv" >/dev/null 2>&1; then
+  # a new VM: make its disk, but only one named after it, in the group that holds the pool
+  [ -n "$disk_size" ] || die "no LVM volume $lv (and no DISK_SIZE to create it with)"
+  matches "$disk_size" '[1-9][0-9]{0,3}' && [ "$disk_size" -le 4096 ] || die "DISK_SIZE must be 1-4096 GiB, not '$disk_size'"
+  [ "${lv#*/}" = "$name" ] || die "only a disk named after the VM is created: /dev/<group>/$name, not $disk"
+  echo "creating $lv: $disk_size GiB, thin, in ${lv%%/*}/$POOL"
+  lvcreate --yes --type thin --virtualsize "${disk_size}G" --thinpool "$POOL" --name "$name" -- "${lv%%/*}"
+fi
 pool=$(lvs --noheadings -o pool_lv -- "$lv" 2>/dev/null | tr -d ' ') || die "no LVM volume $lv"
 [ "$pool" = "$POOL" ] || die "$lv is not a thin volume in the pool $POOL"
 # thin volumes may come up inactive after boot
@@ -59,7 +74,22 @@ lvchange -ay -- "$lv"
 set -- -name "$name" -machine q35,accel=kvm -cpu host -smp "$cpus" -m "$memory" \
   -nodefaults -vga std -display "vnc=unix:$run/vnc.sock" \
   -drive "if=none,id=disk0,file=$disk,format=raw,cache=none,aio=native,discard=unmap" \
-  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=disk0,bus=scsi0.0,rotation_rate=1
+  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=disk0,bus=scsi0.0,rotation_rate=1,bootindex=1
+
+# the CD drive. The ISO directory belongs to home-backend, so the file is opened here (fd 3, which QEMU
+# inherits and reads through /proc/self/fd/3) and what was really opened is checked: a regular file in
+# that directory, owned by home-backend. A symlink, a hard link to a root file or a swap after the
+# check fails one of these. The disk boots first; an empty one falls through to the CD.
+if [ -n "$cdrom" ]; then
+  matches "$cdrom" '[A-Za-z0-9][A-Za-z0-9._+-]{0,123}[.]iso' || die "CDROM must be an ISO file name, not '$cdrom'"
+  [ -f "$ISO_DIR/$cdrom" ] || die "no ISO $ISO_DIR/$cdrom"
+  exec 3<"$ISO_DIR/$cdrom"
+  opened=$(readlink "/proc/$$/fd/3")
+  [ "$opened" = "$ISO_DIR/$cdrom" ] && [ -f "/proc/$$/fd/3" ] &&
+    [ "$(stat -L -c %U "/proc/$$/fd/3")" = home-backend ] || die "$cdrom is not a plain file of home-backend in $ISO_DIR"
+  set -- "$@" -drive "if=none,id=cd0,file=/proc/self/fd/3,format=raw,media=cdrom,readonly=on" \
+    -device scsi-cd,drive=cd0,bus=scsi0.0,bootindex=2
+fi
 
 # one tap per network card, plugged into its bridge: NET=<bridge> <MAC>
 i=0 macs=''

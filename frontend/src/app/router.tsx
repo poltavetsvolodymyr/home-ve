@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router'
+import { IsosPage } from '@/features/isos/IsosPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { NewVmPage } from '@/features/vms/NewVmPage'
 import { VmPage } from '@/features/vms/VmPage'
 import { Layout } from './Layout'
 import { pages } from './routes'
@@ -18,6 +20,9 @@ export const router = createBrowserRouter([
       ...pages.map(p => ({ path: p.path, element: p.element })),
       // a VM's own page: no tab of its own, the VMs tab stays lit
       { path: '/vms/:name', element: <VmPage /> },
+      // a fixed path wins over :name, which is why "new" can't be a VM's name
+      { path: '/vms/new', element: <NewVmPage /> },
+      { path: '/isos', element: <IsosPage /> },
       // the gear in the header, not a tab
       { path: '/settings', element: <SettingsPage /> },
       { path: '*', element: start },

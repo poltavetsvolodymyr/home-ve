@@ -11,6 +11,7 @@
 | `home-update.service` | `update.sh` от root; его запускает кнопка Update в морде |
 | `config.example.json` | образец `/etc/home-backend/config.json` |
 | `vm/vm-run` | запускает VM по `/etc/vm/<имя>.conf`; ставится в `/usr/local/sbin/` |
+| `vm/vm-disk-remove`, `vm/vm-disk-remove@.service` | удаляет диск остановленной VM (кнопка Delete VM с галкой «и диск») |
 | `vm/qmp` | одна команда в управляющий сокет VM: `qmp router system_powerdown` |
 | `vm/vm@.service` | шаблон службы: одна VM = `vm@<имя>` |
 | `vm/vm-autostart`, `vm/vm-autostart.service` | при загрузке запускает VM с `AUTOSTART=yes` |

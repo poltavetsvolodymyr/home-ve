@@ -74,4 +74,42 @@ public class VmConfigFileTests
     [InlineData("", false)]
     public void Names_fit_units_taps_and_paths(string name, bool valid) =>
         Assert.Equal(valid, VmConfigFile.IsValidName(name));
+
+    [Fact]
+    public void Disk_size_and_cd_round_trip()
+    {
+        var c = VmConfigFile.Parse("web", ["CPUS=1", "MEMORY=1024", "DISK=/dev/home/web", "DISK_SIZE=20", "CDROM=debian-13.1.0-amd64-netinst.iso"]);
+
+        Assert.Equal(20, c.DiskSizeGb);
+        Assert.Equal("debian-13.1.0-amd64-netinst.iso", c.Cdrom);
+        Assert.Equal(c with { Nets = [] }, VmConfigFile.Parse("web", VmConfigFile.Format(c).Split('\n')) with { Nets = [] });
+    }
+
+    [Fact]
+    public void Without_disk_size_or_cd_the_keys_stay_out_of_the_file()
+    {
+        var text = VmConfigFile.Format(VmConfigFile.Parse("router", RouterConf));
+        Assert.DoesNotContain("DISK_SIZE", text);
+        Assert.DoesNotContain("CDROM", text);
+    }
+
+    [Theory]
+    [InlineData("../etc/shadow.iso")]
+    [InlineData(".hidden.iso")]
+    [InlineData("debian.img")]
+    [InlineData("a b.iso")]
+    public void Cd_must_be_a_plain_iso_file_name(string iso)
+    {
+        var c = VmConfigFile.Parse("router", RouterConf) with { Cdrom = iso };
+        Assert.NotNull(VmConfigFile.Validate(c));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4097)]
+    public void Disk_size_has_limits(int size)
+    {
+        var c = VmConfigFile.Parse("router", RouterConf) with { DiskSizeGb = size };
+        Assert.NotNull(VmConfigFile.Validate(c));
+    }
 }

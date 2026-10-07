@@ -6,7 +6,8 @@ namespace HomeBackend.Features.Vms;
 
 /// <summary>
 /// /etc/vm for the configs, systemctl for the units, /proc for usage. Runs as the home-backend user:
-/// deploy/install.sh lets it write /etc/vm and (by a polkit rule) start and stop vm@*.service, nothing else.
+/// deploy/install.sh lets it write /etc/vm and (by a polkit rule) start and stop vm@*.service and start
+/// vm-disk-remove@*.service, nothing else.
 /// </summary>
 public sealed class LinuxVmHost(IOptions<HomeBackendOptions> options, ILogger<LinuxVmHost> log) : IVmHost
 {
@@ -48,6 +49,14 @@ public sealed class LinuxVmHost(IOptions<HomeBackendOptions> options, ILogger<Li
         File.WriteAllText(temp, VmConfigFile.Format(config));
         File.Move(temp, path, overwrite: true);
     }
+
+    public bool ConfigExists(string name) => File.Exists(Path.Combine(_dir, name + ".conf"));
+
+    public void DeleteConfig(string name) => File.Delete(Path.Combine(_dir, name + ".conf"));
+
+    // a blocking start: the oneshot's exit code is the answer (lvremove takes a second or two)
+    public Task RemoveDiskAsync(string name, CancellationToken ct) =>
+        ProcessRunner.RunAsync("systemctl", ["start", SystemctlVmUnits.DiskRemoveUnit(name)], ct, timeoutMs: 60_000);
 
     public async Task<IReadOnlyList<VmUnitState>> ReadUnitsAsync(IReadOnlyList<string> names, CancellationToken ct)
     {

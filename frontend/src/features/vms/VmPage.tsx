@@ -6,6 +6,7 @@ import { Badge, Card, ErrorNote, Segmented, Skeleton } from '@/shared/ui'
 import { fetchVm } from './api'
 import { VmActions } from './VmActions'
 import { VmLogs } from './VmLogs'
+import { VmDelete } from './VmDelete'
 import { VmSettingsForm } from './VmSettingsForm'
 import { VmSummary } from './VmSummary'
 import { stateBadge } from './vmState'
@@ -71,7 +72,12 @@ export function VmPage() {
             </p>
           </Card>
         ))}
-      {tab === 'settings' && vm && <VmSettingsForm vm={vm} onSaved={() => refresh()} />}
+      {tab === 'settings' && vm && (
+        <>
+          <VmSettingsForm vm={vm} onSaved={() => refresh()} />
+          <VmDelete vm={vm} />
+        </>
+      )}
       {tab === 'logs' && <VmLogs name={name} />}
     </div>
   )

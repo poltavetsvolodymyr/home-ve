@@ -26,6 +26,15 @@ public sealed class HomeBackendOptions
     /// <summary>Where a running VM keeps its sockets: <c>&lt;dir&gt;/vm-&lt;name&gt;/vnc.sock</c>.</summary>
     public string VmRuntimeDir { get; set; } = "/run";
 
+    /// <summary>
+    /// ISO images for the VMs' CD drives. vm-run only takes images from /var/lib/home-backend/iso, so on the
+    /// host this stays as it is; development points it somewhere else.
+    /// </summary>
+    public string IsoDir { get; set; } = "/var/lib/home-backend/iso";
+
+    /// <summary>LVM volume group of the thin pool "data": a new VM's disk is /dev/&lt;group&gt;/&lt;name&gt;.</summary>
+    public string DiskGroup { get; set; } = "home";
+
     /// <summary>Writable directory for the cookie key ring.</summary>
     public string DataDir { get; set; } = "/var/lib/home-backend";
 

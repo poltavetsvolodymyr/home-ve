@@ -1,13 +1,14 @@
-import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { fetchHost } from '@/features/host/api'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { Card } from '@/shared/ui'
 import { fetchBridges, runVmAction, saveVmSettings, type Vm, type VmSettings } from './api'
-import { maxNets, needsRestart, newNet, randomMac, settingsFrom, validateSettings } from './settings'
+import { CdromField } from './CdromField'
+import { NetsEditor } from './NetsEditor'
+import { needsRestart, settingsFrom, validateSettings } from './settings'
 
 /**
- * CPUs, memory, network cards and autostart. Hardware changes apply at the VM's next start (like on a real
+ * CPUs, memory, CD drive, network cards and autostart. Hardware changes apply at the VM's next start (like on a real
  * machine), so after saving a running VM the form offers to reboot it.
  */
 export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void }) {
@@ -24,8 +25,6 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
   const changed = JSON.stringify(form) !== JSON.stringify(settingsFrom(vm.config))
 
   const update = (patch: Partial<VmSettings>) => setForm(f => ({ ...f, ...patch }))
-  const updateNet = (i: number, patch: Partial<VmSettings['nets'][number]>) =>
-    update({ nets: form.nets.map((n, j) => (j === i ? { ...n, ...patch } : n)) })
 
   const save = async (e: FormEvent) => {
     e.preventDefault()
@@ -51,7 +50,9 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
 
   return (
     <Card title="Settings">
-      <form className="vm-form" onSubmit={save}>
+      {/* our own checks (settings.ts) say what's wrong; the browser's would block silently, e.g. on memory
+          that isn't a multiple of the step */}
+      <form className="vm-form" onSubmit={save} noValidate>
         <label>
           <span>CPUs</span>
           <input
@@ -83,67 +84,14 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
           Start at boot
         </label>
 
-        <fieldset>
-          <legend>Network cards</legend>
-          {form.nets.map((n, i) => (
-            <div key={i} className="vm-net">
-              <span className="muted">{i + 1}</span>
-              <select
-                aria-label={`Card ${i + 1} bridge`}
-                value={n.bridge}
-                onChange={e => updateNet(i, { bridge: e.target.value })}
-              >
-                {!(bridges.data ?? []).includes(n.bridge) && (
-                  <option value={n.bridge}>{n.bridge || 'pick a bridge'}</option>
-                )}
-                {(bridges.data ?? []).map(b => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="mono"
-                aria-label={`Card ${i + 1} MAC`}
-                value={n.mac}
-                onChange={e => updateNet(i, { mac: e.target.value })}
-                spellCheck={false}
-                autoCapitalize="characters"
-              />
-              <button
-                type="button"
-                className="icon-button"
-                title="New MAC"
-                aria-label="New MAC"
-                onClick={() => updateNet(i, { mac: randomMac() })}
-              >
-                <RefreshCw size={15} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className="icon-button"
-                title="Remove card"
-                aria-label={`Remove card ${i + 1}`}
-                onClick={() => update({ nets: form.nets.filter((_, j) => j !== i) })}
-              >
-                <Trash2 size={15} aria-hidden />
-              </button>
-            </div>
-          ))}
-          {form.nets.length < maxNets && (
-            <button type="button" onClick={() => update({ nets: [...form.nets, newNet(bridges.data?.[0] ?? '')] })}>
-              <Plus size={15} aria-hidden /> Add card
-            </button>
-          )}
-          <p className="hint">
-            Inside the guest a card keeps its name while its MAC stays the same. Changing a MAC is like swapping the
-            card.
-          </p>
-        </fieldset>
+        <CdromField value={form.cdrom} onChange={cdrom => update({ cdrom })} />
+
+        <NetsEditor nets={form.nets} bridges={bridges.data ?? []} onChange={nets => update({ nets })} />
 
         <div className="vm-form-foot">
           <div className="muted">
             Disk: <span className="mono">{vm.config.disk}</span>
+            {vm.config.diskSizeGb && ` · ${vm.config.diskSizeGb} GiB`}
           </div>
           {problems.length > 0 && (
             <ul className="error-note vm-problems">

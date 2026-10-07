@@ -1,0 +1,32 @@
+#!/bin/sh
+# vm-disk-remove <name>: deletes the disk of a stopped VM, the thin volume <group>/<name> in the pool
+# "data". vm-disk-remove@<name>.service runs it as root when the web UI deletes a VM with its disk.
+# Only that volume: the name says which, and it must be thin in the pool, so nothing else can go.
+set -eu
+
+POOL=data
+
+die() {
+  echo "vm-disk-remove: $*" >&2
+  exit 1
+}
+
+name=${1:-}
+printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' || die "bad VM name '$name'"
+
+state=$(systemctl show --property=ActiveState --value "vm@$name.service")
+case $state in
+  inactive | failed) ;;
+  *) die "vm@$name is $state: stop it first" ;;
+esac
+
+# the volume of that name that is thin in the pool (there could be one of that name elsewhere too)
+lv=$(lvs --noheadings --separator / -o vg_name,lv_name,pool_lv -S "lv_name=$name" 2>/dev/null |
+  tr -d ' ' | grep -x "[^/]*/$name/$POOL" | head -1 | cut -d/ -f1,2) || true
+if [ -z "$lv" ]; then
+  echo "no thin volume $name in the pool $POOL: nothing to delete"
+  exit 0
+fi
+
+echo "deleting $lv"
+lvremove --yes -- "$lv"

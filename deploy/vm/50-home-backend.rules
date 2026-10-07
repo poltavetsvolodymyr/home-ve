@@ -1,5 +1,6 @@
-// The web UI's backend (user home-backend) may start, stop, restart and kill the VM units, and restart
-// home-update.service (the Update button: deploy/update.sh as root). Nothing else.
+// The web UI's backend (user home-backend) may start, stop, restart and kill the VM units, start
+// vm-disk-remove@<vm>.service (deleting a VM with its disk) and restart home-update.service (the Update
+// button: deploy/update.sh as root). Nothing else.
 // polkit asks this for every systemctl call it makes; anything not allowed here falls through to "no".
 polkit.addRule(function (action, subject) {
     if (action.id == "org.freedesktop.systemd1.manage-units" && subject.user == "home-backend") {
@@ -7,6 +8,9 @@ polkit.addRule(function (action, subject) {
         var verb = action.lookup("verb");
         if (/^vm@[a-z][a-z0-9-]{0,11}\.service$/.test(unit) &&
             ["start", "stop", "restart", "kill"].indexOf(verb) >= 0) {
+            return polkit.Result.YES;
+        }
+        if (/^vm-disk-remove@[a-z][a-z0-9-]{0,11}\.service$/.test(unit) && verb == "start") {
             return polkit.Result.YES;
         }
         if (unit == "home-update.service" && verb == "restart") {

@@ -38,7 +38,9 @@ vm@<имя>.service (root)
 | Что | Как разрешено | Чего нельзя |
 |---|---|---|
 | start / stop / restart / kill VM | polkit, `deploy/vm/50-home-backend.rules`: только `vm@<имя>.service` и только эти четыре действия | любые другие юниты, enable/disable, правка юнитов |
+| удалить VM вместе с диском | тот же polkit: только `start` для `vm-disk-remove@<имя>.service`. Скрипт от root удаляет том `<группа>/<имя>`, только тонкий в пуле `data` и только у остановленной VM | удалить любой другой том |
 | кнопка Update | тот же polkit: только `restart` для `home-update.service`. Юнит от root запускает `update.sh` | выбрать, что запускать: команда зашита в юнит, бэкенд может только перезапустить юнит |
+| ISO-образы | папка `/var/lib/home-backend/iso` принадлежит бэкенду; он сам скачивает туда файлы по ссылке | подсунуть VM файл хоста: `vm-run` открывает ISO сам и проверяет открытый файл (см. ниже) |
 | настройки VM | `/etc/vm` принадлежит `root:home-backend` с правами 0775, в юните `ReadWritePaths=/etc/vm` | писать куда-то ещё: `ProtectSystem=strict` |
 | консоль | `vnc.sock` после старта VM получает группу `home-backend` и права 0660 (`ExecStartPost` в `vm@.service`) | `qmp.sock`, `qga.sock`, `console.sock`: 0600, только root. QMP умеет почти всё, вплоть до чтения файлов хоста |
 | журнал VM | группа `systemd-journal` | — |
@@ -47,7 +49,13 @@ vm@<имя>.service (root)
 (не `source`), а разбирает построчно и проверяет каждое значение по тем же правилам, что и бэкенд
 (`VmConfigFile.cs`): имя, число ядер и памяти, формат MAC и моста, не больше 8 карт. А диск обязан быть
 тонким томом LVM в пуле `data`. Так даже взломанный бэкенд не подсунет VM корневой раздел хоста.
-Диск бэкенд вообще не меняет (`PUT /api/vms/{имя}/config` сохраняет прежний), это задел на v2.
+Путь к диску бэкенд при изменении настроек не трогает. У новой VM диск всегда `/dev/<группа>/<имя>`, и создаёт
+его не бэкенд, а `vm-run` при первом запуске, причём только том с именем VM (`DISK_SIZE` ГиБ, тонкий, в пуле).
+
+**ISO лежат в папке бэкенда, а читает их root.** Поэтому `vm-run` не передаёт QEMU путь, а открывает файл сам
+(дескриптор 3, QEMU читает его через `/proc/self/fd/3`) и проверяет уже открытый файл: обычный, лежит ровно
+в `/var/lib/home-backend/iso`, принадлежит `home-backend`. Симлинк на `/dev/home/root`, жёсткая ссылка на файл root
+или подмена файла между проверкой и открытием не проходят.
 
 ## Формат `/etc/vm/<имя>.conf`
 
@@ -68,6 +76,8 @@ AUTOSTART=yes
 | `DISK` | `/dev/<группа>/<том>` | тонкий том в пуле `data` (проверяет `vm-run`) |
 | `NET` | `<мост> <MAC>`, по строке на карту, в порядке слотов | мост существует, MAC не multicast и не повторяется, до 8 карт |
 | `AUTOSTART` | `yes` / `no` | `vm-autostart.service` при загрузке запускает VM с `yes` |
+| `DISK_SIZE` | ГиБ, необязательно | если тома ещё нет, `vm-run` создаёт его такого размера (только том с именем VM) |
+| `CDROM` | имя файла `.iso`, необязательно | ISO из `/var/lib/home-backend/iso` в CD-приводе; грузится, если диск пустой |
 
 Пустые строки и строки с `#` пропускаются. Бэкенд переписывает файл целиком (временный файл + rename),
 так что свои комментарии в нём не живут.
@@ -108,7 +118,8 @@ Cli/                       home-backend hash-password / set-password
 | `Auth` | вход | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | хеш из конфига |
 | `Host` | Host | `GET /api/host` | собирает из SystemStatus |
 | `SystemStatus` | (на Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp из /sys/class/hwmon) |
-| `Vms` | VMs, страница VM | `GET /api/vms`, `GET /api/vms/{имя}`, `POST /api/vms/{имя}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{имя}/config`, `GET /api/vms/{имя}/logs`, `GET /api/vms/{имя}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
+| `Vms` | VMs, страница VM, New VM | `POST /api/vms` (создать), `DELETE /api/vms/{имя}[?disk=true]` (удалить), `GET /api/vms`, `GET /api/vms/{имя}`, `POST /api/vms/{имя}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{имя}/config`, `GET /api/vms/{имя}/logs`, `GET /api/vms/{имя}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
+| `Isos` | ISO images | `GET /api/isos`, `POST /api/isos` (скачать по ссылке), `DELETE /api/isos/{имя}` (удалить или отменить загрузку) | `IsoStore`: папка `IsoDir`, загрузки в фоне через `.<имя>.part` |
 | `Logs` | (вкладка Logs у VM) | — | `JournalctlSource`: `journalctl -o json -u vm@<имя>.service` |
 | `Update` | Settings (шестерёнка в шапке) | `GET /api/host/update`, `POST /api/host/update` | `SystemctlUpdateRunner`: `systemctl restart/show home-update.service` + его журнал; `MockUpdateRunner` |
 
@@ -179,8 +190,12 @@ features/
   auth/                   LoginPage, useAuthState, api.ts
   settings/               SettingsPage = UpdateCard: кнопка Update с подтверждением, статус и вывод update.sh
   host/                   HostPage = HostStats (CPU, температура, память, диск, аптайм) + HostCard
+  isos/                   IsosPage: скачать ISO по ссылке, ход загрузок, список и удаление
   vms/
-    VmsPage.tsx           карточки VM со статусом и нагрузкой
+    VmsPage.tsx           кнопки New VM и ISO images, карточки VM со статусом и нагрузкой
+    NewVmPage.tsx         новая VM (/vms/new): имя, ядра, память, размер диска, ISO, карты; «запустить и открыть консоль»
+    VmDelete.tsx          удаление остановленной VM; с диском — только после ввода её имени
+    NetsEditor.tsx, CdromField.tsx   общие части форм новой VM и настроек
     VmPage.tsx            одна VM: кнопки действий + вкладки ?tab=summary|console|settings|logs
     VmActions.tsx         Start / Shut down / Reboot / Power off, с подтверждением для прерывающих
     VmSummary.tsx, VmMeters.tsx

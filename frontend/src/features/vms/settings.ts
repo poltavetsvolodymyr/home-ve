@@ -1,9 +1,13 @@
-import type { VmConfig, VmNet, VmSettings } from './api'
+import type { VmConfig, VmCreate, VmNet, VmSettings } from './api'
 
 // The same limits as backend/HomeBackend/Features/Vms/VmConfigFile.cs; the server checks again.
 export const maxCpus = 64
 export const minMemoryMb = 128
 export const maxNets = 8
+export const maxDiskSizeGb = 4096
+const namePattern = /^[a-z][a-z0-9-]{0,11}$/
+/** taken by the host's own volumes, and "new" by the New VM page's address */
+export const reservedNames = ['root', 'swap', 'data', 'new']
 const macPattern = /^[0-9A-F]{2}(:[0-9A-F]{2}){5}$/
 
 /** The settings form starts from the VM's current config. */
@@ -12,7 +16,31 @@ export const settingsFrom = (c: VmConfig): VmSettings => ({
   memoryMb: c.memoryMb,
   nets: c.nets.map(n => ({ ...n })),
   autostart: c.autostart,
+  cdrom: c.cdrom,
 })
+
+/** A new VM's starting point: small, one card on the first bridge, started for installing. */
+export const newVm = (bridge: string): VmCreate => ({
+  name: '',
+  cpus: 2,
+  memoryMb: 2048,
+  diskSizeGb: 20,
+  nets: [newNet(bridge)],
+  autostart: false,
+  cdrom: null,
+  start: true,
+})
+
+/** The settings checks plus the name and the disk size. */
+export function validateNewVm(vm: VmCreate, existing: string[], hostCpus: number, hostMemoryMb: number): string[] {
+  const errors: string[] = []
+  if (!namePattern.test(vm.name)) errors.push('Name: 1–12 lowercase letters, digits or dashes, starting with a letter')
+  else if (reservedNames.includes(vm.name)) errors.push(`Name: "${vm.name}" is reserved`)
+  else if (existing.includes(vm.name)) errors.push(`Name: there already is a VM ${vm.name}`)
+  if (!Number.isInteger(vm.diskSizeGb) || vm.diskSizeGb < 1 || vm.diskSizeGb > maxDiskSizeGb)
+    errors.push(`Disk: 1–${maxDiskSizeGb} GiB`)
+  return [...errors, ...validateSettings(vm, hostCpus, hostMemoryMb)]
+}
 
 /** What's wrong with the form, field by field; empty when it can be saved. */
 export function validateSettings(s: VmSettings, hostCpus: number, hostMemoryMb: number): string[] {
@@ -47,6 +75,7 @@ export const newNet = (bridge: string): VmNet => ({ bridge, mac: randomMac() })
 /** Whether saving would change anything the VM only picks up on its next start. */
 export const needsRestart = (before: VmConfig, after: VmSettings) =>
   before.cpus !== after.cpus ||
+  (before.cdrom ?? null) !== (after.cdrom ?? null) ||
   before.memoryMb !== after.memoryMb ||
   JSON.stringify(before.nets.map(n => [n.bridge, n.mac.toUpperCase()])) !==
     JSON.stringify(after.nets.map(n => [n.bridge, n.mac.toUpperCase()]))

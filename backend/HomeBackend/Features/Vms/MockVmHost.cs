@@ -27,6 +27,22 @@ public sealed class MockVmHost : IVmHost
         lock (_lock) _configs[config.Name] = config;
     }
 
+    public bool ConfigExists(string name)
+    {
+        lock (_lock) return _configs.ContainsKey(name);
+    }
+
+    public void DeleteConfig(string name)
+    {
+        lock (_lock)
+        {
+            _configs.Remove(name);
+            _units.Remove(name);
+        }
+    }
+
+    public Task RemoveDiskAsync(string name, CancellationToken ct) => Task.Delay(500, ct);
+
     public Task<IReadOnlyList<VmUnitState>> ReadUnitsAsync(IReadOnlyList<string> names, CancellationToken ct)
     {
         lock (_lock)

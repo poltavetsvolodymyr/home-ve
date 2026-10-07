@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { VmConfig } from './api'
-import { needsRestart, randomMac, settingsFrom, validateSettings } from './settings'
+import { needsRestart, newVm, randomMac, settingsFrom, validateNewVm, validateSettings } from './settings'
 
 const router: VmConfig = {
   name: 'router',
@@ -12,6 +12,8 @@ const router: VmConfig = {
     { bridge: 'br-wan', mac: 'BC:24:11:C7:E4:7B' },
   ],
   autostart: true,
+  diskSizeGb: null,
+  cdrom: null,
 }
 
 describe('vm settings', () => {
@@ -48,4 +50,24 @@ describe('vm settings', () => {
     expect(needsRestart(router, { ...settingsFrom(router), autostart: false })).toBe(false)
     expect(needsRestart(router, { ...settingsFrom(router), cpus: 4 })).toBe(true)
   })
+})
+
+describe('new vm', () => {
+  const vm = { ...newVm('br-lan'), name: 'web' }
+
+  it('starts out valid once it has a name', () => expect(validateNewVm(vm, ['router'], 16, 30000)).toEqual([]))
+
+  it('refuses taken, reserved and odd names', () => {
+    expect(validateNewVm({ ...vm, name: 'router' }, ['router'], 16, 30000)).toHaveLength(1)
+    expect(validateNewVm({ ...vm, name: 'new' }, [], 16, 30000)).toHaveLength(1)
+    expect(validateNewVm({ ...vm, name: '1web' }, [], 16, 30000)).toHaveLength(1)
+  })
+
+  it('needs a disk of 1–4096 GiB', () => {
+    expect(validateNewVm({ ...vm, diskSizeGb: 0 }, [], 16, 30000)).toHaveLength(1)
+    expect(validateNewVm({ ...vm, diskSizeGb: Number.NaN }, [], 16, 30000)).toHaveLength(1)
+  })
+
+  it('takes a new ISO in the drive as a change for the next start', () =>
+    expect(needsRestart(router, { ...settingsFrom(router), cdrom: 'debian.iso' })).toBe(true))
 })

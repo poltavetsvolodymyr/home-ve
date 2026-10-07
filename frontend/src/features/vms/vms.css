@@ -172,3 +172,13 @@ button.danger {
     height: 56vw;
   }
 }
+
+/* New VM and ISO images, above the list */
+.vms-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vm-delete .check {
+  margin-bottom: 12px;
+}

@@ -1,6 +1,7 @@
 using HomeBackend.Api;
 using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
+using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
 using HomeBackend.Features.SystemStatus;
 using HomeBackend.Features.Update;
@@ -29,6 +30,7 @@ public static class HomeBackendServices
             .AddAuthFeature(keyRingDirectory: options.DataDir)
             .AddSystemStatusFeature(options)
             .AddVmsFeature(options.Mock)
+            .AddIsosFeature()
             .AddLogsFeature(options.Mock)
             .AddUpdateFeature(options.Mock);
 

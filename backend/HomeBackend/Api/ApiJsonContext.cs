@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using HomeBackend.Features.Auth;
 using HomeBackend.Features.Host;
+using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
 using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
@@ -21,6 +22,9 @@ namespace HomeBackend.Api;
 [JsonSerializable(typeof(IReadOnlyList<VmInfo>))]
 [JsonSerializable(typeof(VmInfo))]
 [JsonSerializable(typeof(VmSettingsRequest))]
+[JsonSerializable(typeof(VmCreateRequest))]
+[JsonSerializable(typeof(IsoList))]
+[JsonSerializable(typeof(IsoDownloadRequest))]
 [JsonSerializable(typeof(IReadOnlyList<LogEntry>))]
 [JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(UpdateStatus))]
