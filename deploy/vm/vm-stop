@@ -1,0 +1,25 @@
+#!/bin/sh
+# vm-stop <name>: the ExecStop of vm@<name>.service (systemd passes QEMU's PID in $MAINPID).
+# Presses the power button and gives the guest 120 s to shut itself down. One that ignores it (an
+# installer, a boot menu, a hung system) then has the plug pulled: SIGTERM, on which QEMU drops the
+# guest at once and exits cleanly. So a shutdown always ends with the VM stopped, never with systemd
+# timing out and marking it failed. TimeoutStopSec in the unit stays as the last resort.
+set -u
+
+GRACE=120
+
+name=$1
+pid=${MAINPID:-}
+[ -n "$pid" ] || exit 0 # QEMU is gone already
+
+/usr/local/sbin/qmp "$name" system_powerdown >/dev/null 2>&1 || true
+
+waited=0
+while kill -0 "$pid" 2>/dev/null; do
+  if [ "$waited" -eq "$GRACE" ]; then
+    echo "the guest ignored the power button for $GRACE s: powering it off"
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
+  sleep 1
+  waited=$((waited + 1))
+done

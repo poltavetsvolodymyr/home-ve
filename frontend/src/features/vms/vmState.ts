@@ -44,7 +44,7 @@ export const actionLabels: Record<VmAction, string> = {
 export function confirmText(name: string, action: VmAction): string | null {
   switch (action) {
     case 'shutdown':
-      return `Shut down ${name}? The guest gets the power button and turns itself off.`
+      return `Shut down ${name}? The guest gets the power button and turns itself off. One that ignores it (an installer, a boot menu) is powered off after 2 minutes.`
     case 'reboot':
       return `Reboot ${name}?`
     case 'poweroff':

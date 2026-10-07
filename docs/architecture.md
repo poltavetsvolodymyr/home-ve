@@ -131,7 +131,7 @@ Cli/                       home-backend hash-password / set-password
   | Действие | Команда | Что происходит |
   |---|---|---|
   | Start | `start vm@<имя>` | запуск |
-  | Shut down | `stop --no-block` | `ExecStop` «нажимает кнопку питания» через QMP и ждёт гостя до 150 с |
+  | Shut down | `stop --no-block` | `ExecStop` (`vm-stop`) «нажимает кнопку питания» через QMP и ждёт гостя 120 с. Кто кнопку игнорирует (установщик, меню загрузчика, зависшая система), получает SIGTERM, то есть выдёргивание шнура, и VM всё равно оказывается Stopped, а не Failed |
   | Reboot | `restart --no-block` | то же выключение, потом запуск. Так подхватываются новые настройки |
   | Power off | `kill --signal=TERM`, затем `stop --no-block` | выдернуть шнур: на SIGTERM QEMU сразу бросает гостя и выходит с кодом 0, поэтому VM становится Stopped, а не Failed. `stop` — страховка, если QEMU не отреагирует |
 

@@ -108,7 +108,7 @@ migrate_vm_configs() {
 install_vm_tools() {
   echo "==> VM tools"
   install -m 0755 "$DEPLOY_DIR/vm/vm-run" "$DEPLOY_DIR/vm/qmp" "$DEPLOY_DIR/vm/vm-autostart" \
-    "$DEPLOY_DIR/vm/vm-disk-remove" /usr/local/sbin/
+    "$DEPLOY_DIR/vm/vm-disk-remove" "$DEPLOY_DIR/vm/vm-stop" /usr/local/sbin/
   install -m 0644 "$DEPLOY_DIR/vm/vm@.service" "$DEPLOY_DIR/vm/vm-autostart.service" \
     "$DEPLOY_DIR/vm/vm-disk-remove@.service" /etc/systemd/system/
   install -m 0644 "$DEPLOY_DIR/vm/50-home-backend.rules" /etc/polkit-1/rules.d/
