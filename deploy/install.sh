@@ -39,15 +39,18 @@ note_unusual_location() {
   fi
 }
 
-# QEMU and socat run the VMs; polkitd lets the backend start and stop them without being root
+# QEMU and socat run the VMs; polkitd lets the backend start and stop them without being root.
+# systemctl run by a non-root user talks to systemd over the system D-Bus, which a minimal
+# (debootstrap) Debian may not have yet: dbus provides it.
 install_packages() {
   local missing=()
-  for p in qemu-system-x86 socat polkitd; do
+  for p in qemu-system-x86 socat dbus polkitd; do
     dpkg -s "$p" &>/dev/null || missing+=("$p")
   done
   if (( ${#missing[@]} )); then
     echo "==> installing ${missing[*]}"
     apt-get install -y --no-install-recommends "${missing[@]}"
+    systemctl start dbus.service polkit.service
   fi
 }
 

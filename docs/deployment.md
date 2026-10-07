@@ -52,7 +52,7 @@ bash /opt/home-ve/deploy/install.sh
 
 .NET на хост не ставится. Что делает скрипт:
 
-- ставит недостающее из `qemu-system-x86`, `socat`, `polkitd` (первые два уже стоят);
+- ставит недостающее из `qemu-system-x86`, `socat`, `dbus`, `polkitd`. Через D-Bus `systemctl` от обычного пользователя разговаривает с systemd, а в минимальном Debian его может не быть;
 - создаёт системного пользователя `home-backend` (без shell и home);
 - создаёт `/etc/home-backend/config.json` из образца (права 0640) и спрашивает пароль для морды;
 - **переводит старые `.conf`** на новый формат: `NETS="br-lan=… br-wan=…"` → строки `NET=br-lan …`,
@@ -218,6 +218,7 @@ pkcheck --action-id org.freedesktop.systemd1.manage-units --process $(systemctl 
   --detail unit vm@router.service --detail verb restart   # разрешает ли polkit бэкенду перезапуск
 ```
 
+- `pkcheck` или кнопки: «Could not connect: No such file or directory» → не работает системная шина D-Bus: `apt-get install dbus && systemctl start dbus polkit`.
 - Кнопки дают «Interactive authentication required» → нет правила polkit или не стоит `polkitd`:
   `ls /etc/polkit-1/rules.d/`, `systemctl status polkit`.
 - Консоль: «Failed to connect» и 502 → VM запущена старым `vm-run` без VNC-сокета: `systemctl restart vm@<имя>`.
