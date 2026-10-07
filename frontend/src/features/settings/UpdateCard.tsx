@@ -47,8 +47,9 @@ export function UpdateCard() {
       }
     >
       <p className="muted update-hint">
-        Pulls the latest build from GitHub and applies it: <span className="mono">/opt/home-ve/deploy/update.sh</span>.
-        The VMs keep running; a VM picks up a new vm-run at its next restart.
+        Runs <span className="mono">/opt/home-ve/deploy/update.sh</span>: pulls the latest version from GitHub and
+        installs the backend, this web UI, vm-run and the units. The VMs keep running; a VM picks up a new vm-run at its
+        next restart.
       </p>
       {/* the backend restarts during an update: a failed poll then is expected, not news */}
       {!running && <ErrorNote error={error} />}

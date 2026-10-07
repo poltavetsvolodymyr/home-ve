@@ -9,6 +9,6 @@ export const updateBadge: Record<UpdateState, { status: Status; label: string }>
 }
 
 export const confirmUpdate =
-  'Update the web UI now?\n\n' +
-  'The host pulls the latest version from GitHub and runs install.sh as root. ' +
+  'Update home-ve now?\n\n' +
+  'The host pulls the latest version from GitHub and runs install.sh as root: backend, web UI and VM tools. ' +
   'The page loses the server for a few seconds while the backend restarts. The VMs keep running.'

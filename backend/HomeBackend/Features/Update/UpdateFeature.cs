@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace HomeBackend.Features.Update;
 
 /// <summary>
-/// Updating the web UI from the UI: <c>/opt/home-ve/deploy/update.sh</c>, run by systemd as home-update.service.
+/// Updating home-ve (backend, frontend, VM tools) from the UI: <c>/opt/home-ve/deploy/update.sh</c>, run by systemd as home-update.service.
 /// Page: Settings. Endpoints: <c>GET /api/host/update</c> (last run and its log), <c>POST /api/host/update</c> (start).
 /// </summary>
 public static class UpdateFeature

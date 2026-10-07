@@ -58,6 +58,13 @@ input {
   padding: 6px 10px;
   min-height: 32px;
 }
+/* an icon and its label sit on one centre line */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
 button {
   cursor: pointer;
 }

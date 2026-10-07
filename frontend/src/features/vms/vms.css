@@ -54,11 +54,6 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.vm-actions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 button.danger {
   color: var(--critical-ink);
 }
@@ -91,9 +86,6 @@ button.danger {
 }
 .vm-form fieldset > button {
   align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 .vm-net {
   display: grid;
