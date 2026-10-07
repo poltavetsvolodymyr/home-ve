@@ -9,7 +9,7 @@ export function CdromField({ value, onChange }: { value: string | null; onChange
   const files = isos.data?.files ?? []
 
   return (
-    <label>
+    <label className="wide">
       <span>CD drive</span>
       <select value={value ?? ''} onChange={e => onChange(e.target.value || null)}>
         <option value="">empty</option>

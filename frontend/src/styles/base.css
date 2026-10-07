@@ -60,6 +60,10 @@ input {
   padding: 6px 10px;
   min-height: 32px;
 }
+/* a select is as wide as its longest option unless held back */
+select {
+  max-width: 100%;
+}
 /* an icon and its label sit on one centre line */
 button,
 .button {

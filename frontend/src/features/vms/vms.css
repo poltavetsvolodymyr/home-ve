@@ -71,6 +71,19 @@ button.danger {
   align-items: center;
   gap: 10px;
 }
+/* a field never grows past its column: a long option (an ISO name) would widen the page, and Safari zooms out */
+.vm-form > label:not(.check) > input,
+.vm-form > label:not(.check) > select {
+  min-width: 0;
+  width: 100%;
+}
+/* fields with long values (the CD drive) get the rest of the row */
+.vm-form > label.wide:not(.check) {
+  grid-template-columns: 130px minmax(0, 1fr);
+}
+.vm-form > label.wide small {
+  grid-column: 2;
+}
 .vm-form fieldset {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -167,6 +180,12 @@ button.danger {
   }
   .vm-form > label small {
     grid-column: 1 / -1;
+  }
+  .vm-form > label.wide:not(.check) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vm-form > label.wide small {
+    grid-column: 1;
   }
   .vm-screen {
     height: 56vw;
