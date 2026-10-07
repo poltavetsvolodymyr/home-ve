@@ -133,7 +133,7 @@ Cli/                       home-backend hash-password / set-password
   | Start | `start vm@<имя>` | запуск |
   | Shut down | `stop --no-block` | `ExecStop` «нажимает кнопку питания» через QMP и ждёт гостя до 150 с |
   | Reboot | `restart --no-block` | то же выключение, потом запуск. Так подхватываются новые настройки |
-  | Power off | `kill --signal=KILL`, затем `stop --no-block` | выдернуть шнур: QEMU убит сразу, без автоперезапуска |
+  | Power off | `kill --signal=TERM`, затем `stop --no-block` | выдернуть шнур: на SIGTERM QEMU сразу бросает гостя и выходит с кодом 0, поэтому VM становится Stopped, а не Failed. `stop` — страховка, если QEMU не отреагирует |
 
 - **`VmMonitor`** (`BackgroundService`) раз в 2 секунды перечитывает конфиги, состояние юнитов и
   для запущенных VM `/proc/<pid>/stat` и `statm` процесса QEMU. CPU % считается от ядер самой VM

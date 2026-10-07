@@ -36,9 +36,9 @@ public class VmUnitsTests
         Assert.Equal(state, SystemctlVmUnits.StateOf(new VmUnitState(active, "", null, null)));
 
     [Fact]
-    public void Poweroff_kills_then_stops_so_systemd_doesnt_restart_it() =>
+    public void Poweroff_terms_qemu_so_the_vm_ends_stopped_not_failed() =>
         Assert.Equal(
-            [["kill", "--signal=KILL", "vm@test.service"], ["stop", "--no-block", "vm@test.service"]],
+            [["kill", "--signal=TERM", "vm@test.service"], ["stop", "--no-block", "vm@test.service"]],
             SystemctlVmUnits.ActionCommands("test", VmAction.Poweroff));
 
     [Fact]

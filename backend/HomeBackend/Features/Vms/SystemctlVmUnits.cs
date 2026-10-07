@@ -13,15 +13,16 @@ public static class SystemctlVmUnits
 
     /// <summary>
     /// The commands behind a button. Everything but start returns at once (<c>--no-block</c>): a shutdown can take
-    /// the guest a while, and the page follows the state anyway. Poweroff kills QEMU and then stops the unit, so the
-    /// kill isn't taken for a crash and restarted (Restart=on-failure waits 5 s, the stop cancels that).
+    /// the guest a while, and the page follows the state anyway. Poweroff sends QEMU SIGTERM: it drops the guest at
+    /// once, like pulling the plug, but exits cleanly with 0, so the unit ends up stopped rather than failed (SIGKILL
+    /// counts as a failure). The stop after it is for a QEMU that doesn't react: systemd kills it after the timeout.
     /// </summary>
     public static string[][] ActionCommands(string name, VmAction action) => action switch
     {
         VmAction.Start => [["start", Unit(name)]],
         VmAction.Shutdown => [["stop", "--no-block", Unit(name)]],
         VmAction.Reboot => [["restart", "--no-block", Unit(name)]],
-        VmAction.Poweroff => [["kill", "--signal=KILL", Unit(name)], ["stop", "--no-block", Unit(name)]],
+        VmAction.Poweroff => [["kill", "--signal=TERM", Unit(name)], ["stop", "--no-block", Unit(name)]],
         _ => throw new ArgumentOutOfRangeException(nameof(action)),
     };
 
