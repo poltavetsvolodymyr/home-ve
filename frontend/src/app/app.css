@@ -26,9 +26,31 @@
   align-items: center;
   gap: 10px;
   color: var(--ink);
+}
+/* the mark is drawn like the header's buttons: an outline icon, the accent only on its strokes */
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent);
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.brand-text small {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .topbar-actions {

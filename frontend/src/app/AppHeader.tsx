@@ -1,4 +1,4 @@
-import { ExternalLink, LogOut, Settings } from 'lucide-react'
+import { ExternalLink, LogOut, Server, Settings } from 'lucide-react'
 import { Link } from 'react-router'
 import { NavTabs } from './NavTabs'
 import { ThemeToggle } from './ThemeToggle'
@@ -16,8 +16,13 @@ export function AppHeader({ onLogout }: AppHeaderProps) {
     <header className="topbar">
       <div className="topbar-inner">
         <Link className="brand" to="/">
-          <img src="/favicon.svg" alt="" width={28} height={28} />
-          Home
+          <span className="brand-mark" aria-hidden>
+            <Server size={18} strokeWidth={2} />
+          </span>
+          <span className="brand-text">
+            Home
+            <small>VM host</small>
+          </span>
         </Link>
         <NavTabs placement="top" />
         <div className="topbar-actions">
