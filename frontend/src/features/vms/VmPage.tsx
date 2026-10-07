@@ -9,7 +9,7 @@ import { VmLogs } from './VmLogs'
 import { VmDelete } from './VmDelete'
 import { VmSettingsForm } from './VmSettingsForm'
 import { VmSummary } from './VmSummary'
-import { stateBadge } from './vmState'
+import { hasScreen, stateBadge } from './vmState'
 import './vms.css'
 
 // noVNC is big (and only needed here): loaded when the console tab opens
@@ -55,7 +55,7 @@ export function VmPage() {
 
       {tab === 'summary' && <VmSummary vm={vm} />}
       {tab === 'console' &&
-        (vm?.state === 'running' ? (
+        (vm && hasScreen(vm.state) ? (
           <Suspense
             fallback={
               <Card title="Console">
@@ -63,7 +63,8 @@ export function VmPage() {
               </Card>
             }
           >
-            <VmConsole name={name} />
+            {/* a new QEMU (after a reboot) gets a new connection by itself */}
+            <VmConsole key={vm.since ?? ''} name={name} />
           </Suspense>
         ) : (
           <Card title="Console">

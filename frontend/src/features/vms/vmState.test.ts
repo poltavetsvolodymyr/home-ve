@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { availableActions, confirmText, stateBadge } from './vmState'
+import { availableActions, confirmText, hasScreen, stateBadge } from './vmState'
 
 describe('vm state', () => {
   it('labels every state', () => {
@@ -20,5 +20,14 @@ describe('vm state', () => {
   it('asks before interrupting a VM, not before starting one', () => {
     expect(confirmText('router', 'start')).toBeNull()
     expect(confirmText('router', 'poweroff')).toContain('router')
+  })
+})
+
+describe('hasScreen', () => {
+  it('is there while QEMU runs, stopping included', () => {
+    expect(hasScreen('stopping')).toBe(true)
+    expect(hasScreen('starting')).toBe(true)
+    expect(hasScreen('stopped')).toBe(false)
+    expect(hasScreen('failed')).toBe(false)
   })
 })

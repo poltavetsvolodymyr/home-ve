@@ -33,6 +33,9 @@ export function availableActions(state: VmState): VmAction[] {
   }
 }
 
+/** Whether QEMU runs and so there's a screen: also while starting (BIOS) and stopping (a guest that hangs there). */
+export const hasScreen = (state: VmState) => state === 'running' || state === 'starting' || state === 'stopping'
+
 export const actionLabels: Record<VmAction, string> = {
   start: 'Start',
   shutdown: 'Shut down',

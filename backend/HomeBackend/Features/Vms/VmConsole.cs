@@ -15,7 +15,8 @@ public static class VmConsole
     public static async Task HandleAsync(HttpContext http, string name, IOptions<HomeBackendOptions> options, VmMonitor monitor)
     {
         if (!http.WebSockets.IsWebSocketRequest) { http.Response.StatusCode = 400; return; }
-        if (monitor.Find(name) is not { State: "running" }) { http.Response.StatusCode = 404; return; }
+        // while QEMU runs there's a screen: also starting (the BIOS) and stopping (a guest that won't go down)
+        if (monitor.Find(name) is not { State: "running" or "starting" or "stopping" }) { http.Response.StatusCode = 404; return; }
 
         var path = Path.Combine(options.Value.VmRuntimeDir, $"vm-{name}", "vnc.sock");
         using var vnc = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
