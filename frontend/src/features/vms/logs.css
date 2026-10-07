@@ -1,0 +1,61 @@
+/* Logs page: one grid row per journal line; on a phone the columns stack. */
+
+.log {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+  margin: 0 -18px -16px;
+  border-top: 1px solid var(--grid);
+}
+.log-line {
+  display: grid;
+  grid-template-columns: 128px 44px 140px 1fr;
+  gap: 12px;
+  padding: 3px 18px;
+  border-bottom: 1px solid var(--grid);
+}
+.log-line:hover {
+  background: var(--surface-2);
+}
+.log-time {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.log-level {
+  color: var(--muted);
+  font-weight: 600;
+}
+.log-src {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.log-msg {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.log-line.warning {
+  background: var(--warning-wash);
+}
+.log-line.warning .log-level {
+  color: var(--warning-ink);
+}
+.log-line.critical {
+  background: var(--critical-wash);
+}
+.log-line.critical .log-level {
+  color: var(--critical-ink);
+}
+
+@media (max-width: 640px) {
+  .log-line {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .log-line .log-level,
+  .log-line .log-src {
+    display: inline;
+  }
+}

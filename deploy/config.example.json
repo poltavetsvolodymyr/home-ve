@@ -1,0 +1,8 @@
+{
+  "HomeBackend": {
+    "Urls": [ "http://127.0.0.1:5000" ],
+    "AllowedNetworks": [ "192.168.178.0/24", "10.8.0.0/24", "127.0.0.0/8" ],
+    "VmConfigDir": "/etc/vm",
+    "PasswordHash": ""
+  }
+}

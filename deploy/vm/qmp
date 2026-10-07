@@ -1,0 +1,3 @@
+#!/bin/sh
+# qmp <vm> <command>: one QMP command to a VM, e.g. "qmp router system_powerdown" = press the power button
+printf '{"execute":"qmp_capabilities"}\n{"execute":"%s"}\n' "$2" | socat - "UNIX-CONNECT:/run/vm-$1/qmp.sock"

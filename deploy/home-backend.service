@@ -1,0 +1,41 @@
+[Unit]
+Description=Home backend: API for the VM web UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=home-backend
+Group=home-backend
+# journalctl access for the VM logs
+SupplementaryGroups=systemd-journal
+WorkingDirectory=/opt/home-ve/deploy/app
+ExecStart=/opt/home-ve/deploy/app/home-backend
+Environment=ASPNETCORE_ENVIRONMENT=Production
+# just try again if it dies
+Restart=always
+RestartSec=5
+
+# /var/lib/home-backend: cookie key ring (and the single-file bundle extract dir, should it ever need one)
+Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/home-backend
+StateDirectory=home-backend
+StateDirectoryMode=0700
+
+# Read-only view of the system, except /etc/vm where the VM settings live. Starting and stopping
+# VMs goes through systemd, which asks polkit (/etc/polkit-1/rules.d/50-home-backend.rules).
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/etc/vm
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

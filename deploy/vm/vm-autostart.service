@@ -1,0 +1,10 @@
+[Unit]
+Description=Start the VMs marked AUTOSTART=yes
+After=systemd-networkd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-autostart
+
+[Install]
+WantedBy=multi-user.target

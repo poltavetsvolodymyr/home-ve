@@ -1,0 +1,101 @@
+#!/bin/sh
+# vm-run <name>: runs the VM described in /etc/vm/<name>.conf in the foreground. vm@<name>.service calls it.
+#
+# The web UI (user home-backend) may write /etc/vm, while this script runs as root. So the file is
+# parsed, never sourced: only the keys below, every value checked against the same rules as the
+# backend's VmConfigFile.cs, and the disk must be a thin volume in the pool "data" (not, say, the
+# host's own root volume). Anything off and the VM does not start.
+# "check || die" on purpose: die exits, so it never runs after a passing check
+# shellcheck disable=SC2015
+set -eu
+
+POOL=data
+
+die() {
+  echo "vm-run: $*" >&2
+  exit 1
+}
+
+# matches <value> <extended regex>: the whole value matches
+matches() {
+  printf '%s\n' "$1" | grep -Eqx -- "$2"
+}
+
+name=${1:-}
+matches "$name" '[a-z][a-z0-9-]{0,11}' || die "bad VM name '$name'"
+conf=/etc/vm/$name.conf
+run=/run/vm-$name
+[ -f "$conf" ] || die "no $conf"
+
+cpus='' memory='' disk='' nets=''
+# read trims the spaces around a line; the last line may lack its newline
+while read -r line || [ -n "$line" ]; do
+  case $line in '' | '#'*) continue ;; esac
+  case $line in *=*) ;; *) die "$conf: not KEY=VALUE: $line" ;; esac
+  key=${line%%=*} value=${line#*=}
+  case $key in
+    CPUS) cpus=$value ;;
+    MEMORY) memory=$value ;;
+    DISK) disk=$value ;;
+    NET) nets="$nets$value
+" ;;
+    AUTOSTART) ;; # read by vm-autostart
+    *) die "$conf: unknown key $key" ;;
+  esac
+done <"$conf"
+
+matches "$cpus" '[1-9][0-9]?' && [ "$cpus" -le 64 ] || die "CPUS must be 1-64, not '$cpus'"
+matches "$memory" '[1-9][0-9]{2,5}' && [ "$memory" -ge 128 ] && [ "$memory" -le 262144 ] ||
+  die "MEMORY must be 128-262144 MiB, not '$memory'"
+
+# the disk: /dev/<group>/<volume>, a thin volume in $POOL
+matches "$disk" '/dev/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*' || die "DISK must be /dev/<group>/<volume>, not '$disk'"
+lv=${disk#/dev/}
+pool=$(lvs --noheadings -o pool_lv -- "$lv" 2>/dev/null | tr -d ' ') || die "no LVM volume $lv"
+[ "$pool" = "$POOL" ] || die "$lv is not a thin volume in the pool $POOL"
+# thin volumes may come up inactive after boot
+lvchange -ay -- "$lv"
+
+set -- -name "$name" -machine q35,accel=kvm -cpu host -smp "$cpus" -m "$memory" \
+  -nodefaults -vga std -display "vnc=unix:$run/vnc.sock" \
+  -drive "if=none,id=disk0,file=$disk,format=raw,cache=none,aio=native,discard=unmap" \
+  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=disk0,bus=scsi0.0,rotation_rate=1
+
+# one tap per network card, plugged into its bridge: NET=<bridge> <MAC>
+i=0 macs=''
+while read -r bridge mac extra; do
+  [ -n "$bridge" ] || continue
+  [ -n "$mac" ] && [ -z "$extra" ] || die "NET needs a bridge and a MAC: '$bridge $mac $extra'"
+  matches "$bridge" '[a-z][a-z0-9-]{0,14}' || die "'$bridge' is not a bridge name"
+  mac=$(printf '%s' "$mac" | tr a-f A-F)
+  matches "$mac" '[0-9A-F]{2}(:[0-9A-F]{2}){5}' || die "'$mac' is not a MAC address"
+  # bit 0 of the first byte set = multicast, which a NIC can't have
+  [ $((0x${mac%%:*} & 1)) -eq 0 ] || die "$mac is a multicast address"
+  case "$macs " in *" $mac "*) die "two cards have the MAC $mac" ;; esac
+  macs="$macs $mac"
+  [ $i -lt 8 ] || die "at most 8 network cards"
+
+  # at boot the bridge may not be there yet
+  t=0
+  while [ ! -d "/sys/class/net/$bridge/bridge" ] && [ $t -lt 30 ]; do sleep 1; t=$((t + 1)); done
+  [ -d "/sys/class/net/$bridge/bridge" ] || die "no bridge $bridge"
+
+  # the "cable": a tap named <vm>-n0, -n1..., left over from the last run or new
+  tap=$name-n$i
+  ip link del "$tap" 2>/dev/null || true
+  ip tuntap add dev "$tap" mode tap vnet_hdr
+  ip link set "$tap" master "$bridge" up
+  set -- "$@" -netdev "tap,id=n$i,ifname=$tap,script=no,downscript=no,vhost=on" \
+    -device "virtio-net-pci,netdev=n$i,mac=$mac"
+  i=$((i + 1))
+done <<NETS
+$nets
+NETS
+
+# qga: guest agent channel; qmp: control socket (qmp <vm> <command>); serial: the guest's serial console
+exec qemu-system-x86_64 "$@" \
+  -device virtio-serial-pci \
+  -chardev "socket,id=qga,path=$run/qga.sock,server=on,wait=off" \
+  -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 \
+  -qmp "unix:$run/qmp.sock,server=on,wait=off" \
+  -serial "unix:$run/console.sock,server=on,wait=off"

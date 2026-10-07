@@ -1,0 +1,26 @@
+/* Host page: the grid of stat tiles. */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+/* the CPU tile: three load averages, each value above its time window */
+.load-values {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.load-values span {
+  display: flex;
+  flex-direction: column;
+}
+.load-values b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}

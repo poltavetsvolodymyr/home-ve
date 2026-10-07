@@ -1,0 +1,167 @@
+/* The app shell: a sticky top bar (brand, tabs on wide screens, actions), the main column, and a tab bar
+   at the bottom on phones and small tablets. Both bars are translucent and blur what scrolls under them. */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--page) 88%, transparent);
+  -webkit-backdrop-filter: saturate(1.8) blur(20px);
+  backdrop-filter: saturate(1.8) blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-inner {
+  max-width: 1200px;
+  height: 56px;
+  margin: 0 auto;
+  /* safe areas: the notch in landscape on an iPhone */
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.brand:hover {
+  text-decoration: none;
+}
+
+.topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.icon-button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* --- tabs on wide screens: a segmented pill in the top bar ----------------- */
+
+.tabs-top {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.tabs-top a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 9px;
+  color: var(--ink-2);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.tabs-top a:hover {
+  color: var(--ink);
+  text-decoration: none;
+}
+.tabs-top a.on {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.tabs-top .tab-icon {
+  display: grid;
+}
+.tabs-top a.on .tab-icon {
+  color: var(--accent);
+}
+
+/* --- tabs on phones: a tab bar at the bottom, in thumb reach ---------------- */
+
+.tabs-bottom {
+  display: none;
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+}
+
+/* the five labelled tabs need about 860px next to the brand and the buttons */
+@media (max-width: 860px) {
+  .tabs-top {
+    display: none;
+  }
+  .tabs-bottom {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 10;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    padding: 6px max(4px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
+      max(4px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--page) 88%, transparent);
+    -webkit-backdrop-filter: saturate(1.8) blur(20px);
+    backdrop-filter: saturate(1.8) blur(20px);
+    border-top: 1px solid var(--border);
+  }
+  .tabs-bottom a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 0;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .tabs-bottom a:hover {
+    text-decoration: none;
+  }
+  .tabs-bottom .tab-icon {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 30px;
+    border-radius: 15px;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+  .tabs-bottom a.on {
+    color: var(--ink);
+  }
+  .tabs-bottom a.on .tab-icon {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+  }
+  /* room for the tab bar under the last card */
+  main {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+}

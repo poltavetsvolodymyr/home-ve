@@ -1,0 +1,213 @@
+/* Styles of the UI kit (this folder) and of the layout primitives pages share. Loaded globally,
+   right after the base styles, so feature styles can build on them. */
+
+/* --- layout -------------------------------------------------------------- */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+/* --- Card ---------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  min-width: 0;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* --- Segmented ----------------------------------------------------------- */
+
+.segmented {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 2px;
+}
+.segmented button {
+  border: 0;
+  background: transparent;
+  min-height: 28px;
+  padding: 4px 10px;
+  color: var(--ink-2);
+  border-radius: 6px;
+}
+.segmented button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--border);
+  font-weight: 600;
+}
+
+/* --- Stat ---------------------------------------------------------------- */
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.stat-label {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.stat-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.meter {
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.meter > div {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.4s;
+}
+.meter.warning {
+  background: color-mix(in srgb, var(--warning) 22%, transparent);
+}
+.meter.warning > div {
+  background: var(--warning);
+}
+.meter.critical {
+  background: color-mix(in srgb, var(--critical) 18%, transparent);
+}
+.meter.critical > div {
+  background: var(--critical);
+}
+
+/* --- Badge --------------------------------------------------------------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.badge-icon {
+  font-size: 10px;
+  width: 12px;
+  text-align: center;
+}
+.badge.good .badge-icon {
+  color: var(--good);
+}
+.badge.good {
+  color: var(--good-ink);
+}
+.badge.warning .badge-icon {
+  color: var(--warning);
+}
+.badge.critical .badge-icon {
+  color: var(--critical);
+}
+.badge.critical {
+  color: var(--critical-ink);
+}
+.badge.neutral .badge-icon {
+  color: var(--muted);
+}
+
+/* --- ErrorNote, Skeleton ------------------------------------------------- */
+
+.error-note {
+  background: var(--critical-wash);
+  color: var(--critical-ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* a placeholder bar for a value that hasn't arrived yet (Skeleton.tsx) */
+.skeleton {
+  display: inline-block;
+  max-width: 100%;
+  height: 0.9em;
+  vertical-align: middle;
+  border-radius: 6px;
+  background: var(--surface-2);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* --- tag and key/value list (plain markup, no component) ----------------- */
+
+.tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+dl.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 20px;
+  margin: 0;
+}
+dl.kv dt {
+  color: var(--ink-2);
+}
+dl.kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+dl.kv .kv-row {
+  display: contents;
+}
+
+@media (max-width: 640px) {
+  .card-actions {
+    width: 100%;
+  }
+}

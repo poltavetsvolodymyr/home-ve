@@ -1,0 +1,12 @@
+#!/bin/sh
+# vm-autostart: starts every VM whose /etc/vm/<name>.conf says AUTOSTART=yes. vm-autostart.service runs it at boot.
+for conf in /etc/vm/*.conf; do
+  [ -f "$conf" ] || continue
+  name=$(basename "$conf" .conf)
+  # vm-run checks the name again, this only keeps junk out of systemctl
+  printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' || continue
+  if grep -Eqx '[[:space:]]*AUTOSTART=yes[[:space:]]*' "$conf"; then
+    echo "starting vm@$name"
+    systemctl start --no-block "vm@$name.service"
+  fi
+done

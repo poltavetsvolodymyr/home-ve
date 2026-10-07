@@ -1,0 +1,179 @@
+/* VM list and VM page. */
+
+.vm-card-link {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+.vm-card-link:hover .card {
+  border-color: var(--axis);
+}
+.vm-card-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 12.5px;
+}
+
+/* two bars side by side: CPU and memory */
+.vm-meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.vm-meter-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.vm-meter-sub {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.vm-uptime {
+  margin-top: 14px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  text-decoration: none;
+  width: fit-content;
+}
+
+.vm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vm-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button.danger {
+  color: var(--critical-ink);
+}
+
+/* settings */
+.vm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 560px;
+}
+.vm-form > label:not(.check) {
+  display: grid;
+  grid-template-columns: 130px 120px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.vm-form fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vm-form legend {
+  color: var(--ink-2);
+  padding: 0 6px;
+}
+.vm-form fieldset > button {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vm-net {
+  display: grid;
+  grid-template-columns: 16px minmax(90px, 120px) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.vm-net input {
+  min-width: 0;
+}
+/* On a phone the MAC needs a line of its own: number and bridge on top, MAC and buttons below. */
+@media (max-width: 520px) {
+  .vm-net {
+    grid-template-columns: 16px minmax(0, 1fr) auto auto;
+    row-gap: 6px;
+  }
+  .vm-net select {
+    grid-column: 2 / -1;
+  }
+  .vm-net input {
+    grid-column: 2;
+  }
+  .vm-net + .vm-net {
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+}
+.vm-form-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vm-form-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.vm-problems {
+  margin: 0;
+  padding-left: 28px;
+}
+.vm-restart {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--warning-wash);
+  color: var(--warning-ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+/* console */
+.vm-screen {
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  /* noVNC scales the screen into this box */
+  height: min(70vh, 640px);
+}
+.vm-console-status {
+  font-size: 12px;
+}
+.vm-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.vm-type input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .vm-form > label:not(.check) {
+    grid-template-columns: 1fr 110px;
+  }
+  .vm-form > label small {
+    grid-column: 1 / -1;
+  }
+  .vm-screen {
+    height: 56vw;
+  }
+}
