@@ -3,6 +3,7 @@ using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
 using HomeBackend.Features.Logs;
 using HomeBackend.Features.SystemStatus;
+using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
 
 namespace HomeBackend.Hosting;
@@ -28,7 +29,8 @@ public static class HomeBackendServices
             .AddAuthFeature(keyRingDirectory: options.DataDir)
             .AddSystemStatusFeature(options)
             .AddVmsFeature(options.Mock)
-            .AddLogsFeature(options.Mock);
+            .AddLogsFeature(options.Mock)
+            .AddUpdateFeature(options.Mock);
 
         return builder;
     }

@@ -116,8 +116,10 @@ install_vm_tools() {
   systemctl enable vm-autostart.service
 }
 
+# home-update.service: the Update button in the UI runs update.sh through it
 install_service() {
   install -m 0644 "$DEPLOY_DIR/home-backend.service" "$UNIT"
+  install -m 0644 "$DEPLOY_DIR/home-update.service" /etc/systemd/system/
   systemctl daemon-reload
   systemctl enable home-backend
   systemctl restart home-backend

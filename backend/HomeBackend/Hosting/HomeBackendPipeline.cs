@@ -1,6 +1,7 @@
 using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
 using HomeBackend.Features.Host;
+using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
 using HomeBackend.Security;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -44,6 +45,7 @@ public static class HomeBackendPipeline
 
         app.MapGroup("/api").RequireAuthorization()
             .MapHostEndpoints()
+            .MapUpdateEndpoints()
             .MapVmsEndpoints();
 
         return app;

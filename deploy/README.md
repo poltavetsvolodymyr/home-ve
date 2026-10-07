@@ -8,6 +8,7 @@
 | `app/home-backend` | бэкенд, один бинарник, .NET внутри. Слушает `127.0.0.1:5000` |
 | `www/` | фронт; `install.sh` копирует его в `/var/www/home`, оттуда отдаёт nginx |
 | `home-backend.service` | systemd-юнит бэкенда, ставится в `/etc/systemd/system/` |
+| `home-update.service` | `update.sh` от root; его запускает кнопка Update в морде |
 | `config.example.json` | образец `/etc/home-backend/config.json` |
 | `vm/vm-run` | запускает VM по `/etc/vm/<имя>.conf`; ставится в `/usr/local/sbin/` |
 | `vm/qmp` | одна команда в управляющий сокет VM: `qmp router system_powerdown` |

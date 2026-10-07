@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router'
+import { SettingsPage } from '@/features/settings/SettingsPage'
 import { VmPage } from '@/features/vms/VmPage'
 import { Layout } from './Layout'
 import { pages } from './routes'
@@ -17,6 +18,8 @@ export const router = createBrowserRouter([
       ...pages.map(p => ({ path: p.path, element: p.element })),
       // a VM's own page: no tab of its own, the VMs tab stays lit
       { path: '/vms/:name', element: <VmPage /> },
+      // the gear in the header, not a tab
+      { path: '/settings', element: <SettingsPage /> },
       { path: '*', element: start },
     ],
   },

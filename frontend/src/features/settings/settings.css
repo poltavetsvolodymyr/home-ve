@@ -1,0 +1,22 @@
+/* Settings page. */
+
+.update-hint {
+  margin: 0 0 12px;
+}
+.update-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+/* update.sh's output reads like a terminal: one plain block, no columns or row lines */
+.update-log {
+  margin-top: 12px;
+  max-height: 60vh;
+  padding: 8px 0;
+}
+.update-log .log-line {
+  display: block;
+  padding: 1px 18px;
+  border-bottom: 0;
+}

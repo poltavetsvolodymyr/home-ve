@@ -1,4 +1,4 @@
-import { ExternalLink, LogOut } from 'lucide-react'
+import { ExternalLink, LogOut, Settings } from 'lucide-react'
 import { Link } from 'react-router'
 import { NavTabs } from './NavTabs'
 import { ThemeToggle } from './ThemeToggle'
@@ -10,7 +10,7 @@ interface AppHeaderProps {
 /** home.example.com → https://router.example.com: the router's own page, next door. */
 const routerUrl = location.hostname.startsWith('home.') ? `https://router.${location.hostname.slice(5)}` : null
 
-/** Sticky top bar: brand, page tabs (wide screens only), link to the router, theme switch and log out. */
+/** Sticky top bar: brand, page tabs (wide screens only), link to the router, host settings, theme switch and log out. */
 export function AppHeader({ onLogout }: AppHeaderProps) {
   return (
     <header className="topbar">
@@ -26,6 +26,9 @@ export function AppHeader({ onLogout }: AppHeaderProps) {
               <ExternalLink size={18} aria-hidden />
             </a>
           )}
+          <Link className="icon-button" to="/settings" title="Host settings" aria-label="Host settings">
+            <Settings size={18} aria-hidden />
+          </Link>
           <ThemeToggle />
           <button className="icon-button" onClick={onLogout} title="Log out" aria-label="Log out">
             <LogOut size={18} aria-hidden />
