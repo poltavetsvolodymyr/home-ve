@@ -5,8 +5,11 @@
   text-decoration: none;
   display: block;
 }
-.vm-card-link:hover .card {
-  border-color: var(--axis);
+/* only with a real pointer: on a phone a tap leaves :hover stuck after going back */
+@media (hover: hover) {
+  .vm-card-link:hover .card {
+    border-color: var(--axis);
+  }
 }
 .vm-card-foot {
   display: flex;
