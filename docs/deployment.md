@@ -89,7 +89,7 @@ ls -l /run/vm-router/      # vnc.sock: srw-rw---- root home-backend; остал�
 от роутера: морда хоста нужна именно тогда, когда с роутером что-то не так.
 
 ```bash
-apt-get install -y nginx
+apt-get install -y --no-install-recommends nginx curl openssl ca-certificates
 git clone --depth 1 https://github.com/acmesh-official/acme.sh.git /tmp/acme.sh
 cd /tmp/acme.sh
 ./acme.sh --install --nocron --noprofile --home /opt/acme.sh --config-home /etc/acme.sh --accountemail твой@email
@@ -97,16 +97,19 @@ cd / && rm -rf /tmp/acme.sh
 chmod 700 /etc/acme.sh
 ```
 
-Токен Cloudflare вводить руками не нужно, берём его у роутера на время одной команды:
+Токен и Zone ID берём из `/etc/ddns.conf` роутера (`cat` там) и вставляем на хосте. root на роутер по ssh
+с паролем не пускают (`PermitRootLogin prohibit-password`, так и оставляем), поэтому через буфер обмена:
 
 ```bash
-. <(ssh root@192.168.178.1 cat /etc/ddns.conf)
+read -rsp 'CF token: ' CF_TOKEN; echo
+read -rp 'CF zone id: ' CF_ZONE
 CF_Token=$CF_TOKEN CF_Zone_ID=$CF_ZONE /opt/acme.sh/acme.sh --config-home /etc/acme.sh \
   --issue --server letsencrypt --dns dns_cf -d vladpolt.com -d '*.vladpolt.com'
 unset CF_TOKEN CF_ZONE
 ```
 
-- `. <(ssh … cat …)` читает `ddns.conf` роутера прямо в переменные этой оболочки. На диск хоста он не попадает.
+- `read -s` не показывает ввод, и вставленное через `read` не попадает в историю команд.
+- Вставлять только значение, без `CF_TOKEN=` и кавычек.
 - acme.sh запоминает токен в `/etc/acme.sh/account.conf` (только root) для продлений, как на роутере.
 
 Положить для nginx и продлевать раз в сутки:
@@ -117,11 +120,33 @@ install -d -m 700 /etc/nginx/tls
   --key-file /etc/nginx/tls/vladpolt.com.key \
   --fullchain-file /etc/nginx/tls/vladpolt.com.crt \
   --reloadcmd 'systemctl reload nginx'
-scp root@192.168.178.1:'/etc/systemd/system/acme-renew.*' /etc/systemd/system/
+cat > /etc/systemd/system/acme-renew.service <<'EOF'
+[Unit]
+Description=Renew certificates with acme.sh when due
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/acme.sh/acme.sh --cron --config-home /etc/acme.sh
+EOF
+cat > /etc/systemd/system/acme-renew.timer <<'EOF'
+[Unit]
+Description=Daily certificate renewal check
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
 systemctl daemon-reload && systemctl enable --now acme-renew.timer
 ```
 
-Таймер и служба `acme-renew` те же, что на роутере, поэтому их просто копируем.
+Те же таймер и служба, что на роутере. Куда класть новый сертификат и что перезагружать, `--cron` берёт
+из `/etc/acme.sh/vladpolt.com_ecc/vladpolt.com.conf` (`Le_RealKeyPath`, `Le_RealFullChainPath`,
+`Le_ReloadCmd`): их туда записал `--install-cert`.
 
 ### 6. nginx
 
