@@ -3,7 +3,7 @@ import { Keyboard, Maximize, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Card } from '@/shared/ui'
 import { consoleUrl } from './api'
-import { KEY_ENTER, keysymOf } from './keysyms'
+import { KEY_ENTER, KEY_SHIFT, keysymOf, needsShift } from './keysyms'
 
 type Status = 'connecting' | 'connected' | 'closed'
 
@@ -37,7 +37,12 @@ export default function VmConsole({ name }: { name: string }) {
     e.preventDefault()
     const r = rfb.current
     if (!r) return
-    for (const ch of text) r.sendKey(keysymOf(ch), null)
+    for (const ch of text) {
+      const shift = needsShift(ch)
+      if (shift) r.sendKey(KEY_SHIFT, 'ShiftLeft', true)
+      r.sendKey(keysymOf(ch), null)
+      if (shift) r.sendKey(KEY_SHIFT, 'ShiftLeft', false)
+    }
     r.sendKey(KEY_ENTER, 'Enter')
     setText('')
   }
