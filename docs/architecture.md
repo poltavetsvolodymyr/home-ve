@@ -202,6 +202,8 @@ features/
     VmSettingsForm.tsx    ядра, память, сетевые карты, автозапуск; после сохранения предлагает перезагрузку
     VmConsole.tsx         noVNC (грузится только при открытии вкладки): масштаб, Ctrl+Alt+Del, полный экран,
                           строка ввода для телефона (буквы уходят нажатиями клавиш)
+    VmKeys.tsx            панель клавиш под экраном: Esc, Tab, стрелки (повтор при удержании), Home/End,
+                          PgUp/PgDn, F1–F12, залипающие Ctrl/Alt/Shift для следующей клавиши или строки
     VmLogs.tsx            журнал vm@<имя>.service
     settings.ts, vmState.ts, keysyms.ts, logLevel.ts   чистые функции с тестами
 shared/                   HTTP-клиент, usePoll, сессия, форматирование, UI-кит

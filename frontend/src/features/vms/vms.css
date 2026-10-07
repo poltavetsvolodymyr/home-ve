@@ -163,6 +163,29 @@ button.danger {
 .vm-console-status {
   font-size: 12px;
 }
+/* the on-screen keys: six columns, arrows as an inverted T on the right */
+.vm-keys {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.vm-keys button {
+  min-height: 40px;
+  padding: 4px 2px;
+  font-size: 14px;
+  touch-action: manipulation; /* no double-tap zoom on fast presses */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.vm-keys button.on {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+.vm-keys .span3 {
+  grid-column: span 3;
+}
 .vm-type {
   display: flex;
   align-items: center;

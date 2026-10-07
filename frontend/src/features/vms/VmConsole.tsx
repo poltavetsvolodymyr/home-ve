@@ -3,13 +3,15 @@ import { Keyboard, Maximize, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Card } from '@/shared/ui'
 import { consoleUrl } from './api'
-import { KEY_ENTER, KEY_SHIFT, keysymOf, needsShift } from './keysyms'
+import { panelKeyEvents, panelKeys, textEvents, type KeyEvent, type Modifier, type PanelKey } from './keysyms'
+import { VmKeys } from './VmKeys'
 
 type Status = 'connecting' | 'connected' | 'closed'
 
 /**
  * The VM's screen (noVNC over /api/vms/{name}/console). Scaled to fit; click it to type with a real keyboard.
- * A phone has none that noVNC can capture, so there's a text box that types into the VM key by key.
+ * A phone has none that noVNC can capture, so there's a panel of keys (arrows, Esc, F-keys, Ctrl…) and a
+ * text box that types into the VM key by key.
  */
 export default function VmConsole({ name }: { name: string }) {
   const screen = useRef<HTMLDivElement>(null)
@@ -17,6 +19,7 @@ export default function VmConsole({ name }: { name: string }) {
   const [status, setStatus] = useState<Status>('connecting')
   const [attempt, setAttempt] = useState(0)
   const [text, setText] = useState('')
+  const [mods, setMods] = useState<Modifier[]>([])
 
   useEffect(() => {
     if (!screen.current) return
@@ -33,17 +36,21 @@ export default function VmConsole({ name }: { name: string }) {
     }
   }, [name, attempt])
 
-  const type = (e: FormEvent) => {
-    e.preventDefault()
+  const send = (events: KeyEvent[]) => {
     const r = rfb.current
     if (!r) return
-    for (const ch of text) {
-      const shift = needsShift(ch)
-      if (shift) r.sendKey(KEY_SHIFT, 'ShiftLeft', true)
-      r.sendKey(keysymOf(ch), null)
-      if (shift) r.sendKey(KEY_SHIFT, 'ShiftLeft', false)
-    }
-    r.sendKey(KEY_ENTER, 'Enter')
+    for (const [keysym, code, down] of events) r.sendKey(keysym, code, down)
+    setMods([])
+  }
+
+  const toggle = (m: Modifier) => setMods(ms => (ms.includes(m) ? ms.filter(x => x !== m) : [...ms, m]))
+  const pressKey = (k: PanelKey) => send(panelKeyEvents(k, mods))
+
+  // with Ctrl or Alt on, the line is a shortcut (Ctrl+C), so no Enter after it
+  const type = (e: FormEvent) => {
+    e.preventDefault()
+    const shortcut = mods.includes('ctrl') || mods.includes('alt')
+    send([...textEvents(text, mods), ...(shortcut ? [] : panelKeyEvents(panelKeys.enter))])
     setText('')
   }
 
@@ -73,11 +80,12 @@ export default function VmConsole({ name }: { name: string }) {
       }
     >
       <div ref={screen} className="vm-screen" onClick={() => rfb.current?.focus()} />
+      <VmKeys disabled={status !== 'connected'} mods={mods} onToggle={toggle} onKey={pressKey} />
       <form className="vm-type" onSubmit={type}>
         <Keyboard size={16} aria-hidden className="muted" />
         <input
           className="mono"
-          placeholder="Type a line, Enter sends it"
+          placeholder={mods.length ? `${mods.join('+')} + …` : 'Type a line, Enter sends it'}
           value={text}
           onChange={e => setText(e.target.value)}
           autoCapitalize="off"
