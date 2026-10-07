@@ -50,8 +50,9 @@ install_packages() {
   if (( ${#missing[@]} )); then
     echo "==> installing ${missing[*]}"
     apt-get install -y --no-install-recommends "${missing[@]}"
-    systemctl start dbus.service polkit.service
   fi
+  # installed as a dependency, dbus does not always get started: make sure both run now
+  systemctl start dbus.service polkit.service
 }
 
 # service user: no shell, no home; reads the journal through the unit's SupplementaryGroups
