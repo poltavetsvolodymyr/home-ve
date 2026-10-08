@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { levelClass } from '@/features/vms/logLevel'
 import { dateTime } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
-import { Badge, Card, ErrorNote, Skeleton } from '@/shared/ui'
+import { Badge, Card, confirm, ErrorNote, Skeleton } from '@/shared/ui'
 import { fetchUpdate, startUpdate } from './api'
 import { confirmUpdate, updateBadge } from './update'
 import '@/features/vms/logs.css'
@@ -23,7 +23,7 @@ export function UpdateCard() {
   const badge = data && updateBadge[data.state]
 
   const start = async () => {
-    if (!window.confirm(confirmUpdate)) return
+    if (!(await confirm(confirmUpdate))) return
     setStarting(true)
     setStartError(undefined)
     try {

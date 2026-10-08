@@ -4,9 +4,9 @@ import { levelClass, levelLabel } from '@/features/vms/logLevel'
 import type { Vm } from '@/features/vms/api'
 import { bytes, dateTime } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
-import { Badge, Card, ErrorNote, Skeleton } from '@/shared/ui'
+import { Badge, Card, confirm, ErrorNote, Skeleton } from '@/shared/ui'
 import { backUpNow, deleteBackup, fetchBackups, restoreBackup, type BackupJob } from './api'
-import { backUpBlocked, busy, confirmRestorePrompt, jobBadge, restoreBlocked } from './backups'
+import { backUpBlocked, busy, confirmRestore, jobBadge, restoreBlocked } from './backups'
 import '@/features/vms/logs.css'
 import './backups.css'
 
@@ -32,14 +32,18 @@ export function VmBackups({ vm }: { vm: Vm }) {
     }
   }
 
-  const restore = (id: string, time: string) => {
-    const typed = window.prompt(confirmRestorePrompt(vm.name, dateTime(time)))
-    if (typed?.trim() === vm.name) void run(() => restoreBackup(vm.name, id))
+  const restore = async (id: string, time: string) => {
+    if (await confirm(confirmRestore(vm.name, dateTime(time)))) void run(() => restoreBackup(vm.name, id))
   }
 
-  const remove = (id: string, time: string) => {
-    if (window.confirm(`Delete the backup of ${vm.name} from ${dateTime(time)}?`))
-      void run(() => deleteBackup(vm.name, id))
+  const remove = async (id: string, time: string) => {
+    const ok = await confirm({
+      title: `Delete this backup of ${vm.name}?`,
+      message: `The one from ${dateTime(time)}.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (ok) void run(() => deleteBackup(vm.name, id))
   }
 
   const backingUp = data?.backup.state === 'running'

@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { bytes, dateTime } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
-import { Card, ErrorNote, Skeleton } from '@/shared/ui'
+import { Card, confirm, ErrorNote, Skeleton } from '@/shared/ui'
 import { deleteIso, downloadIso, fetchIsos, type IsoDownload } from './api'
 import { downloadPercent } from './progress'
 import './isos.css'
@@ -42,8 +42,9 @@ export function IsosPage() {
     }
   }
 
-  const remove = (file: string) => {
-    if (window.confirm(`Delete ${file}?`)) void act(() => deleteIso(file))
+  const remove = async (file: string) => {
+    if (await confirm({ title: `Delete ${file}?`, confirmLabel: 'Delete', danger: true }))
+      void act(() => deleteIso(file))
   }
 
   return (

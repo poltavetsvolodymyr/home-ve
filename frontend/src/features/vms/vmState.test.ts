@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { availableActions, confirmText, hasScreen, stateBadge } from './vmState'
+import { availableActions, confirmAction, hasScreen, stateBadge } from './vmState'
 
 describe('vm state', () => {
   it('labels every state', () => {
@@ -18,8 +18,8 @@ describe('vm state', () => {
     expect(availableActions('stopping')).toEqual(['poweroff']))
 
   it('asks before interrupting a VM, not before starting one', () => {
-    expect(confirmText('router', 'start')).toBeNull()
-    expect(confirmText('router', 'poweroff')).toContain('router')
+    expect(confirmAction('router', 'start')).toBeNull()
+    expect(confirmAction('router', 'poweroff')).toMatchObject({ title: 'Power off router?', danger: true })
   })
 })
 

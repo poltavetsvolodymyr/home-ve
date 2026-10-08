@@ -286,3 +286,74 @@ dl.kv .kv-row {
   min-height: 180px;
   max-height: none;
 }
+
+/* --- Confirm: our own confirm()/prompt() ------------------------------------ */
+
+dialog.confirm {
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+dialog.confirm::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+dialog.confirm[open] {
+  animation: confirm-in 0.16s ease-out;
+}
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.confirm[open] {
+    animation: none;
+  }
+}
+dialog.confirm h2 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.confirm-message {
+  color: var(--ink-2);
+  line-height: 1.45;
+  white-space: pre-line;
+}
+.confirm-type {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--ink-2);
+}
+.confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+/* on a phone two big buttons side by side, easy to hit */
+@media (max-width: 640px) {
+  .confirm-buttons > button {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+button.danger-solid {
+  background: var(--critical);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+button.danger-solid:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--critical);
+}

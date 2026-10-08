@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { fetchHost } from '@/features/host/api'
 import { usePoll } from '@/shared/hooks/usePoll'
-import { Card } from '@/shared/ui'
+import { Card, confirm } from '@/shared/ui'
 import { fetchBridges, runVmAction, saveVmSettings, type Vm, type VmSettings } from './api'
 import { CdromField } from './CdromField'
 import { NetsEditor } from './NetsEditor'
@@ -42,7 +42,14 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
   }
 
   const reboot = async () => {
-    if (!window.confirm(`Reboot ${vm.name} now to apply the new settings?`)) return
+    if (
+      !(await confirm({
+        title: `Reboot ${vm.name} now?`,
+        message: 'It picks up the new settings as it starts again.',
+        confirmLabel: 'Reboot',
+      }))
+    )
+      return
     await runVmAction(vm.name, 'reboot').catch(err => setError(err instanceof Error ? err.message : String(err)))
     setRestartPending(false)
     onSaved()

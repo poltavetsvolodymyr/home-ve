@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { useAuthState } from '@/features/auth/useAuthState'
 import { SessionContext } from '@/shared/session'
+import { ConfirmHost } from '@/shared/ui'
 import { router } from './router'
 import './app.css'
 
@@ -20,6 +21,7 @@ export function App() {
   return (
     <SessionContext.Provider value={session}>
       <RouterProvider router={router} />
+      <ConfirmHost />
     </SessionContext.Provider>
   )
 }

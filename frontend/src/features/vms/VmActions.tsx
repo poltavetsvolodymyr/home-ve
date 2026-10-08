@@ -2,7 +2,8 @@ import { Play, Power, RotateCcw, Zap } from 'lucide-react'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { runVmAction, type Vm, type VmAction } from './api'
-import { actionLabels, availableActions, confirmText } from './vmState'
+import { confirm } from '@/shared/ui'
+import { actionLabels, availableActions, confirmAction } from './vmState'
 
 const icons: Record<VmAction, LucideIcon> = { start: Play, shutdown: Power, reboot: RotateCcw, poweroff: Zap }
 
@@ -12,8 +13,8 @@ export function VmActions({ vm, onDone }: { vm: Vm; onDone: (vm: Vm) => void }) 
   const [error, setError] = useState<string>()
 
   const run = async (action: VmAction) => {
-    const question = confirmText(vm.name, action)
-    if (question && !window.confirm(question)) return
+    const question = confirmAction(vm.name, action)
+    if (question && !(await confirm(question))) return
     setBusy(action)
     setError(undefined)
     try {

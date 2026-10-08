@@ -1,4 +1,4 @@
-import type { Status } from '@/shared/ui'
+import type { ConfirmOptions, Status } from '@/shared/ui'
 import type { JobState, VmBackups } from './api'
 
 export const jobBadge: Record<Exclude<JobState, 'never'>, { status: Status; label: string }> = {
@@ -25,7 +25,10 @@ export function restoreBlocked(b: VmBackups, vmState: string): string | null {
   return null
 }
 
-export const confirmRestorePrompt = (name: string, when: string) =>
-  `Restore ${name} from the backup of ${when}?\n\n` +
-  `Its disk is overwritten with the backup. The disk as it is now is kept as the snapshot ${name}-undo ` +
-  `until the next restore.\n\nType the VM's name to confirm:`
+export const confirmRestore = (name: string, when: string): ConfirmOptions => ({
+  title: `Restore ${name} from ${when}?`,
+  message: `Its disk is overwritten with the backup. The disk as it is now is kept as the snapshot ${name}-undo until the next restore.`,
+  confirmLabel: 'Restore',
+  danger: true,
+  typeToConfirm: name,
+})

@@ -1,7 +1,7 @@
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Card } from '@/shared/ui'
+import { Card, confirm } from '@/shared/ui'
 import { deleteVm, type Vm } from './api'
 
 /**
@@ -18,18 +18,23 @@ export function VmDelete({ vm }: { vm: Vm }) {
   const ownDisk = vm.config.disk.endsWith(`/${vm.name}`)
 
   const run = async () => {
-    if (withDisk) {
-      const typed = window.prompt(
-        `Delete ${vm.name} AND its disk ${vm.config.disk}? Everything on it is lost.\n\nType the VM's name to confirm:`,
-      )
-      if (typed?.trim() !== vm.name) return
-    } else if (
-      !window.confirm(
-        `Delete ${vm.name}? Its disk ${vm.config.disk} stays and can be used by a new VM of the same name.`,
-      )
-    ) {
-      return
-    }
+    const ok = await confirm(
+      withDisk
+        ? {
+            title: `Delete ${vm.name} and its disk?`,
+            message: `The disk ${vm.config.disk} goes too: everything on it is lost.`,
+            confirmLabel: 'Delete both',
+            danger: true,
+            typeToConfirm: vm.name,
+          }
+        : {
+            title: `Delete ${vm.name}?`,
+            message: `Its disk ${vm.config.disk} stays and can be used by a new VM of the same name.`,
+            confirmLabel: 'Delete VM',
+            danger: true,
+          },
+    )
+    if (!ok) return
     setBusy(true)
     setError(undefined)
     try {

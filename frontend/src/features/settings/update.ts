@@ -1,4 +1,4 @@
-import type { Status } from '@/shared/ui'
+import type { ConfirmOptions, Status } from '@/shared/ui'
 import type { UpdateState } from './api'
 
 export const updateBadge: Record<UpdateState, { status: Status; label: string }> = {
@@ -8,7 +8,10 @@ export const updateBadge: Record<UpdateState, { status: Status; label: string }>
   failed: { status: 'critical', label: 'Failed' },
 }
 
-export const confirmUpdate =
-  'Update home-ve now?\n\n' +
-  'The host pulls the latest version from GitHub and runs install.sh as root: backend, web UI and VM tools. ' +
-  'The page loses the server for a few seconds while the backend restarts. The VMs keep running.'
+export const confirmUpdate: ConfirmOptions = {
+  title: 'Update home-ve now?',
+  message:
+    'The host pulls the latest version from GitHub and runs install.sh as root: backend, web UI and VM tools. ' +
+    'The page loses the server for a few seconds while the backend restarts. The VMs keep running.',
+  confirmLabel: 'Update',
+}

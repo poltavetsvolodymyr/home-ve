@@ -1,3 +1,4 @@
+import type { ConfirmOptions } from '@/shared/ui'
 import type { Status } from '@/shared/ui'
 import type { VmAction, VmState } from './api'
 
@@ -44,14 +45,24 @@ export const actionLabels: Record<VmAction, string> = {
 }
 
 /** The question before a button that interrupts a running VM; null when no question is needed. */
-export function confirmText(name: string, action: VmAction): string | null {
+export function confirmAction(name: string, action: VmAction): ConfirmOptions | null {
   switch (action) {
     case 'shutdown':
-      return `Shut down ${name}? The guest gets the power button and turns itself off. One that ignores it (an installer, a boot menu) is powered off after 2 minutes.`
+      return {
+        title: `Shut down ${name}?`,
+        message:
+          'The guest gets the power button and turns itself off. One that ignores it (an installer, a boot menu) is powered off after 2 minutes.',
+        confirmLabel: 'Shut down',
+      }
     case 'reboot':
-      return `Reboot ${name}?`
+      return { title: `Reboot ${name}?`, confirmLabel: 'Reboot' }
     case 'poweroff':
-      return `Power off ${name} right now? Like pulling the plug: unsaved data in the guest is lost.`
+      return {
+        title: `Power off ${name}?`,
+        message: 'Right now, like pulling the plug: unsaved data in the guest is lost.',
+        confirmLabel: 'Power off',
+        danger: true,
+      }
     default:
       return null
   }
