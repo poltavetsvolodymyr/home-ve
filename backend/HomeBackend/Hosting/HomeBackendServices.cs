@@ -4,6 +4,7 @@ using HomeBackend.Features.Auth;
 using HomeBackend.Features.Backups;
 using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
+using HomeBackend.Features.Offsite;
 using HomeBackend.Features.SystemStatus;
 using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
@@ -34,6 +35,7 @@ public static class HomeBackendServices
             .AddIsosFeature()
             .AddLogsFeature(options.Mock)
             .AddUpdateFeature(options.Mock)
+            .AddOffsiteFeature(options.Mock)
             .AddBackupsFeature(options.Mock);
 
         return builder;

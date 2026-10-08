@@ -277,6 +277,56 @@ systemctl start vm-restore@router:20261008-033512   # восстановить (
 lvconvert --merge home/router-undo               # откатить восстановление (VM остановлена)
 ```
 
+## Выгрузка наружу (Cloudflare R2)
+
+Вторая копия бэкапов вне дома: `/var/backups/vm` целиком и архив настроек хоста (`/etc`, `/root/.ssh`,
+`/var/lib/home-backend` без ISO) уходят в бакет R2 **зашифрованными на хосте** (rclone crypt: шифруются и данные,
+и имена файлов). Делает это `vm-offsite` (`deploy/offsite`), юнит `vm-offsite.service`: каждую ночь после бэкапов VM
+и кнопкой Settings → Offsite backup → **Upload now**.
+
+В облаке:
+- `vm/` — зеркало `/var/backups/vm` (то, что удалила локальная ротация, удаляется и здесь, но сначала…);
+- `trash/<время>/` — …переезжает сюда и лежит ещё 30 дней.
+
+Предохранители (`/etc/vm-offsite/offsite.conf`, образец `offsite.conf.example` рядом): не больше 5 ГБ за запуск,
+ничего не грузится, если локально или в облаке больше 60 ГиБ, не больше 20 удалений за запуск, скорость 20 Мбит/с.
+Плюс квота на роутере: не больше 100 ГиБ в месяц с хоста в Cloudflare (nftables, правится руками на роутере).
+rclone ходит строго по IPv4 (`--bind 0.0.0.0`), чтобы квота роутера его видела.
+
+### Настройка (один раз)
+
+1. **Cloudflare → R2 → Create bucket**: имя, например, `home-backups`, Location: **Europe (EU)**, класс Standard.
+2. **R2 → Manage API tokens → Create API token**: Object Read & Write, только этот бакет. Запиши Access Key ID,
+   Secret Access Key и endpoint `https://<account-id>.r2.cloudflarestorage.com` (для EU-бакета —
+   `https://<account-id>.eu.r2.cloudflarestorage.com`).
+3. На хосте, ключи вводишь сам (в истории shell они не останутся):
+   ```bash
+   rclone config --config /etc/vm-offsite/rclone.conf
+   ```
+   - `n` → имя **`r2`** → тип `s3` → provider `Cloudflare` → `access_key_id`, `secret_access_key` → endpoint из
+     шага 2 → остальное по умолчанию. В advanced config: **`no_check_bucket = true`** (токен на один бакет не
+     может создавать бакеты, без этого загрузка падает с AccessDenied).
+   - `n` → имя **`offsite`** → тип `crypt` → remote **`r2:home-backups`** → filename_encryption `standard` →
+     directory_name_encryption `true` → пароль: `g` (сгенерировать) или свой → второй пароль (salt) тоже.
+   - **Оба пароля сразу сохрани вне хоста** (менеджер паролей). Без них бэкапы в облаке не открыть, если хост умрёт.
+4. Проверка и первая выгрузка:
+   ```bash
+   chmod 600 /etc/vm-offsite/rclone.conf
+   rclone --config /etc/vm-offsite/rclone.conf lsd r2:home-backups     # бакет виден (пусто — нормально)
+   systemctl restart vm-offsite && journalctl -u vm-offsite -f         # или Upload now в вебморде
+   ```
+   В Cloudflare в бакете будут папки и файлы с нечитаемыми именами: так и должно быть.
+
+### Восстановление из облака
+
+С любой машины с rclone и тем же `rclone.conf` (его можно собрать заново: шаг 3 с теми же паролями):
+```bash
+rclone --config rclone.conf lsf -R offsite:vm/router                  # что есть
+rclone --config rclone.conf copy offsite:vm/router/router-20261008-033512.img.zst /var/backups/vm/router/
+```
+Файл ложится расшифрованным; дальше Restore в вебморде как обычно (рядом с `.img.zst` скопируй `.conf` и `.info`).
+Настройки хоста: `offsite:vm/_host/host-<время>.tar.zst` → `tar --zstd -xf … -C /tmp/restore` и разложить нужное.
+
 ## VM руками, без морды
 
 ```bash

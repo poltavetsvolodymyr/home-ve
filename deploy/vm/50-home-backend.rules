@@ -1,6 +1,7 @@
 // The web UI's backend (user home-backend) may start, stop, restart and kill the VM units, start
 // vm-disk-remove@<vm>.service (deleting a VM with its disk), restart vm-backup@<vm>.service (Back up now),
-// start vm-restore@<vm>:<stamp> and vm-backup-delete@<vm>:<stamp>, and restart home-update.service
+// start vm-restore@<vm>:<stamp> and vm-backup-delete@<vm>:<stamp>, restart vm-offsite.service (Upload now),
+// and restart home-update.service
 // (the Update button: deploy/update.sh as root). Nothing else.
 // polkit asks this for every systemctl call it makes; anything not allowed here falls through to "no".
 polkit.addRule(function (action, subject) {
@@ -18,6 +19,9 @@ polkit.addRule(function (action, subject) {
             return polkit.Result.YES;
         }
         if (/^vm-(restore|backup-delete)@[a-z][a-z0-9-]{0,11}:[0-9]{8}-[0-9]{6}\.service$/.test(unit) && verb == "start") {
+            return polkit.Result.YES;
+        }
+        if (unit == "vm-offsite.service" && verb == "restart") {
             return polkit.Result.YES;
         }
         if (unit == "home-update.service" && verb == "restart") {

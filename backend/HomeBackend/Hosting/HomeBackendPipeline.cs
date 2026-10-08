@@ -3,6 +3,7 @@ using HomeBackend.Features.Auth;
 using HomeBackend.Features.Backups;
 using HomeBackend.Features.Host;
 using HomeBackend.Features.Isos;
+using HomeBackend.Features.Offsite;
 using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
 using HomeBackend.Security;
@@ -48,6 +49,7 @@ public static class HomeBackendPipeline
         app.MapGroup("/api").RequireAuthorization()
             .MapHostEndpoints()
             .MapUpdateEndpoints()
+            .MapOffsiteEndpoints()
             .MapVmsEndpoints()
             .MapBackupsEndpoints()
             .MapIsoEndpoints();

@@ -17,6 +17,8 @@
 | `vm/vm-backup-all`, `.service`, `.timer` | каждую ночь бэкапит все VM без `BACKUP=no` |
 | `vm/vm-restore`, `vm/vm-restore@.service` | записывает бэкап обратно на диск остановленной VM (старый диск остаётся снапшотом `<имя>-undo`) |
 | `vm/vm-backup-delete`, `vm/vm-backup-delete@.service` | удаляет один бэкап |
+| `offsite/vm-offsite`, `offsite/vm-offsite.service` | выгрузка бэкапов и настроек хоста в R2, зашифрованно (настройка: docs/deployment.md) |
+| `offsite/offsite.conf.example` | лимиты выгрузки; ставится в `/etc/vm-offsite/` |
 | `vm/qmp` | одна команда в управляющий сокет VM: `qmp router system_powerdown` |
 | `vm/vm@.service` | шаблон службы: одна VM = `vm@<имя>` |
 | `vm/vm-autostart`, `vm/vm-autostart.service` | при загрузке запускает VM с `AUTOSTART=yes` |

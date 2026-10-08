@@ -18,3 +18,11 @@ export const confirmUpdate: ConfirmOptions = {
     'a new vm-run at its next restart.',
   confirmLabel: 'Update',
 }
+
+export const confirmOffsite: ConfirmOptions = {
+  title: 'Upload the backups now?',
+  message:
+    "Copies /var/backups/vm and an archive of the host's settings to the offsite store, encrypted on the host. " +
+    'Only what changed goes up, at most 5 GB per run (offsite.conf). It also runs every night after the backups.',
+  confirmLabel: 'Upload',
+}

@@ -1,0 +1,111 @@
+#!/bin/bash
+# vm-offsite: copies the backups in /var/backups/vm, plus an archive of the host's own settings, to an offsite
+# store (Cloudflare R2), encrypted on the host by rclone before anything leaves it. vm-offsite.service runs it
+# as root: after the nightly backups (vm-backup-all) and on the web UI's "Upload now".
+#
+#   offsite:vm/      a mirror of /var/backups/vm: what the local rotation deletes goes here too, but first ...
+#   offsite:trash/   ... into trash/<time of the run>, kept 30 days: a bad night can't wipe the offsite copy
+#
+# "offsite" is an rclone crypt remote in /etc/vm-offsite/rclone.conf (set up by hand: docs/deployment.md,
+# "Выгрузка наружу"); the bucket only ever sees encrypted files with encrypted names.
+#
+# Limits, whatever goes wrong elsewhere: at most MAX_RUN uploaded per run, nothing at all once the store or
+# the local side holds more than MAX_TOTAL_GB, at most MAX_DELETE files deleted per run, BWLIMIT bytes/s.
+# The router adds its own monthly cap on the host's traffic to Cloudflare (nftables quota): IPv4 only, so
+# rclone is bound to IPv4 here.
+set -euo pipefail
+
+DIR=/var/backups/vm
+CONF_DIR=/etc/vm-offsite
+RCLONE_CONF=$CONF_DIR/rclone.conf
+REMOTE=offsite
+HOST_DIR=$DIR/_host   # not a VM name ([a-z]…), so it never clashes with a VM's backups
+
+MAX_RUN=5G
+MAX_TOTAL_GB=60
+MAX_DELETE=20
+BWLIMIT=2.5M          # bytes per second: 20 Mbit/s
+KEEP_HOST=7           # host settings archives kept
+KEEP_TRASH_DAYS=30
+
+die() {
+  echo "vm-offsite: $*" >&2
+  exit 1
+}
+
+# offsite.conf may change the limits: KEY=VALUE lines, checked, never sourced
+if [[ -f $CONF_DIR/offsite.conf ]]; then
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%%#*}
+    line=${line//[[:space:]]/}
+    [[ -n $line ]] || continue
+    key=${line%%=*} value=${line#*=}
+    case $key in
+      MAX_RUN) [[ $value =~ ^[0-9]+[KMG]$ ]] || die "offsite.conf: MAX_RUN like 5G, not '$value'" ;;
+      BWLIMIT) [[ $value =~ ^([0-9]+(\.[0-9]+)?[KMG]|off)$ ]] || die "offsite.conf: BWLIMIT like 2.5M or off, not '$value'" ;;
+      MAX_TOTAL_GB | MAX_DELETE | KEEP_HOST | KEEP_TRASH_DAYS)
+        [[ $value =~ ^[0-9]+$ ]] || die "offsite.conf: $key must be a number, not '$value'" ;;
+      *) die "offsite.conf: unknown key $key" ;;
+    esac
+    printf -v "$key" '%s' "$value"
+  done <"$CONF_DIR/offsite.conf"
+fi
+
+[[ -f $RCLONE_CONF ]] || die "not set up: there is no $RCLONE_CONF (docs/deployment.md, «Выгрузка наружу»)"
+mountpoint -q "$DIR" || die "$DIR is not mounted: an empty folder there would look like every backup was deleted"
+
+rc() {
+  rclone --config "$RCLONE_CONF" --bind 0.0.0.0 "$@"
+}
+
+stamp=$(date +%Y%m%d-%H%M%S)
+max_total=$((MAX_TOTAL_GB * 1024 * 1024 * 1024))
+
+# 1. the host's own settings: what a reinstalled Debian + install.sh doesn't bring back
+install -d -m 0700 "$HOST_DIR"
+archive=$HOST_DIR/host-$stamp.tar.zst
+trap 'rm -f -- "$archive.part"' EXIT
+echo "archiving the host's settings into ${archive#"$DIR"/}"
+umask 077
+# /etc: network, fstab, LVM metadata, nginx, acme.sh, the VMs' configs, the backend's settings, ssh host keys;
+# /root/.ssh: the deploy key; /var/lib/home-backend: the login cookie keys (not the ISO images)
+tar --zstd -cf "$archive.part" --warning=no-file-changed \
+  --exclude=/etc/vm-offsite --exclude=/var/lib/home-backend/iso \
+  /etc /root/.ssh /var/lib/home-backend 2>&1 | grep -v 'Removing leading' || true
+[[ -s $archive.part ]] || die "the settings archive came out empty"
+mv -- "$archive.part" "$archive"
+find "$HOST_DIR" -maxdepth 1 -name 'host-*.tar.zst' | sort -r | tail -n +"$((KEEP_HOST + 1))" | while read -r old; do
+  echo "removing the old settings archive ${old##*/}"
+  rm -f -- "$old"
+done
+
+# 2. sizes: neither side may hold more than MAX_TOTAL_GB
+local_bytes=$(du -sb --exclude=lost+found "$DIR" | cut -f1)
+((local_bytes <= max_total)) || die "$DIR holds $((local_bytes >> 30)) GiB, more than MAX_TOTAL_GB=$MAX_TOTAL_GB: nothing uploaded"
+rc mkdir "$REMOTE:vm"
+remote_bytes=$(rc size "$REMOTE:" --json | sed -n 's/.*"bytes":\([0-9]*\).*/\1/p')
+[[ -n $remote_bytes ]] || die "could not read the size of the offsite store"
+((remote_bytes <= max_total)) || die "the offsite store holds $((remote_bytes >> 30)) GiB, more than MAX_TOTAL_GB=$MAX_TOTAL_GB: nothing uploaded"
+echo "local $((local_bytes >> 20)) MiB, offsite $((remote_bytes >> 20)) MiB before the upload"
+
+# 3. the mirror; what it replaces or deletes goes to trash/<stamp> instead of away
+set +e
+rc sync "$DIR" "$REMOTE:vm" --backup-dir "$REMOTE:trash/$stamp" \
+  --exclude '*.part' --exclude 'lost+found/**' \
+  --max-transfer "$MAX_RUN" --cutoff-mode hard --max-delete "$MAX_DELETE" --bwlimit "$BWLIMIT" \
+  --stats 0 -v 2>&1 | sed -E 's#^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9:]{8} ##; s#^INFO +: ##'
+status=${PIPESTATUS[0]}
+set -e
+case $status in
+  0) ;;
+  8) die "stopped at MAX_RUN=$MAX_RUN for this run; the rest goes up next time" ;;
+  7) die "rclone stopped (exit 7): MAX_DELETE=$MAX_DELETE reached, or another fatal error above" ;;
+  *) die "rclone sync failed (exit $status), see above" ;;
+esac
+
+# 4. trash older than KEEP_TRASH_DAYS goes for good
+rc delete "$REMOTE:trash" --min-age "${KEEP_TRASH_DAYS}d" 2>/dev/null || true
+rc rmdirs "$REMOTE:trash" --leave-root 2>/dev/null || true
+
+remote_bytes=$(rc size "$REMOTE:" --json | sed -n 's/.*"bytes":\([0-9]*\).*/\1/p')
+echo "done: the offsite store holds $((remote_bytes >> 20)) MiB"

@@ -44,7 +44,7 @@ note_unusual_location() {
 # (debootstrap) Debian may not have yet: dbus provides it.
 install_packages() {
   local missing=()
-  for p in qemu-system-x86 socat dbus polkitd zstd; do
+  for p in qemu-system-x86 socat dbus polkitd zstd rclone; do
     dpkg -s "$p" &>/dev/null || missing+=("$p")
   done
   if (( ${#missing[@]} )); then
@@ -127,6 +127,15 @@ install_vm_tools() {
   else
     echo "note: /var/backups/vm is not mounted, nightly backups stay off (docs/deployment.md)" >&2
   fi
+
+  # offsite upload (docs/deployment.md, "Выгрузка наружу"): the script and unit always; it does nothing until
+  # /etc/vm-offsite/rclone.conf is set up by hand. The directory is root's, but home-backend may see whether
+  # rclone.conf is there (x for others, no r) to tell "not set up" in the web UI.
+  install -m 0755 "$DEPLOY_DIR/offsite/vm-offsite" /usr/local/sbin/
+  install -m 0644 "$DEPLOY_DIR/offsite/vm-offsite.service" /etc/systemd/system/
+  install -d -m 0711 /etc/vm-offsite
+  install -m 0644 "$DEPLOY_DIR/offsite/offsite.conf.example" /etc/vm-offsite/
+  systemctl daemon-reload
 }
 
 # home-update.service: the Update button in the UI runs update.sh through it

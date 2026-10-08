@@ -1,0 +1,15 @@
+# /etc/vm-offsite/offsite.conf: limits for vm-offsite. Every line is optional; these are the defaults.
+# KEY=VALUE, checked by vm-offsite (never run as a script).
+
+# at most this much uploaded in one run (K, M or G); the rest goes up next time
+MAX_RUN=5G
+# nothing is uploaded once /var/backups/vm or the offsite store holds more than this (GiB)
+MAX_TOTAL_GB=60
+# at most this many files deleted offsite in one run
+MAX_DELETE=20
+# upload speed in bytes per second (2.5M = 20 Mbit/s), or off
+BWLIMIT=2.5M
+# archives of the host's settings kept
+KEEP_HOST=7
+# days what the mirror deletes stays in trash/
+KEEP_TRASH_DAYS=30

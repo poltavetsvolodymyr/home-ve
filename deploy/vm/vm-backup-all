@@ -10,4 +10,8 @@ for conf in /etc/vm/*.conf; do
   # restart, not start: the unit stays "active (exited)" after a run (RemainAfterExit)
   systemctl restart "vm-backup@$name.service" || failed=1
 done
+# then the offsite upload (deploy/offsite), once it's set up; it runs on its own, failed VMs or not
+if [ -f /etc/vm-offsite/rclone.conf ]; then
+  systemctl restart --no-block vm-offsite.service
+fi
 exit $failed

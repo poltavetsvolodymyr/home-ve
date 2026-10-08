@@ -1,0 +1,17 @@
+# Uploads the backups and the host's settings to the offsite store (deploy/offsite/vm-offsite), encrypted.
+# Started by vm-backup-all after the nightly backups and by the web UI's "Upload now"; polkit lets
+# home-backend restart it.
+[Unit]
+Description=Upload the backups offsite
+RequiresMountsFor=/var/backups/vm
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-offsite
+# stays "active (exited)" with its result and times for the web UI; a new run is a restart
+RemainAfterExit=yes
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h

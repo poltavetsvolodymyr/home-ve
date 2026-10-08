@@ -17,3 +17,13 @@ export interface UpdateStatus {
 
 export const fetchUpdate = () => get<UpdateStatus>('/api/host/update')
 export const startUpdate = () => post<UpdateStatus>('/api/host/update')
+
+// Mirrors backend/HomeBackend/Features/Offsite/OffsiteStatus.cs
+
+export interface OffsiteStatus extends UpdateStatus {
+  /** /etc/vm-offsite/rclone.conf is there: the offsite store has been set up */
+  configured: boolean
+}
+
+export const fetchOffsite = () => get<OffsiteStatus>('/api/host/offsite')
+export const startOffsite = () => post<OffsiteStatus>('/api/host/offsite')

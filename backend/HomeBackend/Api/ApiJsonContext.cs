@@ -5,6 +5,7 @@ using HomeBackend.Features.Backups;
 using HomeBackend.Features.Host;
 using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
+using HomeBackend.Features.Offsite;
 using HomeBackend.Features.Update;
 using HomeBackend.Features.Vms;
 using Microsoft.AspNetCore.Mvc;
@@ -29,6 +30,7 @@ namespace HomeBackend.Api;
 [JsonSerializable(typeof(IReadOnlyList<LogEntry>))]
 [JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(UpdateStatus))]
+[JsonSerializable(typeof(OffsiteStatus))]
 [JsonSerializable(typeof(VmBackups))]
 [JsonSerializable(typeof(ProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;
