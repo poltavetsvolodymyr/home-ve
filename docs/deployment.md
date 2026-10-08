@@ -16,8 +16,10 @@ deploy/
 
 ## Preparing the host
 
-Run everything as root (`su -`). If you work in a console where you cannot paste several lines at once, install SSH
-(`apt-get install -y openssh-server`), log in from a terminal as a regular user, then run `su -`.
+Run everything as root (`su -`), preferably over SSH from your own terminal, where copy and paste just work: tick
+**SSH server** under "Software selection" when installing Debian (or later: `apt-get install -y openssh-server`), log
+in as the regular user you created, then run `su -`. The one exception is the bridge step below: the network goes
+down for a moment there, so do it from the host's keyboard or console.
 
 ### Requirements
 
