@@ -55,6 +55,21 @@ export default function VmConsole({ name }: { name: string }) {
     }
   }, [name, attempt])
 
+  // Opening the tab brings the whole console into view: a smooth scroll (the page stays, it just moves) up to
+  // the top bar, unless it fits already. Instant for those who asked their system for less motion.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const card = screen.current?.closest('.card')
+      if (!card) return
+      const bar = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0
+      const rect = card.getBoundingClientRect()
+      if (rect.top >= bar && rect.bottom <= window.innerHeight) return
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      window.scrollTo({ top: window.scrollY + rect.top - bar - 12, behavior: reduce ? 'auto' : 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [])
+
   const send = (events: KeyEvent[]) => {
     const r = rfb.current
     if (!r) return
