@@ -95,5 +95,9 @@ git commit -m "..."; git push
   такое использование коммерческое, и она его не разрешает. Напишите автору через
   [GitHub](https://github.com/poltavetsvolodymyr).
 
+Правки от других людей принимаются только с согласием на [CONTRIBUTING.md](CONTRIBUTING.md) (галочка в
+шаблоне pull request): автор правки сохраняет свои права, а проект может распространяться и под коммерческими
+лицензиями.
+
 Сторонние части сохраняют свои лицензии: noVNC (MPL-2.0, без изменений, из пакета `@novnc/novnc`,
 исходники — https://github.com/novnc/noVNC), React (MIT), lucide-react (ISC), .NET (MIT).
