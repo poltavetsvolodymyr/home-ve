@@ -88,7 +88,7 @@ create_config() {
 set_disk_group() {
   if grep -q '"DiskGroup": *"[^"]' "$CONFIG"; then return; fi
   local groups
-  groups=$(lvs --noheadings -o vg_name -S 'lv_name=data && segtype=thin-pool' 2>/dev/null | tr -d ' ')
+  groups=$(lvs --noheadings -o vg_name -S 'lv_name=data && segtype=thin-pool' 2>/dev/null | tr -d ' ') || true
   if [[ -z $groups ]]; then
     echo "note: no LVM thin pool named \"data\": the web UI can't create VMs until there is one, e.g." >&2
     echo "      lvcreate --type thin-pool -l 90%FREE -n data <volume group>   (then run install.sh again)" >&2
@@ -143,7 +143,7 @@ migrate_vm_configs() {
 RCLONE_MIN=1.65
 install_rclone() {
   local have
-  have=$(rclone version 2>/dev/null | sed -n '1s/^rclone v\([0-9]*\.[0-9]*\).*/\1/p')
+  have=$(rclone version 2>/dev/null | sed -n '1s/^rclone v\([0-9]*\.[0-9]*\).*/\1/p') || true
   if [[ -n $have && $(printf '%s\n' "$RCLONE_MIN" "$have" | sort -V | head -1) == "$RCLONE_MIN" ]]; then
     return
   fi
