@@ -195,7 +195,7 @@ getent hosts debian.org     # DNS works
 **The host's address usually changes once**: the router sees a new DHCP client. The new address is in `ip -br a`. To keep
 the web UI's address from changing again, reserve it for the host in your router's DHCP settings.
 
-Rollback (from the host's keyboard):
+**Only if something went wrong** (no network after the reboot) — undo it all from the host's keyboard:
 
 ```bash
 rm /etc/systemd/network/10-br0.* /etc/systemd/network/20-br0-port.network
