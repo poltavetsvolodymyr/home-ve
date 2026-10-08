@@ -60,6 +60,15 @@ input {
   padding: 6px 10px;
   min-height: 32px;
 }
+/* iOS Safari zooms the page into any field with text under 16px when it gets focus, and doesn't zoom back
+   out. On touch screens fields get 16px; !important so that classes like .mono can't undo it. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
 /* a select is as wide as its longest option unless held back */
 select {
   max-width: 100%;
