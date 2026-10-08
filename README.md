@@ -84,22 +84,16 @@ git commit -m "..."; git push
 
 ## Лицензия
 
-[PolyForm Noncommercial 1.0.0](LICENSE) с дополнительным разрешением ниже. Коротко: дома, для хобби, учёбы,
-некоммерческих организаций, а также частному лицу для собственной работы — бесплатно, в том числе менять и
-распространять. Фирме, а также любому, кто на этом зарабатывает (продаёт, встраивает в продукт или устройство,
-предоставляет как сервис, ставит клиентам за деньги), нужна коммерческая лицензия: напишите автору через
-[GitHub](https://github.com/poltavetsvolodymyr).
+Действует текст в [LICENSE](LICENSE): [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)
+и дополнительное разрешение над ним. Ниже только пересказ.
 
-Юридически действует английский текст:
-
-> **Additional permission.** An individual — including a freelancer or sole proprietor working on their own
-> account — may use this software for their own work, commercial or not, free of charge.
->
-> A commercial license is needed for any use by or on behalf of a company or other organization, including
-> installing it on computers or servers used by its employees, and for selling it, shipping it in a product or
-> device, offering it as a hosted service, or running it for paying clients.
-
-Required Notice: Copyright 2026 Volodymyr Poltavets (https://github.com/poltavetsvolodymyr)
+- **Бесплатно:** дома, для хобби, учёбы и исследований; некоммерческим, образовательным и государственным
+  организациям; частному лицу (в том числе фрилансеру или ИП) для собственной работы. Можно менять и распространять.
+- **Нужна коммерческая лицензия:** любой фирме, которая зарабатывает (в том числе поставить сотрудникам на рабочие
+  компьютеры или себе на серверы), и любому, кто зарабатывает на самом проекте: продаёт его, встраивает в продукт или
+  устройство, предоставляет как сервис или ставит клиентам за деньги. Это следует из самой PolyForm Noncommercial:
+  такое использование коммерческое, и она его не разрешает. Напишите автору через
+  [GitHub](https://github.com/poltavetsvolodymyr).
 
 Сторонние части сохраняют свои лицензии: noVNC (MPL-2.0, без изменений, из пакета `@novnc/novnc`,
 исходники — https://github.com/novnc/noVNC), React (MIT), lucide-react (ISC), .NET (MIT).
