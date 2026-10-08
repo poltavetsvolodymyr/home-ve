@@ -14,9 +14,82 @@ deploy/
   update.sh               git pull + install.sh
 ```
 
+## Подготовка хоста
+
+Всё под root (`su -`). Если работаешь через консоль, где нельзя вставить несколько строк, поставь SSH
+(`apt-get install -y openssh-server`) и заходи из терминала обычным пользователем, потом `su -`.
+
+### Что нужно
+
+- **Debian 13 (trixie)**, x86-64, подключённый к домашней сети.
+- **Виртуализация в процессоре**, включённая в BIOS (Intel VT-x / AMD-V, иногда называется SVM Mode):
+  ```bash
+  grep -cwE 'svm|vmx' /proc/cpuinfo
+  ```
+  Число больше 0 — есть. 0 — включи в BIOS; если это сам по себе виртуальный сервер, нужна вложенная
+  виртуализация у того, кто его запускает.
+- **Место под диски VM**: тонкий пул LVM с именем `data` (ниже). Сама морда занимает около 200 МБ памяти,
+  остальное — VM.
+
+### Тонкий пул `data`
+
+Диски VM — тонкие тома в пуле `data`: место на хосте занимается только по мере того, как VM пишет.
+`install.sh` сам находит группу LVM, в которой есть такой пул.
+
+```bash
+apt-get install -y lvm2 thin-provisioning-tools
+vgs
+```
+
+- `lvm2` — сам LVM, `thin-provisioning-tools` — без него тонкий пул не поднимется после перезагрузки;
+- `vgs` — какие группы LVM уже есть и сколько в них свободно (`VFree`). Нет вывода или `command not found`
+  до установки — групп нет.
+
+Дальше один из вариантов.
+
+**А. Группа есть и в ней свободно** (Debian ставили с «use entire disk and set up LVM» и на вопрос
+«Amount of volume group to use» оставили место; группа называется по имени хоста, например `debian-vg`):
+
+```bash
+lvcreate --type thin-pool -l 90%FREE -n data debian-vg
+```
+
+**Б. Отдельный пустой диск** (например `/dev/sdb`; `lsblk` покажет его без разделов). Всё на нём будет стёрто:
+
+```bash
+pvcreate /dev/sdb
+vgcreate vms /dev/sdb
+lvcreate --type thin-pool -l 90%FREE -n data vms
+```
+
+**В. Свободное место в конце системного диска** (`lsblk`: диск больше, чем сумма его разделов):
+
+```bash
+apt-get install -y fdisk
+echo ',,8e' | sfdisk --append /dev/sda
+partx -a /dev/sda
+lsblk
+```
+
+- `sfdisk --append` добавляет раздел в свободное место в конце (`,,` — от начала свободного места до конца
+  диска, `8e` — тип «Linux LVM»). Существующие разделы не трогаются;
+- диск занят (на нём система), поэтому `sfdisk` скажет, что ядро таблицу не перечитало, а `partx -a` —
+  что не может добавить старые разделы: это нормально, `partx` добавляет только новый;
+- в `lsblk` появился новый раздел (например `sda3`). Если нет — `reboot`.
+
+Дальше как в варианте Б, только с этим разделом: `pvcreate /dev/sda3`, `vgcreate vms /dev/sda3`,
+`lvcreate --type thin-pool -l 90%FREE -n data vms`.
+
+Проверка: `lvs` показывает `data` с атрибутами `twi-a-tz--` (тонкий пул, активен).
+
+Почему `90%FREE`, а не всё: остаток группы — запас, чтобы при необходимости увеличить служебную часть пула
+(`lvextend --poolmetadatasize`) или сам пул.
+
+Если `install.sh` уже запускали до того, как появился пул, запусти его ещё раз: он допишет группу в настройки.
+
 ## Первая установка
 
-Хост: Debian 13 (trixie), LVM с тонким пулом `data` для дисков VM. Всё на хосте под root.
+Хост подготовлен (раздел выше). Всё на хосте под root.
 
 ### 1. Ключ для чтения репозитория
 
@@ -30,11 +103,14 @@ cat /root/.ssh/home_deploy.pub
 Публичный ключ: GitHub → home-ve → Settings → Deploy keys → Add (без «Allow write access»). Потом:
 
 ```bash
-cat >> /root/.ssh/config <<'CFG'
-Host github.com
-    IdentityFile /root/.ssh/home_deploy
-CFG
+printf 'Host github.com\n    IdentityFile /root/.ssh/home_deploy\n' >> /root/.ssh/config
+ssh -T git@github.com
 ```
+
+- `printf` дописывает в `/root/.ssh/config` две строки (`\n` — перевод строки): для github.com брать этот ключ;
+- `ssh -T` проверяет ключ: на вопрос про отпечаток ответь `yes`, дальше должно быть
+  `Hi poltavetsvolodymyr/home-ve! You've successfully authenticated`. `Permission denied` — ключ на GitHub
+  не тот или не добавлен.
 
 ### 2. Клонировать только `deploy/`
 
