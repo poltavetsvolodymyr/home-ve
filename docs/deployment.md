@@ -30,7 +30,10 @@ down for a moment there, so do it from the host's keyboard or console.
   ```
   A number greater than 0 means it is available. 0 means you need to enable it in the BIOS. If the host is itself a
   virtual server, whoever runs it must enable nested virtualization.
-- **Space for VM disks**: an LVM thin pool named `data` (see below). The web UI itself uses about 200 MB of memory;
+- **Space for VM disks**: an LVM thin pool named `data` (see below). Easiest if you plan for it when installing
+  Debian: choose **Guided - use entire disk and set up LVM**, and at **Amount of volume group to use for guided
+  partitioning** give the system only part of it (for example `15 GB`); the rest becomes the pool. Or have a second,
+  empty disk for the VMs. The web UI itself uses about 200 MB of memory;
   the rest is for the VMs.
 
 ### The `data` thin pool
@@ -47,7 +50,33 @@ vgs
 - `vgs` shows which LVM volume groups already exist and how much free space they have (`VFree`). No output, or
   `command not found` before installing, means there are no groups.
 
-Then pick one of the options.
+Then work out which case you are in. `lsblk` shows your disks and what is on them:
+
+```bash
+lsblk
+```
+
+> **Never use a disk or partition that has anything in the `MOUNTPOINTS` column (`/`, `/boot`, `[SWAP]`, …), or that
+> has partitions under it.** That is your running system: the commands below would erase it.
+
+| What you see | Case |
+|---|---|
+| `vgs` lists a group with free space (`VFree` of a few GB or more) | **A** |
+| a second disk (e.g. `sdb`) with no partitions under it and no mount point | **B** |
+| the system disk is bigger than the sum of its partitions (for example `sda 60G`, but `sda1` + `sda5` = 40G) | **C** |
+| none of these: the system takes the whole disk, no LVM, no second disk | **D** |
+
+For example, this is case **D** — `sda` is 40G and its partitions fill it; `sda2` (1K) is only a container for `sda5`,
+and `sr0` is the CD drive:
+
+```
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda      8:0    0   40G  0 disk
+├─sda1   8:1    0 37.9G  0 part /
+├─sda2   8:2    0    1K  0 part
+└─sda5   8:5    0  2.1G  0 part [SWAP]
+sr0     11:0    1  756M  1 rom
+```
 
 **A. A volume group exists and has free space** (Debian was installed with "use entire disk and set up LVM", and
 space was left free at the "Amount of volume group to use" question; the group is named after the host, for example `debian-vg`):
@@ -56,7 +85,8 @@ space was left free at the "Amount of volume group to use" question; the group i
 lvcreate --type thin-pool -l 90%FREE -n data debian-vg
 ```
 
-**B. A separate empty disk** (for example `/dev/sdb`; `lsblk` shows it without partitions). Everything on it will be erased:
+**B. A separate empty disk** (for example `/dev/sdb`: in `lsblk` it has no partitions under it and no mount point).
+Everything on it will be erased. Check the name twice:
 
 ```bash
 pvcreate /dev/sdb
@@ -81,6 +111,12 @@ lsblk
 
 Then continue as in option B, using this partition: `pvcreate /dev/sda3`, `vgcreate vms /dev/sda3`,
 `lvcreate --type thin-pool -l 90%FREE -n data vms`.
+
+**D. The system takes the whole disk.** There is no room for VM disks yet. Either add a second disk and use case B,
+or reinstall Debian with LVM and leave room: in the installer's partitioning, choose **Guided - use entire disk and
+set up LVM**, then **All files in one partition**, and at **Amount of volume group to use for guided partitioning**
+enter a size for the system only (for example `15 GB`; Debian itself needs a few GB). The rest of the group stays
+free, and after the installation you are in case A.
 
 Check: `lvs` shows `data` with the attributes `twi-a-tz--` (thin pool, active).
 
