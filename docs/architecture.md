@@ -1,65 +1,65 @@
-# Архитектура
+# Architecture
 
-## Общая картина
+## Overview
 
 ```
-браузер в LAN или через VPN
-   │  https://<хост>
+browser on the LAN or through a VPN
+   │  https://<host>
    ▼
-nginx (на хосте)
-   ├── /          → файлы из /var/www/home            (frontend, собранный Vite)
-   └── /api/      → http://127.0.0.1:5000             (backend, Kestrel; консоль — WebSocket)
+nginx (on the host)
+   ├── /          → files from /var/www/home          (frontend, built by Vite)
+   └── /api/      → http://127.0.0.1:5000             (backend, Kestrel; console over WebSocket)
                         │
-                        ├── /etc/vm/*.conf               настройки VM: читает и пишет
-                        ├── systemctl show/start/stop    состояние VM и действия, через polkit
-                        ├── /run/vm-<имя>/vnc.sock       экран VM для консоли
-                        ├── /proc, /sys                  нагрузка хоста и каждой VM, температура, мосты
-                        └── journalctl -o json           журнал vm@<имя>.service
+                        ├── /etc/vm/*.conf               VM settings: reads and writes
+                        ├── systemctl show/start/stop    VM state and actions, via polkit
+                        ├── /run/vm-<name>/vnc.sock      VM screen for the console
+                        ├── /proc, /sys                  load of the host and of each VM, temperature, bridges
+                        └── journalctl -o json           log of vm@<name>.service
 
-vm@<имя>.service (root)
-   └── /usr/local/sbin/vm-run <имя>   читает /etc/vm/<имя>.conf, проверяет, создаёт tap-«провода»
-          └── exec qemu-system-x86_64  сокеты в /run/vm-<имя>/: qmp, qga, serial, vnc
+vm@<name>.service (root)
+   └── /usr/local/sbin/vm-run <name>   reads /etc/vm/<name>.conf, validates it, creates the tap "cables"
+          └── exec qemu-system-x86_64  sockets in /run/vm-<name>/: qmp, qga, serial, vnc
 ```
 
-- **Фронт** — статическое React-приложение. Данные берёт только из `/api/...`, раз в несколько секунд
-  перезапрашивает (`usePoll`). Консоль — noVNC поверх WebSocket.
-- **Бэкенд** — один self-contained бинарник `deploy/app/home-backend` (.NET внутри). Отдаёт только JSON
-  (и WebSocket консоли), слушает только loopback, работает от пользователя `home-backend` без root,
-  в песочнице systemd.
-- **VM запускает не бэкенд, а systemd**: `vm@<имя>.service` → `vm-run` → QEMU. Бэкенд только просит systemd
-  (start/stop/restart/kill) и правит `.conf`. Если бэкенд упадёт или его остановить, VM этого не заметят.
-- **Сборка** делается на компьютере разработчика (`build.ps1`), результат коммитится в `deploy/`.
-  Хост ничего не собирает: `update.sh` делает `git pull` и раскладывает файлы.
+- **Frontend**: a static React application. It gets data only from `/api/...` and re-fetches it every few
+  seconds (`usePoll`). The console is noVNC over WebSocket.
+- **Backend**: a single self-contained binary `deploy/app/home-backend` (.NET included). It serves only JSON
+  (and the console WebSocket), listens only on loopback, runs as the user `home-backend` without root,
+  in a systemd sandbox.
+- **VMs are started by systemd, not by the backend**: `vm@<name>.service` → `vm-run` → QEMU. The backend only asks
+  systemd (start/stop/restart/kill) and edits the `.conf`. If the backend crashes or is stopped, the VMs do not notice.
+- **The build** runs on the developer's computer (`build.ps1`), and the result is committed to `deploy/`.
+  The host builds nothing: `update.sh` runs `git pull` and installs the files.
 
-## Права: кто что может
+## Permissions: who can do what
 
-Бэкенду нужно управлять VM, но не быть root. Поэтому права выданы точечно:
+The backend has to manage VMs without being root. So permissions are granted narrowly:
 
-| Что | Как разрешено | Чего нельзя |
+| What | How it is allowed | What is not allowed |
 |---|---|---|
-| start / stop / restart / kill VM | polkit, `deploy/vm/50-home-backend.rules`: только `vm@<имя>.service` и только эти четыре действия | любые другие юниты, enable/disable, правка юнитов |
-| удалить VM вместе с диском | тот же polkit: только `start` для `vm-disk-remove@<имя>.service`. Скрипт от root удаляет том `<группа>/<имя>`, только тонкий в пуле `data` и только у остановленной VM | удалить любой другой том |
-| бэкапы | тот же polkit: `restart` для `vm-backup@<имя>.service`, `start` для `vm-restore@<имя>:<время>` и `vm-backup-delete@<имя>:<время>`. Скрипты от root сами проверяют имя, время и диск: только тонкий `<группа>/<имя>` этой самой VM; восстановление только на остановленную VM | читать сами бэкапы: папки `/var/backups/vm/<имя>` дают группе `home-backend` только список файлов, сами файлы 0600 root |
-| выгрузка наружу | тот же polkit: `restart` для `vm-offsite.service`. `/etc/vm-offsite` — `root`, 0711: бэкенд видит, есть ли `rclone.conf`, но не может его прочитать | ключи R2 и пароли шифрования: только root |
-| кнопка Update | тот же polkit: только `restart` для `home-update.service`. Юнит от root запускает `update.sh` | выбрать, что запускать: команда зашита в юнит, бэкенд может только перезапустить юнит |
-| ISO-образы | папка `/var/lib/home-backend/iso` принадлежит бэкенду; он сам скачивает туда файлы по ссылке | подсунуть VM файл хоста: `vm-run` открывает ISO сам и проверяет открытый файл (см. ниже) |
-| настройки VM | `/etc/vm` принадлежит `root:home-backend` с правами 0775, в юните `ReadWritePaths=/etc/vm` | писать куда-то ещё: `ProtectSystem=strict` |
-| консоль | `vnc.sock` после старта VM получает группу `home-backend` и права 0660 (`ExecStartPost` в `vm@.service`) | `qmp.sock`, `qga.sock`, `console.sock`: 0600, только root. QMP умеет почти всё, вплоть до чтения файлов хоста |
-| журнал VM | группа `systemd-journal` | — |
+| start / stop / restart / kill a VM | polkit, `deploy/vm/50-home-backend.rules`: only `vm@<name>.service` and only these four actions | any other units, enable/disable, editing units |
+| delete a VM together with its disk | the same polkit rule: only `start` for `vm-disk-remove@<name>.service`. The script runs as root and removes the volume `<group>/<name>`, only a thin one in the pool `data` and only for a stopped VM | deleting any other volume |
+| backups | the same polkit rule: `restart` for `vm-backup@<name>.service`, `start` for `vm-restore@<name>:<time>` and `vm-backup-delete@<name>:<time>`. The scripts run as root and validate the name, the time and the disk themselves: only the thin `<group>/<name>` of that very VM; restore only onto a stopped VM | reading the backups themselves: the folders `/var/backups/vm/<name>` give the group `home-backend` only the list of files, the files themselves are 0600 root |
+| offsite upload | the same polkit rule: `restart` for `vm-offsite.service`. `/etc/vm-offsite` is `root`, 0711: the backend can see whether `rclone.conf` exists, but cannot read it | R2 keys and encryption passwords: root only |
+| Update button | the same polkit rule: only `restart` for `home-update.service`. The unit runs `update.sh` as root | choosing what to run: the command is fixed in the unit, the backend can only restart the unit |
+| ISO images | the folder `/var/lib/home-backend/iso` belongs to the backend; it downloads files there from a URL itself | slipping a host file to a VM: `vm-run` opens the ISO itself and checks the opened file (see below) |
+| VM settings | `/etc/vm` is owned by `root:home-backend` with mode 0775, the unit has `ReadWritePaths=/etc/vm` | writing anywhere else: `ProtectSystem=strict` |
+| console | after the VM starts, `vnc.sock` gets the group `home-backend` and mode 0660 (`ExecStartPost` in `vm@.service`) | `qmp.sock`, `qga.sock`, `console.sock`: 0600, root only. QMP can do almost anything, up to reading host files |
+| VM log | the group `systemd-journal` | — |
 
-**`.conf` пишет непривилегированный бэкенд, а читает root.** Поэтому `vm-run` файл не исполняет
-(не `source`), а разбирает построчно и проверяет каждое значение по тем же правилам, что и бэкенд
-(`VmConfigFile.cs`): имя, число ядер и памяти, формат MAC и моста, не больше 8 карт. А диск обязан быть
-тонким томом LVM в пуле `data`. Так даже взломанный бэкенд не подсунет VM корневой раздел хоста.
-Путь к диску бэкенд при изменении настроек не трогает. У новой VM диск всегда `/dev/<группа>/<имя>`, и создаёт
-его не бэкенд, а `vm-run` при первом запуске, причём только том с именем VM (`DISK_SIZE` ГиБ, тонкий, в пуле).
+**The `.conf` is written by the unprivileged backend and read by root.** So `vm-run` does not execute the file
+(no `source`); it parses it line by line and checks every value by the same rules as the backend
+(`VmConfigFile.cs`): name, number of cores and memory, MAC and bridge format, no more than 8 cards. And the disk must be
+a thin LVM volume in the pool `data`. This way even a compromised backend cannot give a VM the host's root partition.
+The backend does not touch the disk path when settings change. A new VM's disk is always `/dev/<group>/<name>`, and it
+is created not by the backend but by `vm-run` on first start, and only a volume named after the VM (`DISK_SIZE` GiB, thin, in the pool).
 
-**ISO лежат в папке бэкенда, а читает их root.** Поэтому `vm-run` не передаёт QEMU путь, а открывает файл сам
-(дескриптор 3, QEMU читает его через `/proc/self/fd/3`) и проверяет уже открытый файл: обычный, лежит ровно
-в `/var/lib/home-backend/iso`, принадлежит `home-backend`. Симлинк на `/dev/home/root`, жёсткая ссылка на файл root
-или подмена файла между проверкой и открытием не проходят.
+**ISOs live in the backend's folder and are read by root.** So `vm-run` does not pass a path to QEMU; it opens the file
+itself (descriptor 3, QEMU reads it via `/proc/self/fd/3`) and checks the already opened file: a regular file, located
+directly in `/var/lib/home-backend/iso`, owned by `home-backend`. A symlink to `/dev/home/root`, a hard link to a file
+owned by root, or swapping the file between the check and the open do not get through.
 
-## Формат `/etc/vm/<имя>.conf`
+## The `/etc/vm/<name>.conf` format
 
 ```
 # VM "router", run by vm@router.service. After editing: systemctl restart vm@router
@@ -71,187 +71,187 @@ NET=br-wan BC:24:11:C7:E4:7B
 AUTOSTART=yes
 ```
 
-| Ключ | Значение | Правило |
+| Key | Value | Rule |
 |---|---|---|
-| `CPUS` | число виртуальных ядер | 1–64 |
-| `MEMORY` | память, МиБ | 128–262144 |
-| `DISK` | `/dev/<группа>/<том>` | тонкий том в пуле `data` (проверяет `vm-run`) |
-| `NET` | `<мост> <MAC>`, по строке на карту, в порядке слотов | мост существует, MAC не multicast и не повторяется, до 8 карт |
-| `AUTOSTART` | `yes` / `no` | `vm-autostart.service` при загрузке запускает VM с `yes` |
-| `DISK_SIZE` | ГиБ, необязательно | если тома ещё нет, `vm-run` создаёт его такого размера (только том с именем VM) |
-| `CDROM` | имя файла `.iso`, необязательно | ISO из `/var/lib/home-backend/iso` в CD-приводе; грузится, если диск пустой |
-| `BACKUP` | `no`, необязательно | без строки VM бэкапится каждую ночь (`vm-backup-all`); с `no` пропускается |
+| `CPUS` | number of virtual cores | 1–64 |
+| `MEMORY` | memory, MiB | 128–262144 |
+| `DISK` | `/dev/<group>/<volume>` | thin volume in the pool `data` (checked by `vm-run`) |
+| `NET` | `<bridge> <MAC>`, one line per card, in slot order | the bridge exists, the MAC is not multicast and not repeated, up to 8 cards |
+| `AUTOSTART` | `yes` / `no` | `vm-autostart.service` starts VMs with `yes` at boot |
+| `DISK_SIZE` | GiB, optional | if the volume does not exist yet, `vm-run` creates it with this size (only a volume named after the VM) |
+| `CDROM` | `.iso` file name, optional | an ISO from `/var/lib/home-backend/iso` in the CD drive; boots from it if the disk is empty |
+| `BACKUP` | `no`, optional | without this line the VM is backed up every night (`vm-backup-all`); with `no` it is skipped |
 
-Пустые строки и строки с `#` пропускаются. Бэкенд переписывает файл целиком (временный файл + rename),
-так что свои комментарии в нём не живут.
+Empty lines and lines with `#` are skipped. The backend rewrites the whole file (temporary file + rename),
+so your own comments in it do not survive.
 
-Изменения железа применяются при следующем старте VM, как в Proxmox. Карта N внутри гостя — это слот N:
-пока MAC тот же, гость видит «ту же» карту (`.link`-файлы роутера привязывают имена `ens18`/`ens19` к MAC).
+Hardware changes apply on the next VM start, as in Proxmox. Card N inside the guest is slot N:
+as long as the MAC is the same, the guest sees "the same" card (the router's `.link` files bind the names `ens18`/`ens19` to the MAC).
 
-## Бэкенд: `backend/HomeBackend`
+## Backend: `backend/HomeBackend`
 
 ```
-Program.cs                 CLI-команда (set-password) или веб-сервер
+Program.cs                 CLI command (set-password) or web server
 Hosting/
-  HomeBackendServices.cs   AddHomeBackend(): конфиг + регистрация всех фич
-  HomeBackendPipeline.cs   UseHomeBackend(): middleware по порядку + все эндпоинты
+  HomeBackendServices.cs   AddHomeBackend(): config + registration of all features
+  HomeBackendPipeline.cs   UseHomeBackend(): middleware in order + all endpoints
 Configuration/
-  HomeBackendOptions.cs    секция HomeBackend из /etc/home-backend/config.json, значения по умолчанию
+  HomeBackendOptions.cs    the HomeBackend section of /etc/home-backend/config.json, default values
 Security/
-  PasswordHash.cs          PBKDF2-хеш пароля
-  NetworkAllowlist.cs      запросы не из AllowedNetworks обрываются без ответа
+  PasswordHash.cs          PBKDF2 password hash
+  NetworkAllowlist.cs      requests not from AllowedNetworks are dropped without a response
   SecurityHeaders.cs       nosniff, DENY, no-referrer, CSP
 Api/
-  ApiJsonContext.cs        список всех типов, которые API (де)сериализует
-  ErrorResponse.cs         тело ответа 400: {"error": "..."}
-  HostCommandFailure.cs    сбой systemctl/journalctl → 502 Bad Gateway
-Features/                  см. ниже
+  ApiJsonContext.cs        list of all types the API (de)serializes
+  ErrorResponse.cs         body of a 400 response: {"error": "..."}
+  HostCommandFailure.cs    systemctl/journalctl failure → 502 Bad Gateway
+Features/                  see below
 Infrastructure/
-  ProcessRunner.cs         запуск программ без shell, с таймаутом
-  LinuxFiles.cs            чтение однострочных файлов /proc и /sys
-  DataSources.cs           AddDataSource<>(): Linux-реализация или мок
-  MockClock.cs             общее фейковое время загрузки для моков
+  ProcessRunner.cs         runs programs without a shell, with a timeout
+  LinuxFiles.cs            reads single-line files in /proc and /sys
+  DataSources.cs           AddDataSource<>(): Linux implementation or mock
+  MockClock.cs             shared fake boot time for the mocks
 Cli/                       home-backend hash-password / set-password
 ```
 
-### Фичи
+### Features
 
-| Фича | Страница | Эндпоинты | Откуда данные (Linux / мок) |
+| Feature | Page | Endpoints | Data source (Linux / mock) |
 |---|---|---|---|
-| `Auth` | вход | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | хеш из конфига |
-| `Host` | Host | `GET /api/host` | собирает из SystemStatus |
-| `SystemStatus` | (на Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp из /sys/class/hwmon) |
-| `Vms` | VMs, страница VM, New VM | `POST /api/vms` (создать), `DELETE /api/vms/{имя}[?disk=true]` (удалить), `GET /api/vms`, `GET /api/vms/{имя}`, `POST /api/vms/{имя}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{имя}/config`, `GET /api/vms/{имя}/logs`, `GET /api/vms/{имя}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
-| `Isos` | ISO images | `GET /api/isos`, `POST /api/isos` (скачать по ссылке), `DELETE /api/isos/{имя}` (удалить или отменить загрузку) | `IsoStore`: папка `IsoDir`, загрузки в фоне через `.<имя>.part` |
-| `Backups` | вкладка Backups у VM | `GET/POST /api/vms/{имя}/backups` (список / Back up now), `POST /api/vms/{имя}/backups/{время}/restore`, `DELETE /api/vms/{имя}/backups/{время}` | `LinuxBackupHost`: список файлов в `BackupDir`, `systemctl` для юнитов `vm-backup@`/`vm-restore@`/`vm-backup-delete@` и их журнал; `BackupRestores` держит идущее восстановление в памяти; `MockBackupHost` |
-| `Offsite` | Settings | `GET /api/host/offsite`, `POST /api/host/offsite` | `SystemctlOffsiteRunner`: `systemctl restart/show vm-offsite.service`, его журнал, есть ли `/etc/vm-offsite/rclone.conf`; `MockOffsiteRunner` |
-| `Logs` | (вкладка Logs у VM) | — | `JournalctlSource`: `journalctl -o json -u vm@<имя>.service` |
-| `Update` | Settings (шестерёнка в шапке) | `GET /api/host/update`, `POST /api/host/update` | `SystemctlUpdateRunner`: `systemctl restart/show home-update.service` + его журнал; `MockUpdateRunner` |
+| `Auth` | login | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | hash from the config |
+| `Host` | Host | `GET /api/host` | assembled from SystemStatus |
+| `SystemStatus` | (on Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp from /sys/class/hwmon) |
+| `Vms` | VMs, VM page, New VM | `POST /api/vms` (create), `DELETE /api/vms/{name}[?disk=true]` (delete), `GET /api/vms`, `GET /api/vms/{name}`, `POST /api/vms/{name}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{name}/config`, `GET /api/vms/{name}/logs`, `GET /api/vms/{name}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
+| `Isos` | ISO images | `GET /api/isos`, `POST /api/isos` (download from a URL), `DELETE /api/isos/{name}` (delete or cancel a download) | `IsoStore`: the `IsoDir` folder, background downloads via `.<name>.part` |
+| `Backups` | Backups tab of a VM | `GET/POST /api/vms/{name}/backups` (list / Back up now), `POST /api/vms/{name}/backups/{time}/restore`, `DELETE /api/vms/{name}/backups/{time}` | `LinuxBackupHost`: list of files in `BackupDir`, `systemctl` for the units `vm-backup@`/`vm-restore@`/`vm-backup-delete@` and their log; `BackupRestores` keeps a running restore in memory; `MockBackupHost` |
+| `Offsite` | Settings | `GET /api/host/offsite`, `POST /api/host/offsite` | `SystemctlOffsiteRunner`: `systemctl restart/show vm-offsite.service`, its log, whether `/etc/vm-offsite/rclone.conf` exists; `MockOffsiteRunner` |
+| `Logs` | (Logs tab of a VM) | — | `JournalctlSource`: `journalctl -o json -u vm@<name>.service` |
+| `Update` | Settings (gear in the header) | `GET /api/host/update`, `POST /api/host/update` | `SystemctlUpdateRunner`: `systemctl restart/show home-update.service` + its log; `MockUpdateRunner` |
 
-Внутри `Vms`:
+Inside `Vms`:
 
-- **`VmConfigFile`** — формат `.conf`: разбор, запись, проверка. Те же правила, что в `vm-run`.
-- **`SystemctlVmUnits`** — какие команды `systemctl` за каким действием и разбор `systemctl show`:
+- **`VmConfigFile`**: the `.conf` format: parsing, writing, validation. The same rules as in `vm-run`.
+- **`SystemctlVmUnits`**: which `systemctl` commands are behind which action, and parsing of `systemctl show`:
 
-  | Действие | Команда | Что происходит |
+  | Action | Command | What happens |
   |---|---|---|
-  | Start | `start vm@<имя>` | запуск |
-  | Shut down | `stop --no-block` | `ExecStop` (`vm-stop`) «нажимает кнопку питания» через QMP и ждёт гостя 120 с. Кто кнопку игнорирует (установщик, меню загрузчика, зависшая система), получает SIGTERM, то есть выдёргивание шнура, и VM всё равно оказывается Stopped, а не Failed |
-  | Reboot | `restart --no-block` | то же выключение, потом запуск. Так подхватываются новые настройки |
-  | Power off | `kill --signal=TERM`, затем `stop --no-block` | выдернуть шнур: на SIGTERM QEMU сразу бросает гостя и выходит с кодом 0, поэтому VM становится Stopped, а не Failed. `stop` — страховка, если QEMU не отреагирует |
+  | Start | `start vm@<name>` | start |
+  | Shut down | `stop --no-block` | `ExecStop` (`vm-stop`) "presses the power button" via QMP and waits 120 s for the guest. Whatever ignores the button (an installer, a boot loader menu, a hung system) gets SIGTERM, i.e. the power cord is pulled, and the VM still ends up Stopped, not Failed |
+  | Reboot | `restart --no-block` | the same shutdown, then a start. This is how new settings are picked up |
+  | Power off | `kill --signal=TERM`, then `stop --no-block` | pull the power cord: on SIGTERM QEMU drops the guest immediately and exits with code 0, so the VM becomes Stopped, not Failed. `stop` is a fallback in case QEMU does not react |
 
-- **`VmMonitor`** (`BackgroundService`) раз в 2 секунды перечитывает конфиги, состояние юнитов и
-  для запущенных VM `/proc/<pid>/stat` и `statm` процесса QEMU. CPU % считается от ядер самой VM
-  (100 % = все её vCPU заняты), память — RSS процесса QEMU. Эндпоинты отдают последний снимок,
-  а после действия или сохранения бэкенд обновляет его сразу.
-- **`VmConsole`** — мост WebSocket ⇄ unix-сокет `vnc.sock`. Байты VNC идут как есть (подпротокол `binary`),
-  протокол разбирает noVNC в браузере. VM не запущена → 404, сокета нет → 502. Каждое направление
-  закрывается само: закрылась VM — браузер получает нормальное закрытие, закрыл браузер — сокет к VM закрывается.
+- **`VmMonitor`** (`BackgroundService`) re-reads the configs, the unit states and, for running VMs,
+  `/proc/<pid>/stat` and `statm` of the QEMU process every 2 seconds. CPU % is relative to the VM's own cores
+  (100 % = all of its vCPUs are busy), memory is the RSS of the QEMU process. Endpoints return the latest snapshot,
+  and after an action or a save the backend refreshes it immediately.
+- **`VmConsole`**: a bridge WebSocket ⇄ unix socket `vnc.sock`. VNC bytes are passed as is (subprotocol `binary`);
+  the protocol is parsed by noVNC in the browser. VM not running → 404, no socket → 502. Each direction
+  closes on its own: if the VM closes, the browser gets a normal close; if the browser closes, the socket to the VM is closed.
 
-### Фоновые замеры
+### Background measurements
 
-CPU — это скорость, нужны два замера с паузой. Поэтому `CpuMonitor` и `VmMonitor` читают счётчики каждые
-2 секунды, а `CpuTemperatureMonitor` — раз в 5 секунд. Эндпоинты просто отдают последнее значение.
+CPU usage is a rate, so it needs two measurements with a pause between them. That is why `CpuMonitor` and `VmMonitor` read
+the counters every 2 seconds, and `CpuTemperatureMonitor` every 5 seconds. Endpoints just return the latest value.
 
-### Путь запроса
+### Request path
 
-Порядок задан в `Hosting/HomeBackendPipeline.cs`:
+The order is set in `Hosting/HomeBackendPipeline.cs`:
 
-1. **ForwardedHeaders** — берёт IP клиента из `X-Forwarded-For`, который ставит nginx. Заголовку верит
-   только от loopback.
-2. **NetworkAllowlist** — если IP не из `AllowedNetworks` (LAN и VPN), соединение обрывается без ответа.
+1. **ForwardedHeaders**: takes the client IP from `X-Forwarded-For`, which nginx sets. The header is trusted
+   only from loopback.
+2. **NetworkAllowlist**: if the IP is not in `AllowedNetworks` (LAN and VPN), the connection is dropped without a response.
 3. **SecurityHeaders**.
-4. **RateLimiter** — для входа: не больше 10 попыток за 5 минут с одного IP.
-5. **Authentication** — cookie `home-backend`, живёт 7 дней, продлевается при использовании.
-6. **Authorization** — всё под `/api`, кроме login и logout, требует входа. Без сессии ответ 401.
-7. **WebSockets** — для консоли; та же cookie, тот же allowlist.
-8. **Эндпоинт**. Если systemctl или journalctl упали, ответ 502 с текстом ошибки.
+4. **RateLimiter**: for login: no more than 10 attempts per 5 minutes from one IP.
+5. **Authentication**: cookie `home-backend`, lives 7 days, extended on use.
+6. **Authorization**: everything under `/api` except login and logout requires a login. Without a session the response is 401.
+7. **WebSockets**: for the console; the same cookie, the same allowlist.
+8. **Endpoint**. If systemctl or journalctl fails, the response is 502 with the error text.
 
-### Trimming: что нельзя делать
+### Trimming: what not to do
 
-Бинарник публикуется trimmed (`Properties/PublishProfiles/Home.pubxml`), поэтому рефлексии быть не должно:
+The binary is published trimmed (`Properties/PublishProfiles/Home.pubxml`), so there must be no reflection:
 
-- JSON только через source generation: новый тип запроса или ответа нужно добавить в `Api/ApiJsonContext.cs`;
-- эндпоинты собирает Request Delegate Generator, конфиг — binding generator;
-- анализаторы trimming включены в обычной сборке, так что `dotnet build` сразу покажет предупреждение.
-  Сборка должна быть без предупреждений.
+- JSON only through source generation: a new request or response type must be added to `Api/ApiJsonContext.cs`;
+- endpoints are built by the Request Delegate Generator, the config by the binding generator;
+- the trimming analyzers are enabled in the normal build, so `dotnet build` shows a warning right away.
+  The build must have no warnings.
 
-Подвох minimal API: метод-обработчик с единственным параметром `HttpContext` попадает в перегрузку
-`RequestDelegate`, и его результат молча выбрасывается (так был бы сломан logout). Для таких случаев
-используйте лямбду (см. `AuthFeature`); компилятор предупреждает об этом (ASP0016).
+A minimal API pitfall: a handler method whose only parameter is `HttpContext` matches the
+`RequestDelegate` overload, and its result is silently discarded (this would have broken logout). In such cases
+use a lambda (see `AuthFeature`); the compiler warns about this (ASP0016).
 
-## Фронт: `frontend/src`
+## Frontend: `frontend/src`
 
 ```
-main.tsx                  тема до первого рендера, глобальные стили, <App/>
+main.tsx                  theme before the first render, global styles, <App/>
 app/
-  App.tsx                 вход или роутер
-  routes.tsx              вкладки: VMs и Host (путь, заголовок, иконка, что рендерить)
-  router.tsx              react-router: вкладки + /vms/:имя внутри Layout, неизвестный путь → /vms
-  Layout.tsx              шапка + страница текущего пути (<Outlet/>) + нижние вкладки
-  AppHeader.tsx           шапка: бренд, вкладки (на широком экране), ссылка на роутер, тема, выход
+  App.tsx                 login or the router
+  routes.tsx              tabs: VMs and Host (path, title, icon, what to render)
+  router.tsx              react-router: tabs + /vms/:name inside Layout, unknown path → /vms
+  Layout.tsx              header + page of the current path (<Outlet/>) + bottom tabs
+  AppHeader.tsx           header: brand, tabs (on a wide screen), link to the router, theme, logout
   NavTabs.tsx, ThemeToggle.tsx, theme.ts
 features/
   auth/                   LoginPage, useAuthState, api.ts
-  settings/               SettingsPage = UpdateCard: кнопка Update с подтверждением, статус и вывод update.sh
-  host/                   HostPage = HostStats (CPU, температура, память, диск, аптайм) + HostCard
-  isos/                   IsosPage: скачать ISO по ссылке, ход загрузок, список и удаление
+  settings/               SettingsPage = UpdateCard: Update button with confirmation, status and update.sh output
+  host/                   HostPage = HostStats (CPU, temperature, memory, disk, uptime) + HostCard
+  isos/                   IsosPage: download an ISO from a URL, download progress, list and deletion
   vms/
-    VmsPage.tsx           кнопки New VM и ISO images, карточки VM со статусом и нагрузкой
-    NewVmPage.tsx         новая VM (/vms/new): имя, ядра, память, размер диска, ISO, карты; «запустить и открыть консоль»
-    VmDelete.tsx          удаление остановленной VM; с диском — только после ввода её имени
-    NetsEditor.tsx, CdromField.tsx   общие части форм новой VM и настроек
-    VmPage.tsx            одна VM: кнопки действий + вкладки ?tab=summary|console|settings|logs
-    VmActions.tsx         Start / Shut down / Reboot / Power off, с подтверждением для прерывающих
+    VmsPage.tsx           New VM and ISO images buttons, VM cards with status and load
+    NewVmPage.tsx         new VM (/vms/new): name, cores, memory, disk size, ISO, cards; "start and open console"
+    VmDelete.tsx          deleting a stopped VM; with the disk, only after typing its name
+    NetsEditor.tsx, CdromField.tsx   shared parts of the new VM and settings forms
+    VmPage.tsx            one VM: action buttons + tabs ?tab=summary|console|settings|logs
+    VmActions.tsx         Start / Shut down / Reboot / Power off, with confirmation for the disruptive ones
     VmSummary.tsx, VmMeters.tsx
-    VmSettingsForm.tsx    ядра, память, сетевые карты, автозапуск; после сохранения предлагает перезагрузку
-    VmConsole.tsx         noVNC (грузится только при открытии вкладки): масштаб, Ctrl+Alt+Del, полный экран,
-                          строка ввода для телефона (буквы уходят нажатиями клавиш)
-    VmKeys.tsx            панель клавиш под экраном: Esc, Tab, стрелки (повтор при удержании), Home/End,
-                          PgUp/PgDn, F1–F12, залипающие Ctrl/Alt/Shift для следующей клавиши или строки
-    VmLogs.tsx            журнал vm@<имя>.service
-    settings.ts, vmState.ts, keysyms.ts, logLevel.ts   чистые функции с тестами
-shared/                   HTTP-клиент, usePoll, сессия, форматирование, UI-кит
-styles/                   tokens.css (цвета тем), base.css, index.css
+    VmSettingsForm.tsx    cores, memory, network cards, autostart; after saving offers a reboot
+    VmConsole.tsx         noVNC (loaded only when the tab is opened): scaling, Ctrl+Alt+Del, full screen,
+                          input line for phones (letters are sent as key presses)
+    VmKeys.tsx            key panel under the screen: Esc, Tab, arrows (repeat while held), Home/End,
+                          PgUp/PgDn, F1–F12, sticky Ctrl/Alt/Shift for the next key or line
+    VmLogs.tsx            log of vm@<name>.service
+    settings.ts, vmState.ts, keysyms.ts, logLevel.ts   pure functions with tests
+shared/                   HTTP client, usePoll, session, formatting, UI kit
+styles/                   tokens.css (theme colors), base.css, index.css
 ```
 
-Правила:
+Rules:
 
-- **Страница = папка в `features/`**: компонент страницы, `api.ts` (типы ответа + функции запроса),
-  её собственные компоненты, чистые функции с тестами (`*.test.ts` рядом), её CSS.
-- **`shared/` не знает о фичах**, фичи не знают об `app/`. Фича может брать типы и запросы другой фичи
- , но не её компоненты.
-- Импорты через алиас `@/`: `@/shared/ui`, а не `../../shared/ui`.
-- **Маршрутизация** — react-router с настоящими путями (`/vms`, `/vms/router?tab=console`, `/host`). Файл один,
-  `index.html`: nginx отдаёт его на любой путь, которого нет на диске (`try_files`, см. deployment.md),
-  а роутер выбирает страницу по пути. Шапка при переходе не перерисовывается, меняется только страница.
-- **Данные** только через `usePoll`. Он сам разлогинит на 401, а ошибку и последние данные вернёт странице.
-  Вернувшись на вкладку, страница сразу показывает прошлые данные и тут же их обновляет.
-- **Каркас сразу.** Страница рендерит всю разметку с первого кадра, а на месте ещё не пришедших значений
-  стоят `<Skeleton/>` (серые полоски; для таблиц `<SkeletonRows/>`). Пришли данные — полоски заменились
-  значениями, раскладка не прыгает. Никаких «Loading…» вместо страницы.
-- **CSS** — обычные глобальные классы. Глобальные стили (`styles/index.css`: токены → база → UI-кит)
-  грузятся первыми, стили фич подключаются их компонентами и идут после. Поэтому, например, `.login-card`
-  может переопределить `padding` у `.card`. Цвета только через переменные из `tokens.css`, тогда тёмная
-  тема работает сама.
-- **Тема** — атрибут `<html data-theme>`, по умолчанию тёмная, выбор хранится в `localStorage`.
+- **Page = folder in `features/`**: the page component, `api.ts` (response types + request functions),
+  its own components, pure functions with tests (`*.test.ts` next to them), its CSS.
+- **`shared/` knows nothing about features**, features know nothing about `app/`. A feature may use the types and
+  requests of another feature, but not its components.
+- Imports go through the `@/` alias: `@/shared/ui`, not `../../shared/ui`.
+- **Routing**: react-router with real paths (`/vms`, `/vms/router?tab=console`, `/host`). There is one file,
+  `index.html`: nginx serves it for any path that does not exist on disk (`try_files`, see deployment.md),
+  and the router picks the page by the path. The header is not re-rendered on navigation, only the page changes.
+- **Data** only through `usePoll`. It logs out by itself on 401, and returns the error and the latest data to the page.
+  When you come back to a tab, the page immediately shows the previous data and refreshes it right away.
+- **Skeleton first.** A page renders all of its markup from the first frame, and values that have not arrived yet
+  are shown as `<Skeleton/>` (gray bars; `<SkeletonRows/>` for tables). When the data arrives, the bars are replaced
+  by values and the layout does not jump. No "Loading…" instead of a page.
+- **CSS**: plain global classes. Global styles (`styles/index.css`: tokens → base → UI kit)
+  load first; feature styles are imported by their components and come after. So, for example, `.login-card`
+  can override the `padding` of `.card`. Colors only through variables from `tokens.css`; then the dark
+  theme works by itself.
+- **Theme**: the `<html data-theme>` attribute, dark by default, the choice is stored in `localStorage`.
 
-## Рецепты
+## Recipes
 
-### Добавить действие над VM
+### Add a VM action
 
-1. Значение в `enum VmAction` (`Features/Vms/VmState.cs`) и команды в `SystemctlVmUnits.ActionCommands`.
-2. Если нужен новый глагол systemctl — добавить его в `deploy/vm/50-home-backend.rules`, иначе polkit откажет.
-3. Фронт: `features/vms/vmState.ts` (`availableActions`, `actionLabels`, `confirmText`) и тест рядом.
+1. A value in `enum VmAction` (`Features/Vms/VmState.cs`) and the commands in `SystemctlVmUnits.ActionCommands`.
+2. If a new systemctl verb is needed, add it to `deploy/vm/50-home-backend.rules`, otherwise polkit refuses.
+3. Frontend: `features/vms/vmState.ts` (`availableActions`, `actionLabels`, `confirmText`) and the test next to it.
 
-### Добавить ключ в `.conf`
+### Add a key to `.conf`
 
-Три места должны совпадать: `VmConfigFile.cs` (разбор, запись, проверка + тест), `deploy/vm/vm-run`
-(разбор и проверка, иначе VM не стартует с «unknown key») и таблица выше. Если ключ должна менять
-морда — ещё `VmSettingsRequest` в `VmsFeature.cs` и форма `VmSettingsForm.tsx`.
+Three places must match: `VmConfigFile.cs` (parsing, writing, validation + test), `deploy/vm/vm-run`
+(parsing and validation, otherwise the VM does not start, with "unknown key") and the table above. If the key should be
+editable from the web UI, also `VmSettingsRequest` in `VmsFeature.cs` and the form `VmSettingsForm.tsx`.
 
-### Добавить настройку бэкенда
+### Add a backend setting
 
-Свойство в `Configuration/HomeBackendOptions.cs`; списки по умолчанию задаются в `WithDefaults()`
-(массивы из разных источников конфига сливаются по индексу). Затем `deploy/config.example.json` и таблица
-в [deployment.md](deployment.md).
+A property in `Configuration/HomeBackendOptions.cs`; default lists are set in `WithDefaults()`
+(arrays from different config sources are merged by index). Then `deploy/config.example.json` and the table
+in [deployment.md](deployment.md).

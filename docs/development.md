@@ -1,21 +1,21 @@
-# Разработка
+# Development
 
-## Что нужно
+## Requirements
 
 - .NET 10 SDK
-- Node.js 22 LTS (Vite 7 требует Node 20.19+ или 22.12+)
-- IDE: `backend/HomeBackend.slnx` открывается в Visual Studio или Rider, `frontend/` — в VS Code
-  (подхватит ESLint и Prettier).
+- Node.js 22 LTS (Vite 7 requires Node 20.19+ or 22.12+)
+- IDE: `backend/HomeBackend.slnx` opens in Visual Studio or Rider, `frontend/` in VS Code
+  (it picks up ESLint and Prettier).
 
-## Запуск
+## Running
 
-Бэкенд с фейковыми данными (`appsettings.Development.json`: мок, порт 5080, пароль `admin`):
+Backend with fake data (`appsettings.Development.json`: mock, port 5080, password `admin`):
 
 ```powershell
 dotnet run --project backend/HomeBackend --launch-profile "HomeBackend (mock)"
 ```
 
-Фронт с hot reload, `/api` проксируется на бэкенд выше:
+Frontend with hot reload, `/api` is proxied to the backend above:
 
 ```powershell
 cd frontend
@@ -23,78 +23,78 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
-## Проверки
+## Checks
 
-| Что | Команда |
+| What | Command |
 |---|---|
-| тесты бэкенда | `dotnet test --solution backend/HomeBackend.slnx` |
-| всё по фронту: типы, ESLint, Prettier, тесты | `cd frontend; npm run check` |
-| только тесты фронта | `npm test` (или `npm run test:watch`) |
-| поправить форматирование | `npm run format` |
-| стиль C# | `dotnet format backend/HomeBackend.slnx --verify-no-changes` |
+| backend tests | `dotnet test --solution backend/HomeBackend.slnx` |
+| everything for the frontend: types, ESLint, Prettier, tests | `cd frontend; npm run check` |
+| frontend tests only | `npm test` (or `npm run test:watch`) |
+| fix formatting | `npm run format` |
+| C# style | `dotnet format backend/HomeBackend.slnx --verify-no-changes` |
 
-Перед коммитом стоит прогнать обе первые строки. Сборка бэкенда должна быть без предупреждений:
-это в том числе предупреждения trimming (см. [architecture.md](architecture.md#trimming-что-нельзя-делать)).
+Run the first two rows before committing. The backend build must have no warnings,
+and that includes trimming warnings (see [architecture.md](architecture.md#trimming-what-not-to-do)).
 
-`dotnet test` работает через Microsoft.Testing.Platform (так требует xunit v3 на .NET 10 SDK). Этот режим
-включён в `global.json` в корне репозитория.
+`dotnet test` runs through Microsoft.Testing.Platform (xunit v3 on the .NET 10 SDK requires this). This mode
+is enabled in `global.json` at the repository root.
 
-### Что покрыто тестами
+### What the tests cover
 
-- **Бэкенд, юнит-тесты** (`HomeBackend.Tests/Features`, `Security`): формат `.conf` (разбор, запись,
-  все правила проверки), команды systemctl для действий и разбор `systemctl show`, разбор `/proc/<pid>`,
-  журнал, /sys/class/hwmon и выбор датчика CPU; хеш пароля; список разрешённых сетей.
-- **Бэкенд, интеграционные** (`HomeBackend.Tests/Integration`): настоящее приложение с мок-данными на
-  случайном порту loopback. Вход и выход, 401 без сессии, список VM, действия (400 на неизвестное, 404 на
-  чужую VM), сохранение настроек с проверкой, журнал VM, обрыв соединения для чужой сети, лимит входа,
-  заголовки безопасности. `ConsoleTests` поднимает фейковый VNC-сервер на unix-сокете и гоняет байты
-  через настоящий WebSocket в обе стороны; для остановленной VM — 404.
-- **Фронт** (`*.test.ts` рядом с кодом): форматирование, плитка температуры, состояния и действия VM,
-  проверка формы настроек и случайный MAC, раскладка символов в нажатия клавиш для консоли, уровни журнала.
-- **`deploy/vm/vm-run`** автотестов не имеет; при правке прогоните `shellcheck -s sh deploy/vm/*` и
-  проверьте вручную на хосте `systemctl restart vm@<имя>` + `journalctl -u vm@<имя> -n 20`.
+- **Backend, unit tests** (`HomeBackend.Tests/Features`, `Security`): the `.conf` format (parsing, writing,
+  all validation rules), systemctl commands for actions and parsing of `systemctl show`, parsing of `/proc/<pid>`,
+  the log, /sys/class/hwmon and the choice of the CPU sensor; the password hash; the list of allowed networks.
+- **Backend, integration tests** (`HomeBackend.Tests/Integration`): the real application with mock data on a
+  random loopback port. Login and logout, 401 without a session, the VM list, actions (400 for an unknown one, 404 for
+  a nonexistent VM), saving settings with validation, the VM log, dropping the connection for a foreign network, the login
+  limit, security headers. `ConsoleTests` starts a fake VNC server on a unix socket and pushes bytes
+  through a real WebSocket in both directions; for a stopped VM it expects 404.
+- **Frontend** (`*.test.ts` next to the code): formatting, the temperature tile, VM states and actions,
+  validation of the settings form and the random MAC, mapping characters to key presses for the console, log levels.
+- **`deploy/vm/vm-run`** has no automated tests; when you change it, run `shellcheck -s sh deploy/vm/*` and
+  check by hand on the host with `systemctl restart vm@<name>` + `journalctl -u vm@<name> -n 20`.
 
-### Консоль локально
+### Console locally
 
-С мок-бэкендом вкладка Console ищет сокет `.data/run/vm-router/vnc.sock` (`HomeBackend:VmRuntimeDir`
-в `appsettings.Development.json`). Без него будет 502, это нормально. Чтобы увидеть живой экран на Linux,
-достаточно любой QEMU с VNC на этом сокете:
+With the mock backend, the Console tab looks for the socket `.data/run/vm-router/vnc.sock` (`HomeBackend:VmRuntimeDir`
+in `appsettings.Development.json`). Without it you get 502, which is expected. To see a live screen on Linux,
+any QEMU with VNC on this socket will do:
 
 ```bash
 mkdir -p backend/HomeBackend/.data/run/vm-router
 qemu-system-x86_64 -m 128 -display vnc=unix:backend/HomeBackend/.data/run/vm-router/vnc.sock
 ```
 
-## Соглашения
+## Conventions
 
-**Общие:** код и комментарии на английском, документация на русском. Отступы и прочее задаёт
-`.editorconfig`. Комментарии объясняют «почему», а не пересказывают код.
+**General:** code, comments and documentation are in English. Indentation and the like are set by
+`.editorconfig`. Comments explain "why", they do not retell the code.
 
 **C#:**
-- namespace по папке, file-scoped;
-- API-модели — `sealed record`, они же JSON (camelCase);
-- фича — папка в `Features/` (см. [architecture.md](architecture.md#фичи));
-- никакой рефлексии: всё должно переживать trimming.
+- namespace follows the folder, file-scoped;
+- API models are `sealed record`s, and they are also the JSON (camelCase);
+- a feature is a folder in `Features/` (see [architecture.md](architecture.md#features));
+- no reflection: everything must survive trimming.
 
 **TypeScript/React:**
-- функциональные компоненты, именованные экспорты, один компонент на файл;
-- страница — папка в `src/features/`, общее — в `src/shared/`;
-- импорты через `@/`;
-- форматирует Prettier (`.prettierrc.json`: без `;`, одинарные кавычки, 120 символов);
-- стили — глобальные классы, цвета только из `src/styles/tokens.css`.
+- function components, named exports, one component per file;
+- a page is a folder in `src/features/`, shared code goes in `src/shared/`;
+- imports through `@/`;
+- formatted by Prettier (`.prettierrc.json`: no `;`, single quotes, 120 characters);
+- styles are global classes, colors only from `src/styles/tokens.css`.
 
-## Сборка для хоста
+## Building for the host
 
 ```powershell
 .\build.ps1          # Windows
-./build.sh           # Linux/macOS, те же шаги
+./build.sh           # Linux/macOS, same steps
 ```
 
-Скрипт собирает фронт в `deploy/www`, публикует бэкенд по профилю
-`backend/HomeBackend/Properties/PublishProfiles/Home.pubxml` в `deploy/app` (один файл примерно на 16 МБ,
-linux-x64, .NET внутри) и добавляет всё в git, включая бит исполнения бинарника. Дальше commit, push
-и `update.sh` на хосте, см. [deployment.md](deployment.md).
+The script builds the frontend into `deploy/www`, publishes the backend with the profile
+`backend/HomeBackend/Properties/PublishProfiles/Home.pubxml` into `deploy/app` (a single file of about 16 MB,
+linux-x64, .NET included) and adds everything to git, including the executable bit of the binary. Then commit, push
+and `update.sh` on the host, see [deployment.md](deployment.md).
 
-Каждая сборка кладёт в git новый бинарник. На хосте это не мешает: partial clone
-(`--filter=blob:none`) тянет только текущую версию. Но история на GitHub со временем растёт. Если начнёт
-мешать, бинарник можно перенести в GitHub Releases или Git LFS.
+Every build puts a new binary into git. This does not matter on the host: the partial clone
+(`--filter=blob:none`) fetches only the current version. But the history on GitHub grows over time. If it starts
+to get in the way, the binary can be moved to GitHub Releases or Git LFS.

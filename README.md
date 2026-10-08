@@ -1,103 +1,110 @@
 # home-ve
 
-Веб-морда для хоста виртуалок «home» (Debian + QEMU/KVM, без Proxmox). VM описаны файлами `/etc/vm/<имя>.conf`
-и запускаются шаблонной службой `vm@<имя>.service`.
+A web UI for a virtual machine host (Debian + QEMU/KVM, no Proxmox). VMs are described by files `/etc/vm/<name>.conf`
+and run by the template service `vm@<name>.service`.
 
-Версия 1: состояние хоста (CPU, температура, память, диск), список VM, запуск / выключение / перезагрузка /
-жёсткое выключение, правка ядер, памяти, сетевых карт и автозапуска, консоль VM в браузере (noVNC) и журнал VM.
-Версия 2: создание VM (диск создаётся при первом запуске, установка с ISO через консоль), удаление VM с диском или
-без, ISO-образы со скачиванием по ссылке. Дальше: снапшоты и бэкапы (v3).
+What it does:
 
-## Как это устроено
+- host status: CPU, temperature, memory, disk;
+- VMs: create (installation from an ISO through the console in the browser), start, shut down, reboot, power off,
+  delete with or without the disk; cores, memory, network cards, CD drive, autostart; the VM's log;
+- ISO images downloaded by the host from a URL;
+- backups: nightly and on demand, without stopping the VM (thin snapshot + zstd), restore with an undo snapshot;
+- optional encrypted offsite copy of the backups (rclone to Cloudflare R2);
+- self-update from the web UI.
+
+## How it works
 
 ```
-браузер ──► nginx на хосте ──┬─► /var/www/home           фронт: статика (React)
-                             └─► /api/ → 127.0.0.1:5000  бэкенд: ASP.NET Core, только API
-                                              ├─► /etc/vm/*.conf               настройки VM (читает и пишет)
-                                              ├─► systemctl … vm@<имя>          через polkit, только эти юниты
-                                              ├─► /run/vm-<имя>/vnc.sock        консоль, WebSocket ⇄ VNC
-                                              └─► /proc, /sys, journalctl       нагрузка, температура, журнал
+browser ──► nginx on the host ─┬─► /var/www/home           frontend: static files (React)
+                               └─► /api/ → 127.0.0.1:5000  backend: ASP.NET Core, API only
+                                                ├─► /etc/vm/*.conf               VM settings (reads and writes)
+                                                ├─► systemctl … vm@<name>        via polkit, only these units
+                                                ├─► /run/vm-<name>/vnc.sock      console, WebSocket ⇄ VNC
+                                                └─► /proc, /sys, journalctl      load, temperature, log
 
-vm@<имя>.service ──► vm-run <имя> ──► qemu-system-x86_64     (root; сам проверяет .conf, ничего не исполняет из него)
+vm@<name>.service ──► vm-run <name> ──► qemu-system-x86_64     (root; validates the .conf itself, executes nothing from it)
 ```
 
-Бэкенд работает без root, наружу не слушает, пускает только LAN и VPN и только после входа по паролю.
-Подробнее в [docs/architecture.md](docs/architecture.md).
+The backend runs without root, does not listen on external interfaces, lets in only private networks (configurable), and only
+after a password login. More in [docs/architecture.md](docs/architecture.md).
 
-## Где что лежит
+## Where things are
 
 ```
 backend/
-  HomeBackend/              бэкенд (ASP.NET Core 10, minimal API)
-    Program.cs              точка входа: CLI-команда или веб-сервер
-    Hosting/                что регистрируется и в каком порядке идут middleware
-    Features/<Фича>/        Host, Vms, SystemStatus, Logs, Auth: источник данных (Linux и мок), модели, эндпоинты
-    Security/ Api/ Cli/ Configuration/ Infrastructure/   общие части
-  HomeBackend.Tests/        тесты бэкенда (xunit)
+  HomeBackend/              backend (ASP.NET Core 10, minimal API)
+    Program.cs              entry point: CLI command or web server
+    Hosting/                what is registered and the order of the middleware
+    Features/<Feature>/     Host, Vms, SystemStatus, Logs, Auth: data source (Linux and mock), models, endpoints
+    Security/ Api/ Cli/ Configuration/ Infrastructure/   shared parts
+  HomeBackend.Tests/        backend tests (xunit)
 frontend/
-  src/app/                  оболочка: шапка, маршруты, тема
-  src/features/<страница>/  vms, host, auth: страница, её запросы к API, компоненты и стили
-  src/shared/               HTTP-клиент, usePoll, форматирование, UI-кит
-  src/styles/               цвета (токены) и базовые стили
-deploy/                     то, что тянет хост: бинарник, собранный фронт, юниты, скрипты
-  vm/                       vm-run, qmp, vm@.service, автозапуск, правило polkit
-  nginx/                    сайт nginx (HTTPS, консоль через WebSocket)
-docs/                       архитектура, разработка, выкладка
-build.ps1 / build.sh        сборка фронта и бэкенда в deploy/
+  src/app/                  shell: header, routes, theme
+  src/features/<page>/      vms, host, auth: the page, its API requests, components and styles
+  src/shared/               HTTP client, usePoll, formatting, UI kit
+  src/styles/               colors (tokens) and base styles
+deploy/                     what the host pulls: binary, built frontend, units, scripts
+  vm/                       vm-run, qmp, vm@.service, autostart, polkit rule
+  nginx/                    nginx site (HTTPS, console over WebSocket)
+docs/                       architecture, development, deployment
+build.ps1 / build.sh        builds the frontend and the backend into deploy/
 ```
 
-## Быстрый старт (Windows)
+## Quick start (Windows)
 
-Нужны .NET 10 SDK и Node.js 22.
+You need the .NET 10 SDK and Node.js 22.
 
 ```powershell
-dotnet run --project backend/HomeBackend --launch-profile "HomeBackend (mock)"   # API на :5080 с фейковыми VM, пароль admin
-cd frontend; npm install; npm run dev                                           # http://localhost:5173 с hot reload
+dotnet run --project backend/HomeBackend --launch-profile "HomeBackend (mock)"   # API on :5080 with fake VMs, password admin
+cd frontend; npm install; npm run dev                                           # http://localhost:5173 with hot reload
 ```
 
-Тесты и проверки:
+Tests and checks:
 
 ```powershell
-dotnet test --solution backend/HomeBackend.slnx   # бэкенд
-cd frontend; npm run check                        # фронт: типы, ESLint, Prettier, тесты
+dotnet test --solution backend/HomeBackend.slnx   # backend
+cd frontend; npm run check                        # frontend: types, ESLint, Prettier, tests
 ```
 
-## Выкладка
+## Deployment
 
 ```powershell
-.\build.ps1                                      # фронт -> deploy/www, бэкенд -> deploy/app/home-backend, всё в git
+.\build.ps1                                      # frontend -> deploy/www, backend -> deploy/app/home-backend, all into git
 git commit -m "..."; git push
 ```
 
-На хосте:
+On the host:
 
 ```bash
 /opt/home-ve/deploy/update.sh
 ```
 
-## Документация
+## Documentation
 
-- [docs/architecture.md](docs/architecture.md): как устроен код, путь запроса, права, формат `.conf`
-- [docs/development.md](docs/development.md): запуск, тесты, линтеры, соглашения
-- [docs/deployment.md](docs/deployment.md): первая установка на хост, nginx и сертификат, настройки, откат
-- [deploy/README.md](deploy/README.md): шпаргалка для хоста (там лежит только `deploy/`)
+- [docs/architecture.md](docs/architecture.md): how the code is organized, the request path, permissions, the `.conf` format
+- [docs/development.md](docs/development.md): running, tests, linters, conventions
+- [docs/deployment.md](docs/deployment.md): preparing the host (CPU virtualization, the LVM thin pool, the network
+  bridge), installation, your own domain and certificate, updates, settings, backups, offsite upload
+- [deploy/README.md](deploy/README.md): cheat sheet for the host (the host only has `deploy/`)
 
-## Лицензия
+## License
 
-Действует текст в [LICENSE](LICENSE): [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)
-и дополнительное разрешение над ним. Ниже только пересказ.
+The text in [LICENSE](LICENSE) is what applies: [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)
+plus an additional permission on top of it. What follows is only a summary.
 
-- **Бесплатно:** дома, для хобби, учёбы и исследований; некоммерческим, образовательным и государственным
-  организациям; частному лицу (в том числе фрилансеру или ИП) для собственной работы. Можно менять и распространять.
-- **Нужна коммерческая лицензия:** любой фирме, которая зарабатывает (в том числе поставить сотрудникам на рабочие
-  компьютеры или себе на серверы), и любому, кто зарабатывает на самом проекте: продаёт его, встраивает в продукт или
-  устройство, предоставляет как сервис или ставит клиентам за деньги. Это следует из самой PolyForm Noncommercial:
-  такое использование коммерческое, и она его не разрешает. Напишите автору через
+- **Free of charge:** at home, for hobby, study and research; for noncommercial, educational and government
+  organizations; for an individual (including a freelancer or sole proprietor) for their own work. You may change
+  and distribute it.
+- **A commercial license is required:** for any company that makes money (including installing it on employees' work
+  computers or on its own servers), and for anyone who makes money from the project itself: sells it, builds it into a
+  product or device, offers it as a service, or installs it for clients for a fee. This follows from PolyForm
+  Noncommercial itself: such use is commercial, and that license does not permit it. Contact the author via
   [GitHub](https://github.com/poltavetsvolodymyr).
 
-Правки от других людей принимаются только с согласием на [CONTRIBUTING.md](CONTRIBUTING.md) (галочка в
-шаблоне pull request): автор правки сохраняет свои права, а проект может распространяться и под коммерческими
-лицензиями.
+Contributions from other people are accepted only with agreement to [CONTRIBUTING.md](CONTRIBUTING.md) (the checkbox in
+the pull request template): the contributor keeps their rights, and the project may also be distributed under
+commercial licenses.
 
-Сторонние части сохраняют свои лицензии: noVNC (MPL-2.0, без изменений, из пакета `@novnc/novnc`,
-исходники — https://github.com/novnc/noVNC), React (MIT), lucide-react (ISC), .NET (MIT).
+Third-party components keep their own licenses: noVNC (MPL-2.0, unmodified, from the `@novnc/novnc` package,
+source code at https://github.com/novnc/noVNC), React (MIT), lucide-react (ISC), .NET (MIT).
