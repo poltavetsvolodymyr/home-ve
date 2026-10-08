@@ -88,12 +88,14 @@ remote_bytes=$(rc size "$REMOTE:" --json | sed -n 's/.*"bytes":\([0-9]*\).*/\1/p
 ((remote_bytes <= max_total)) || die "the offsite store holds $((remote_bytes >> 30)) GiB, more than MAX_TOTAL_GB=$MAX_TOTAL_GB: nothing uploaded"
 echo "local $((local_bytes >> 20)) MiB, offsite $((remote_bytes >> 20)) MiB before the upload"
 
-# 3. the mirror; what it replaces or deletes goes to trash/<stamp> instead of away
+# 3. the mirror; what it replaces or deletes goes to trash/<stamp> instead of away. A line per file once it is
+# up, and a progress line a minute while it runs; sed -u passes each line on at once (into the journal, sed
+# would otherwise buffer them up to the end)
 set +e
 rc sync "$DIR" "$REMOTE:vm" --backup-dir "$REMOTE:trash/$stamp" \
   --exclude '*.part' --exclude 'lost+found/**' \
   --max-transfer "$MAX_RUN" --cutoff-mode hard --max-delete "$MAX_DELETE" --bwlimit "$BWLIMIT" \
-  --stats 0 -v 2>&1 | sed -E 's#^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9:]{8} ##; s#^INFO +: ##'
+  --stats 1m --stats-one-line -v 2>&1 | sed -u -E 's#^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9:]{8} ##; s#^INFO +: ##; /: Moved \(server-side\)$/d'
 status=${PIPESTATUS[0]}
 set -e
 case $status in
