@@ -1,60 +1,60 @@
-# Выкладка на хост «home»
+# Deployment
 
-На хосте лежит sparse checkout репозитория в `/opt/home-ve`, в нём только папка `deploy/`:
+The host keeps a sparse checkout of the repository in `/opt/home-ve`. It contains only the `deploy/` folder:
 
 ```
 deploy/
-  app/home-backend        бэкенд: один self-contained бинарник linux-x64
-  www/                    собранный фронт; install.sh копирует его в /var/www/home
-  home-backend.service    systemd-юнит бэкенда
-  config.example.json     образец /etc/home-backend/config.json
-  vm/                     vm-run, qmp, vm@.service, vm-autostart(.service), правило polkit
-  nginx/home.conf         сайт nginx (install.sh ставит его сам)
-  install.sh              установка и любое обновление (идемпотентный)
+  app/home-backend        backend: a single self-contained linux-x64 binary
+  www/                    built frontend; install.sh copies it to /var/www/home
+  home-backend.service    systemd unit for the backend
+  config.example.json     template for /etc/home-backend/config.json
+  vm/                     vm-run, qmp, vm@.service, vm-autostart(.service), polkit rule
+  nginx/home.conf         nginx site (install.sh installs it itself)
+  install.sh              install and every update (idempotent)
   update.sh               git pull + install.sh
 ```
 
-## Подготовка хоста
+## Preparing the host
 
-Всё под root (`su -`). Если работаешь через консоль, где нельзя вставить несколько строк, поставь SSH
-(`apt-get install -y openssh-server`) и заходи из терминала обычным пользователем, потом `su -`.
+Run everything as root (`su -`). If you work in a console where you cannot paste several lines at once, install SSH
+(`apt-get install -y openssh-server`), log in from a terminal as a regular user, then run `su -`.
 
-### Что нужно
+### Requirements
 
-- **Debian 13 (trixie)**, x86-64, подключённый к домашней сети.
-- **Виртуализация в процессоре**, включённая в BIOS (Intel VT-x / AMD-V, иногда называется SVM Mode):
+- **Debian 13 (trixie)**, x86-64, connected to your home network.
+- **CPU virtualization** enabled in the BIOS (Intel VT-x / AMD-V, sometimes called SVM Mode):
   ```bash
   grep -cwE 'svm|vmx' /proc/cpuinfo
   ```
-  Число больше 0 — есть. 0 — включи в BIOS; если это сам по себе виртуальный сервер, нужна вложенная
-  виртуализация у того, кто его запускает.
-- **Место под диски VM**: тонкий пул LVM с именем `data` (ниже). Сама морда занимает около 200 МБ памяти,
-  остальное — VM.
+  A number greater than 0 means it is available. 0 means you need to enable it in the BIOS. If the host is itself a
+  virtual server, whoever runs it must enable nested virtualization.
+- **Space for VM disks**: an LVM thin pool named `data` (see below). The web UI itself uses about 200 MB of memory;
+  the rest is for the VMs.
 
-### Тонкий пул `data`
+### The `data` thin pool
 
-Диски VM — тонкие тома в пуле `data`: место на хосте занимается только по мере того, как VM пишет.
-`install.sh` сам находит группу LVM, в которой есть такой пул.
+VM disks are thin volumes in the `data` pool: space on the host is used only as the VM writes data.
+`install.sh` finds the LVM volume group that contains this pool by itself.
 
 ```bash
 apt-get install -y lvm2 thin-provisioning-tools
 vgs
 ```
 
-- `lvm2` — сам LVM, `thin-provisioning-tools` — без него тонкий пул не поднимется после перезагрузки;
-- `vgs` — какие группы LVM уже есть и сколько в них свободно (`VFree`). Нет вывода или `command not found`
-  до установки — групп нет.
+- `lvm2` is LVM itself. Without `thin-provisioning-tools` the thin pool will not come up after a reboot;
+- `vgs` shows which LVM volume groups already exist and how much free space they have (`VFree`). No output, or
+  `command not found` before installing, means there are no groups.
 
-Дальше один из вариантов.
+Then pick one of the options.
 
-**А. Группа есть и в ней свободно** (Debian ставили с «use entire disk and set up LVM» и на вопрос
-«Amount of volume group to use» оставили место; группа называется по имени хоста, например `debian-vg`):
+**A. A volume group exists and has free space** (Debian was installed with "use entire disk and set up LVM", and
+space was left free at the "Amount of volume group to use" question; the group is named after the host, for example `debian-vg`):
 
 ```bash
 lvcreate --type thin-pool -l 90%FREE -n data debian-vg
 ```
 
-**Б. Отдельный пустой диск** (например `/dev/sdb`; `lsblk` покажет его без разделов). Всё на нём будет стёрто:
+**B. A separate empty disk** (for example `/dev/sdb`; `lsblk` shows it without partitions). Everything on it will be erased:
 
 ```bash
 pvcreate /dev/sdb
@@ -62,7 +62,7 @@ vgcreate vms /dev/sdb
 lvcreate --type thin-pool -l 90%FREE -n data vms
 ```
 
-**В. Свободное место в конце системного диска** (`lsblk`: диск больше, чем сумма его разделов):
+**C. Free space at the end of the system disk** (`lsblk`: the disk is larger than the sum of its partitions):
 
 ```bash
 apt-get install -y fdisk
@@ -71,39 +71,39 @@ partx -a /dev/sda
 lsblk
 ```
 
-- `sfdisk --append` добавляет раздел в свободное место в конце (`,,` — от начала свободного места до конца
-  диска, `8e` — тип «Linux LVM»). Существующие разделы не трогаются;
-- диск занят (на нём система), поэтому `sfdisk` скажет, что ядро таблицу не перечитало, а `partx -a` —
-  что не может добавить старые разделы: это нормально, `partx` добавляет только новый;
-- в `lsblk` появился новый раздел (например `sda3`). Если нет — `reboot`.
+- `sfdisk --append` adds a partition in the free space at the end (`,,` means from the start of the free space to the
+  end of the disk, `8e` is the "Linux LVM" type). Existing partitions are not touched;
+- the disk is in use (the system is on it), so `sfdisk` reports that the kernel did not re-read the table, and `partx -a`
+  reports that it cannot add the old partitions. This is normal: `partx` adds only the new one;
+- a new partition (for example `sda3`) now shows up in `lsblk`. If it does not, `reboot`.
 
-Дальше как в варианте Б, только с этим разделом: `pvcreate /dev/sda3`, `vgcreate vms /dev/sda3`,
+Then continue as in option B, using this partition: `pvcreate /dev/sda3`, `vgcreate vms /dev/sda3`,
 `lvcreate --type thin-pool -l 90%FREE -n data vms`.
 
-Проверка: `lvs` показывает `data` с атрибутами `twi-a-tz--` (тонкий пул, активен).
+Check: `lvs` shows `data` with the attributes `twi-a-tz--` (thin pool, active).
 
-Почему `90%FREE`, а не всё: остаток группы — запас, чтобы при необходимости увеличить служебную часть пула
-(`lvextend --poolmetadatasize`) или сам пул.
+Why `90%FREE` and not everything: the rest of the group is a reserve, so you can grow the pool's metadata
+(`lvextend --poolmetadatasize`) or the pool itself if needed.
 
-Если `install.sh` уже запускали до того, как появился пул, запусти его ещё раз: он допишет группу в настройки.
+If you already ran `install.sh` before the pool existed, run it again: it will add the group to the settings.
 
-### Мост для сети VM
+### Bridge for VM networking
 
-Сетевая карта VM подключается к мосту на хосте: это виртуальный коммутатор, в который включены и настоящая
-карта хоста, и карты VM. Тогда VM — такое же устройство в домашней сети, как любое другое, и получает адрес
-от роутера. В морде при создании VM выбирается мост; пока мостов нет, сети у VM не будет.
+A VM's network card connects to a bridge on the host. A bridge is a virtual switch that both the host's real network
+card and the VMs' cards are plugged into. That way a VM is a regular device on your home network, like any other, and
+gets its address from the router. When you create a VM in the web UI, you choose a bridge; until a bridge exists, VMs have no network.
 
-Делается через systemd-networkd: он уже есть в Debian, ставить ничего не нужно. **Делай это с клавиатуры
-хоста (или из консоли, если хост сам виртуальный), не по SSH**: сеть при переключении пропадёт. Wi-Fi-карту
-в мост включить нельзя, нужна проводная.
+This is done with systemd-networkd: it is already part of Debian, so there is nothing to install. **Do this from the host's
+keyboard (or from the console, if the host is itself virtual), not over SSH**: the network goes down during the switch.
+A Wi-Fi card cannot be added to a bridge; you need a wired one.
 
-Имя карты:
+The card's name:
 
 ```bash
 ip -br link
 ```
 
-Нужна та, что `UP` и не `lo`, например `enp1s0` или `eno1`. Ниже вместо `enp1s0` подставь её имя.
+You need the one that is `UP` and is not `lo`, for example `enp1s0` or `eno1`. Below, replace `enp1s0` with its name.
 
 ```bash
 printf '[NetDev]\nName=br0\nKind=bridge\n' > /etc/systemd/network/10-br0.netdev
@@ -111,12 +111,12 @@ printf '[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nClientIdentifier=
 printf '[Match]\nName=enp1s0\n\n[Network]\nBridge=br0\n' > /etc/systemd/network/20-br0-port.network
 ```
 
-- `10-br0.netdev` создаёт мост `br0`;
-- `10-br0.network`: адрес по DHCP получает мост. `ClientIdentifier=mac` — представляться роутеру по MAC,
-  так адрес не будет меняться;
-- `20-br0-port.network`: карта включается в мост и сама адреса больше не получает.
+- `10-br0.netdev` creates the bridge `br0`;
+- `10-br0.network`: the bridge gets the address via DHCP. `ClientIdentifier=mac` makes it identify itself to the router
+  by MAC, so the address does not change;
+- `20-br0-port.network`: the card is added to the bridge and no longer gets an address of its own.
 
-Теперь убрать карту из старой настройки сети (ifupdown) и включить networkd:
+Now remove the card from the old network configuration (ifupdown) and enable networkd:
 
 ```bash
 cp /etc/network/interfaces /etc/network/interfaces.bak
@@ -125,22 +125,22 @@ systemctl enable systemd-networkd
 reboot
 ```
 
-- `sed` комментирует строки про эту карту в `/etc/network/interfaces`, иначе ей будут управлять двое;
-- `/etc/resolv.conf` (DNS) остаётся таким, каким его оставил старый DHCP-клиент: он уже правильный. Если
-  DNS-сервер в сети потом сменится, поправь этот файл или поставь `systemd-resolved`.
+- `sed` comments out the lines about this card in `/etc/network/interfaces`; otherwise two services would manage it;
+- `/etc/resolv.conf` (DNS) stays as the old DHCP client left it: it is already correct. If the DNS server on your
+  network changes later, edit this file or install `systemd-resolved`.
 
-После загрузки:
+After the reboot:
 
 ```bash
 networkctl                  # br0: routable configured, enp1s0: enslaved configured
-ip -br a                    # адрес теперь у br0
-getent hosts debian.org     # DNS работает
+ip -br a                    # the address is now on br0
+getent hosts debian.org     # DNS works
 ```
 
-**Адрес хоста может смениться один раз**: роутер видит нового DHCP-клиента. Новый — в `ip -br a`. Чтобы
-адрес морды больше не менялся, закрепи его за хостом в настройках DHCP роутера.
+**The host's address may change once**: the router sees a new DHCP client. The new address is in `ip -br a`. To keep
+the web UI's address from changing again, reserve it for the host in your router's DHCP settings.
 
-Откат (с клавиатуры хоста):
+Rollback (from the host's keyboard):
 
 ```bash
 rm /etc/systemd/network/10-br0.* /etc/systemd/network/20-br0-port.network
@@ -148,36 +148,39 @@ cp /etc/network/interfaces.bak /etc/network/interfaces
 reboot
 ```
 
-Две сети (например, хост для VM-роутера: LAN и WAN) — два моста, так же: `br-lan` и `br-wan`, у каждого своя
-карта. Адрес хосту нужен только в одной из них; у второго моста в `.network` вместо `DHCP=` пишется
-`LinkLocalAddressing=no`.
+For two networks (for example, a host for a router VM: LAN and WAN), create two bridges the same way, `br-lan` and
+`br-wan`, each with its own card. The host needs an address on only one of them; in the second bridge's `.network`,
+write `LinkLocalAddressing=no` instead of `DHCP=`.
 
-## Первая установка
+## First installation
 
-Хост подготовлен (раздел выше). Всё на хосте под root.
+The host is prepared (see the section above). Run everything on the host as root.
 
-### 1. Ключ для чтения репозитория
+### 1. Key for reading the repository
 
-Репо приватный, хосту нужен свой read-only deploy key (ключ роутера к этому репо доступа не даёт):
+Once the repository is public, skip this step: in step 2, clone over HTTPS instead
+(`https://github.com/poltavetsvolodymyr/home-ve.git` in place of `git@github.com:poltavetsvolodymyr/home-ve.git`).
+
+While the repository is private, the host needs its own read-only deploy key:
 
 ```bash
 ssh-keygen -t ed25519 -f /root/.ssh/home_deploy -N "" -C "home deploy"
 cat /root/.ssh/home_deploy.pub
 ```
 
-Публичный ключ: GitHub → home-ve → Settings → Deploy keys → Add (без «Allow write access»). Потом:
+Add the public key: GitHub → home-ve → Settings → Deploy keys → Add (without "Allow write access"). Then:
 
 ```bash
 printf 'Host github.com\n    IdentityFile /root/.ssh/home_deploy\n' >> /root/.ssh/config
 ssh -T git@github.com
 ```
 
-- `printf` дописывает в `/root/.ssh/config` две строки (`\n` — перевод строки): для github.com брать этот ключ;
-- `ssh -T` проверяет ключ: на вопрос про отпечаток ответь `yes`, дальше должно быть
-  `Hi poltavetsvolodymyr/home-ve! You've successfully authenticated`. `Permission denied` — ключ на GitHub
-  не тот или не добавлен.
+- `printf` appends two lines to `/root/.ssh/config` (`\n` is a line break): use this key for github.com;
+- `ssh -T` tests the key: answer `yes` to the fingerprint question; after that you should see
+  `Hi poltavetsvolodymyr/home-ve! You've successfully authenticated`. `Permission denied` means the key on GitHub
+  is the wrong one or was not added.
 
-### 2. Клонировать только `deploy/`
+### 2. Clone only `deploy/`
 
 ```bash
 apt-get install -y git
@@ -185,69 +188,69 @@ git clone --filter=blob:none --sparse git@github.com:poltavetsvolodymyr/home-ve.
 cd /opt/home-ve && git sparse-checkout set deploy
 ```
 
-### 3. Установить
+### 3. Install
 
 ```bash
 bash /opt/home-ve/deploy/install.sh
 ```
 
-.NET на хост не ставится. Что делает скрипт:
+.NET is not installed on the host. What the script does:
 
-- ставит недостающее из `qemu-system-x86`, `socat`, `lvm2`, `thin-provisioning-tools`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
-  `nginx`, `openssl`. Через D-Bus `systemctl` от обычного пользователя разговаривает с systemd, а в минимальном
-  Debian его может не быть;
-- создаёт системного пользователя `home-backend` (без shell и home);
-- создаёт `/etc/home-backend/config.json` из образца (права 0640) и спрашивает пароль для морды;
-- **находит, куда класть диски VM**: группу LVM, в которой есть тонкий пул `data`, и пишет её в `DiskGroup`
-  (только если там ещё пусто). Пула нет — скрипт подскажет, как его сделать, например
-  `lvcreate --type thin-pool -l 90%FREE -n data <группа>`; пока его нет и `install.sh` не запущен снова,
-  морда не создаёт VM;
-- **переводит старые `.conf`** на новый формат: `NETS="br-lan=… br-wan=…"` → строки `NET=br-lan …`,
-  и если `vm@<имя>` был включён (`enable`), пишет `AUTOSTART=yes` и выключает этот `enable`. Теперь при
-  загрузке VM запускает `vm-autostart.service`. Старый файл остаётся рядом как `<имя>.conf.bak`;
-- ставит `vm-run`, `qmp`, `vm-autostart` в `/usr/local/sbin`, юниты в `/etc/systemd/system`, правило polkit
-  в `/etc/polkit-1/rules.d`; `/etc/vm` получает группу `home-backend` и права 0775;
-- ставит юнит бэкенда, включает и перезапускает его;
-- целиком заменяет `/var/www/home` свежим фронтом;
-- **nginx**: сайт `/etc/nginx/sites-available/home` берётся из `deploy/nginx/home.conf` при каждом запуске
-  (предыдущий остаётся рядом как `home.bak`, и если `nginx -t` новый не принимает, возвращается он). Какой
-  сертификат — написано в `/etc/nginx/home-ve/tls.conf`: его скрипт создаёт один раз и дальше не трогает.
-  Сначала там самоподписанный сертификат на имя и адреса хоста (`/etc/nginx/home-ve/selfsigned.*`, на 825 дней;
-  за 30 дней до конца скрипт делает новый). Если сайт уже был настроен руками, `tls.conf` получает его сертификат.
+- installs whatever is missing from `qemu-system-x86`, `socat`, `lvm2`, `thin-provisioning-tools`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
+  `nginx`, `openssl`. `systemctl` run by a regular user talks to systemd over D-Bus, and a minimal Debian
+  may not have it;
+- creates the system user `home-backend` (no shell, no home directory);
+- creates `/etc/home-backend/config.json` from the template (mode 0640) and asks for the web UI password;
+- **finds where to put VM disks**: the LVM volume group that contains the `data` thin pool, and writes it to `DiskGroup`
+  (only if that is still empty). If there is no pool, the script tells you how to create one, for example
+  `lvcreate --type thin-pool -l 90%FREE -n data <group>`; until the pool exists and you run `install.sh` again,
+  the web UI does not create VMs;
+- **converts old `.conf` files** to the new format: `NETS="br-lan=… br-wan=…"` → lines `NET=br-lan …`,
+  and if `vm@<name>` was enabled (`enable`), writes `AUTOSTART=yes` and disables that `enable`. VMs are now started
+  at boot by `vm-autostart.service`. The old file is kept next to it as `<name>.conf.bak`;
+- installs `vm-run`, `qmp`, `vm-autostart` to `/usr/local/sbin`, the units to `/etc/systemd/system`, the polkit rule
+  to `/etc/polkit-1/rules.d`; `/etc/vm` gets the group `home-backend` and mode 0775;
+- installs the backend unit, enables it and restarts it;
+- replaces `/var/www/home` entirely with the fresh frontend;
+- **nginx**: the site `/etc/nginx/sites-available/home` is taken from `deploy/nginx/home.conf` on every run
+  (the previous one is kept next to it as `home.bak`, and if `nginx -t` rejects the new one, the old one is restored). Which
+  certificate to use is set in `/etc/nginx/home-ve/tls.conf`: the script creates it once and never touches it again.
+  At first it points to a self-signed certificate for the host's name and addresses (`/etc/nginx/home-ve/selfsigned.*`, valid for 825 days;
+  30 days before it expires the script makes a new one). If the site was already configured by hand, `tls.conf` gets its certificate.
 
-Готово: морда открывается по `https://<адрес хоста>/`. С самоподписанным сертификатом браузер один раз
-предупредит (соединение всё равно шифруется). Без предупреждения — свой домен и сертификат, шаг 4.
+Done: the web UI is at `https://<host address>/`. With the self-signed certificate the browser warns you once
+(the connection is still encrypted). To get rid of the warning, use your own domain and certificate, step 4.
 
-Работающие VM скрипт не трогает. Новый `vm-run` (и с ним консоль в браузере) VM получит при следующем
-перезапуске. Если в VM роутер, это ~30 секунд без интернета, так что выбери удобный момент:
+The script does not touch running VMs. A VM gets the new `vm-run` (and with it the browser console) on its next
+restart. If the VM is a router, this means ~30 seconds without internet, so pick a convenient moment:
 
 ```bash
 systemctl restart vm@router
-ls -l /run/vm-router/      # vnc.sock: srw-rw---- root home-backend; остальные сокеты только root
+ls -l /run/vm-router/      # vnc.sock: srw-rw---- root home-backend; other sockets root only
 ```
 
-### 4. Свой домен и сертификат (по желанию)
+### 4. Your own domain and certificate (optional)
 
-Так сделано у автора: домен в Cloudflare, сертификат Let's Encrypt через acme.sh с проверкой через DNS, поэтому
-хост не должен быть виден из интернета. Ниже `example.com`, `home.example.com` и `192.168.1.2` — подставь свои.
+This is how the author does it: the domain is on Cloudflare, the certificate is from Let's Encrypt via acme.sh with
+DNS validation, so the host does not need to be reachable from the internet. Below, replace `example.com`, `home.example.com` and `192.168.1.2` with your own values.
 
-**Имя.** Cloudflare → домен → DNS → Add record:
+**Name.** Cloudflare → domain → DNS → Add record:
 
 | Type | Name | IPv4 | Proxy |
 |---|---|---|---|
-| A | `home` | `192.168.1.2` | DNS only (серое облако) |
+| A | `home` | `192.168.1.2` | DNS only (grey cloud) |
 
-Снаружи по этому адресу ничего нет (это адрес в домашней сети), а дома и через VPN он ведёт на хост. Если
-DNS-сервер роутера защищён от DNS rebinding (dnsmasq со `stop-dns-rebind`), разреши свой домен:
-`rebind-domain-ok=/example.com/`. Проверка с хоста: `getent hosts home.example.com` → `192.168.1.2`.
+From outside, there is nothing at this address (it is an address on your home network), but at home and over VPN it points to the host. If
+your router's DNS server is protected against DNS rebinding (dnsmasq with `stop-dns-rebind`), allow your domain:
+`rebind-domain-ok=/example.com/`. Check from the host: `getent hosts home.example.com` → `192.168.1.2`.
 
-**Сертификат.** Нужен API-токен Cloudflare с правом Zone → DNS → Edit на этот домен и Zone ID (страница домена,
-справа внизу).
+**Certificate.** You need a Cloudflare API token with the Zone → DNS → Edit permission for this domain, and the Zone ID
+(on the domain's page, bottom right).
 
 ```bash
 git clone --depth 1 https://github.com/acmesh-official/acme.sh.git /tmp/acme.sh
 cd /tmp/acme.sh
-./acme.sh --install --nocron --noprofile --home /opt/acme.sh --config-home /etc/acme.sh --accountemail твой@email
+./acme.sh --install --nocron --noprofile --home /opt/acme.sh --config-home /etc/acme.sh --accountemail you@email
 cd / && rm -rf /tmp/acme.sh
 chmod 700 /etc/acme.sh
 read -rsp 'CF token: ' CF_TOKEN; echo
@@ -257,11 +260,11 @@ CF_Token=$CF_TOKEN CF_Zone_ID=$CF_ZONE /opt/acme.sh/acme.sh --config-home /etc/a
 unset CF_TOKEN CF_ZONE
 ```
 
-- `read -s` не показывает ввод, и вставленное через `read` не попадает в историю команд.
-- Вставлять только значение, без `CF_TOKEN=` и кавычек.
-- acme.sh запоминает токен в `/etc/acme.sh/account.conf` (только root) для продлений.
+- `read -s` does not echo the input, and what you paste into `read` does not end up in the shell history.
+- Paste only the value, without `CF_TOKEN=` and without quotes.
+- acme.sh stores the token in `/etc/acme.sh/account.conf` (root only) for renewals.
 
-Положить для nginx, сказать nginx, что брать его, и продлевать раз в сутки:
+Install the certificate for nginx, tell nginx to use it, and check for renewal once a day:
 
 ```bash
 install -d -m 700 /etc/nginx/tls
@@ -298,208 +301,220 @@ EOF
 systemctl daemon-reload && systemctl enable --now acme-renew.timer
 ```
 
-Куда класть новый сертификат и что перезагружать, `--cron` берёт из `/etc/acme.sh/example.com_ecc/example.com.conf`
-(`Le_RealKeyPath`, `Le_RealFullChainPath`, `Le_ReloadCmd`): их туда записал `--install-cert`.
+`--cron` reads where to put the new certificate and what to reload from `/etc/acme.sh/example.com_ecc/example.com.conf`
+(`Le_RealKeyPath`, `Le_RealFullChainPath`, `Le_ReloadCmd`): `--install-cert` wrote them there.
 
-Открыть `https://home.example.com`.
+Open `https://home.example.com`.
 
-### Что в `home.conf`
+### What is in `home.conf`
 
-- `map $http_upgrade $connection_upgrade` и `location ~ ^/api/vms/[^/]+/console$` — консоль работает
-  через WebSocket. nginx по умолчанию разговаривает с бэкендом по HTTP/1.0 и выбрасывает заголовки
-  `Upgrade`/`Connection`, а здесь передаёт их, и соединение «переключается» в WebSocket.
-- `proxy_read_timeout 1h` — без этого nginx закроет консоль через 60 секунд тишины на экране.
-- Регулярный `location ~` важнее обычного префиксного `/api/`, поэтому консоль попадает именно в него.
-- Свои правки сайта `install.sh` затрёт при следующем обновлении; сертификат — только в `tls.conf`.
+- `map $http_upgrade $connection_upgrade` and `location ~ ^/api/vms/[^/]+/console$`: the console works
+  over WebSocket. By default nginx talks to the backend over HTTP/1.0 and drops the `Upgrade`/`Connection`
+  headers; here it passes them through, so the connection is "upgraded" to WebSocket.
+- `proxy_read_timeout 1h`: without it nginx closes the console after 60 seconds of no activity on the screen.
+- A regex `location ~` takes priority over the plain `/api/` prefix, so the console requests go to it.
+- `install.sh` overwrites your own edits to the site on the next update; put certificate settings only in `tls.conf`.
 
-## Обновление
+## Updating
 
-После `build.ps1`, commit и push на компьютере:
+After running `build.ps1`, commit and push on your computer:
 
 ```bash
 /opt/home-ve/deploy/update.sh
 ```
 
-`update.sh` делает `git pull --ff-only` и, если что-то пришло, запускает свежий `install.sh`.
+`update.sh` runs `git pull --ff-only` and, if anything new arrived, runs the fresh `install.sh`.
 
-То же самое из морды: шестерёнка в шапке → **Update now** → подтверждение. Кнопка запускает
-`home-update.service`: это `update.sh` от root отдельной службой, поэтому обновление доживает до конца,
-хотя `install.sh` по ходу перезапускает бэкенд. Страница показывает статус и вывод скрипта, а после
-успешного обновления предлагает перезагрузить себя (мог прийти новый фронт). Из консоли:
-`systemctl restart home-update` и `journalctl -u home-update -n 50`.
+You can do the same from the web UI: gear icon in the header → **Update now** → confirm. The button starts
+`home-update.service`: this is `update.sh` run as root as a separate service, so the update runs to the end
+even though `install.sh` restarts the backend along the way. The page shows the status and the script's output, and after
+a successful update offers to reload itself (a new frontend may have arrived). From the console:
+`systemctl restart home-update` and `journalctl -u home-update -n 50`.
 
-Кнопка появится после первого обновления руками: юнит `home-update.service` и правило polkit для него
-ставит `install.sh`.
-Если изменился `vm-run` или `vm@.service`, VM подхватят их при следующем перезапуске.
+The button appears after the first manual update: `install.sh` installs the `home-update.service` unit and its polkit
+rule.
+If `vm-run` or `vm@.service` changed, VMs pick them up on their next restart.
 
-## Откат
+## Rollback
 
 ```bash
 cd /opt/home-ve
-git log --oneline -5             # найти предыдущую версию
-git reset --hard <хеш>           # вернуться к ней
-bash deploy/install.sh           # применить
+git log --oneline -5             # find the previous version
+git reset --hard <hash>          # go back to it
+bash deploy/install.sh           # apply it
 ```
 
-Вернуться на последнюю версию: `/opt/home-ve/deploy/update.sh`.
+To return to the latest version: `/opt/home-ve/deploy/update.sh`.
 
-## Безопасность
+## Security
 
-- Снаружи доступен только nginx. Kestrel слушает `127.0.0.1:5000`.
-- Запросы не из `AllowedNetworks` (по умолчанию частные сети `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` и сам
-  хост) обрываются без ответа. Сузить до своих сетей: `AllowedNetworks` в `config.json`.
-- Вход по паролю, хеш PBKDF2 в `/etc/home-backend/config.json`. Cookie сессии живёт 7 дней и `Secure`
-  (nginx передаёт `X-Forwarded-Proto`). Попыток входа не больше 10 за 5 минут с одного IP.
-- Бэкенд без root. Что именно ему разрешено (polkit, `/etc/vm`, сокет консоли), см.
-  [architecture.md](architecture.md#права-кто-что-может).
-- `vm-run` работает от root и не доверяет `.conf`: разбирает, а не исполняет, и пускает в качестве диска
-  только тонкие тома пула `data`.
-- Консоль — это клавиатура и экран VM. Кто вошёл в морду, тот может залогиниться в VM, если знает её пароль,
-  или перезагрузить её в single-user. Пароль морды должен быть не слабее root-пароля роутера.
+- Only nginx is reachable from outside. Kestrel listens on `127.0.0.1:5000`.
+- Requests not from `AllowedNetworks` (by default the private networks `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` and the
+  host itself) are dropped without a response. To narrow this down to your own networks, set `AllowedNetworks` in `config.json`.
+- Login is by password; a PBKDF2 hash is stored in `/etc/home-backend/config.json`. The session cookie lasts 7 days and is `Secure`
+  (nginx passes `X-Forwarded-Proto`). At most 10 login attempts per 5 minutes from one IP.
+- The backend does not run as root. For exactly what it is allowed to do (polkit, `/etc/vm`, the console socket), see
+  [architecture.md](architecture.md#permissions-who-can-do-what).
+- `vm-run` runs as root and does not trust `.conf` files: it parses them rather than executing them, and accepts only
+  thin volumes of the `data` pool as disks.
+- The console is the VM's keyboard and screen. Anyone logged in to the web UI can log in to a VM if they know its password,
+  or reboot it into single-user mode. The web UI password should be at least as strong as the root passwords of your VMs.
 
-## Настройки
+## Settings
 
-Файл `/etc/home-backend/config.json` (образец: `deploy/config.example.json`). После правки нужен
+File `/etc/home-backend/config.json` (template: `deploy/config.example.json`). After editing, run
 `systemctl restart home-backend`.
 
-| Ключ | По умолчанию | |
+| Key | Default | |
 |---|---|---|
-| `Urls` | `http://127.0.0.1:5000` | где слушает Kestrel; nginx проксирует сюда `/api/` |
-| `AllowedNetworks` | `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `::1/128` | кого пускать |
-| `DiskGroup` | — (находит `install.sh`) | группа LVM с тонким пулом `data`: диск новой VM — `/dev/<группа>/<имя>` |
-| `VmConfigDir` | `/etc/vm` | где `.conf` (vm-run всегда читает `/etc/vm`) |
-| `VmRuntimeDir` | `/run` | где папки `vm-<имя>` с сокетами |
-| `DataDir` | `/var/lib/home-backend` | ключи cookie |
-| `PasswordHash` | — | задаётся командой ниже |
+| `Urls` | `http://127.0.0.1:5000` | where Kestrel listens; nginx proxies `/api/` here |
+| `AllowedNetworks` | `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `::1/128` | who is allowed in |
+| `DiskGroup` | — (found by `install.sh`) | LVM volume group with the `data` thin pool: a new VM's disk is `/dev/<group>/<name>` |
+| `VmConfigDir` | `/etc/vm` | where the `.conf` files are (vm-run always reads `/etc/vm`) |
+| `VmRuntimeDir` | `/run` | where the `vm-<name>` folders with sockets are |
+| `DataDir` | `/var/lib/home-backend` | cookie keys |
+| `PasswordHash` | — | set with the command below |
 
-Сменить пароль:
+To change the password:
 
 ```bash
 /opt/home-ve/deploy/app/home-backend set-password /etc/home-backend/config.json && systemctl restart home-backend
 ```
 
-## Новая VM
+## New VM
 
-1. **ISO images → Download an ISO**: ссылка на установочный образ, например netinst Debian. Хост скачивает его
-   сам в `/var/lib/home-backend/iso`, телефон можно закрыть.
-2. **New VM**: имя, ядра, память, размер диска, ISO в CD-приводе, сетевые карты. С галкой «Start now» VM сразу
-   стартует, и открывается консоль с установщиком.
-3. При первом старте `vm-run` создаёт диск `/dev/<DiskGroup>/<имя>` (тонкий том в пуле `data`): место занимается
-   по мере записи. Пустой диск не грузится, и BIOS загружает CD. После установки грузится уже диск, так что ISO
-   можно оставить, а можно убрать в Settings → CD drive.
+1. **ISO images → Download an ISO**: a link to an installation image, for example Debian netinst. The host downloads it
+   itself to `/var/lib/home-backend/iso`, so you can close the page on your phone.
+2. **New VM**: name, cores, memory, disk size, ISO in the CD drive, network cards. With "Start now" checked, the VM
+   starts right away and the console with the installer opens.
+3. On first start, `vm-run` creates the disk `/dev/<DiskGroup>/<name>` (a thin volume in the `data` pool): space is used
+   as data is written. An empty disk is not bootable, so the BIOS boots from the CD. After installation the disk boots, so you
+   can leave the ISO in place or remove it in Settings → CD drive.
 
-VM грузится через BIOS (SeaBIOS), как роутер. Установщики это умеют, но систему ставить нужно в режиме BIOS/MBR.
+VMs boot via BIOS (SeaBIOS). Installers support this, but you must install the system in BIOS/MBR mode.
 
-**Удаление**: VM → Settings → Delete VM, только остановленную. Без галки удаляется только `.conf`, диск остаётся,
-и новая VM с тем же именем подхватит его как есть. С галкой удаляется и диск, для этого нужно ввести имя VM.
+**Deleting**: VM → Settings → Delete VM, only when the VM is stopped. Without the checkbox only the `.conf` is deleted; the disk stays,
+and a new VM with the same name picks it up as is. With the checkbox the disk is deleted too; for that you must type the VM's name.
 
-## Бэкапы
+## Backups
 
-Куда: отдельный том `/dev/home/backups` (50G, ext4), смонтирован в `/var/backups/vm` (строка в `/etc/fstab`
-с `nofail`). Пока он не смонтирован, `install.sh` не включает таймер, а `vm-backup` отказывается писать,
-чтобы не забить корневой раздел.
+Where: a separate volume mounted at `/var/backups/vm`. Until it is mounted, `install.sh` does not enable the timer, and `vm-backup` refuses to write,
+so the root filesystem does not fill up.
 
-Как (`deploy/vm/vm-backup`, юнит `vm-backup@<имя>`):
-
-1. если VM работает и в ней есть `qemu-guest-agent`, файловые системы гостя на мгновение замораживаются (fsfreeze);
-   без агента копия как после выдернутого шнура, журналируемые ФС это переживают;
-2. тонкий снапшот диска: мгновенно и без места;
-3. гость размораживается и работает дальше, а снапшот сжимается `zstd` в
-   `/var/backups/vm/<имя>/<имя>-<ГГГГММДД-ЧЧММСС>.img.zst` (рядом `.conf` — настройки VM на тот момент, `.info` — размер диска);
-4. снапшот удаляется; остаются самые свежие бэкапы за каждый из 7 последних дней и за каждую из 4 недель до них.
-
-Когда: каждую ночь около 3:30 (`vm-backup-all.timer`, ±30 минут) для всех VM без `BACKUP=no`, и кнопкой
-VM → Backups → Back up now. Галка «Back up every night» в настройках VM включает и выключает ночной бэкап.
-
-Восстановление: VM → Backups → Restore, только у остановленной VM, с вводом имени. Диск перезаписывается
-бэкапом, а то, что было на нём до этого, остаётся снапшотом `home/<имя>-undo` до следующего восстановления.
-Пока идёт восстановление, VM не стартует.
+Create the volume, for example a regular (not thin) LV in your volume group, or use a separate disk. Format it as ext4,
+mount it at `/var/backups/vm` with an `/etc/fstab` line that uses `nofail`, then run `install.sh` again to enable the
+nightly timer. Replace `<group>` with your volume group's name:
 
 ```bash
-systemctl list-timers vm-backup-all              # когда следующий ночной запуск
-systemctl restart vm-backup@router               # бэкап руками
-journalctl -u vm-backup@router -n 30             # как прошёл
-ls -lh /var/backups/vm/router/                   # что лежит
-systemctl start vm-restore@router:20261008-033512   # восстановить (VM должна быть остановлена)
-lvconvert --merge home/router-undo               # откатить восстановление (VM остановлена)
+lvcreate -L 50G -n backups <group>
+mkfs.ext4 /dev/<group>/backups
+mkdir -p /var/backups/vm
+echo '/dev/<group>/backups /var/backups/vm ext4 defaults,nofail 0 2' >> /etc/fstab
+mount /var/backups/vm
+bash /opt/home-ve/deploy/install.sh
 ```
 
-## Выгрузка наружу (Cloudflare R2)
+How (`deploy/vm/vm-backup`, unit `vm-backup@<name>`):
 
-Вторая копия бэкапов вне дома: `/var/backups/vm` целиком и архив настроек хоста (`/etc`, `/root/.ssh`,
-`/var/lib/home-backend` без ISO) уходят в бакет R2 **зашифрованными на хосте** (rclone crypt: шифруются и данные,
-и имена файлов). Делает это `vm-offsite` (`deploy/offsite`), юнит `vm-offsite.service`: каждую ночь после бэкапов VM
-и кнопкой Settings → Offsite backup → **Upload now**.
+1. if the VM is running and has `qemu-guest-agent`, the guest's filesystems are frozen for a moment (fsfreeze);
+   without the agent the copy is like after pulling the power cord, which journaling filesystems survive;
+2. a thin snapshot of the disk is taken: instant and takes no space;
+3. the guest is unfrozen and keeps running, and the snapshot is compressed with `zstd` to
+   `/var/backups/vm/<name>/<name>-<YYYYMMDD-HHMMSS>.img.zst` (next to it: `.conf`, the VM's settings at that moment, and `.info`, the disk size);
+4. the snapshot is deleted. Retention keeps the most recent backup for each of the last 7 days and for each of the 4 weeks before that.
 
-В облаке:
-- `vm/` — зеркало `/var/backups/vm` (то, что удалила локальная ротация, удаляется и здесь, но сначала…);
-- `trash/<время>/` — …переезжает сюда и лежит ещё 30 дней.
+When: every night around 3:30 (`vm-backup-all.timer`, ±30 minutes) for all VMs without `BACKUP=no`, and with the
+VM → Backups → Back up now button. The "Back up every night" checkbox in the VM's settings turns the nightly backup on and off.
 
-Предохранители (`/etc/vm-offsite/offsite.conf`, образец `offsite.conf.example` рядом): не больше 5 ГБ за запуск,
-ничего не грузится, если локально или в облаке больше 60 ГиБ, не больше 20 удалений за запуск, скорость 20 Мбит/с.
-Плюс квота на роутере: не больше 100 ГиБ в месяц с хоста в Cloudflare (nftables, правится руками на роутере).
-rclone ходит строго по IPv4 (`--bind 0.0.0.0`), чтобы квота роутера его видела.
+Restore: VM → Backups → Restore, only for a stopped VM, and you must type its name. The disk is overwritten with
+the backup, and what was on it before is kept as the snapshot `<group>/<name>-undo` until the next restore.
+While a restore is running, the VM does not start.
 
-### Настройка (один раз)
+```bash
+systemctl list-timers vm-backup-all              # when the next nightly run is
+systemctl restart vm-backup@router               # manual backup
+journalctl -u vm-backup@router -n 30             # how it went
+ls -lh /var/backups/vm/router/                   # what is stored
+systemctl start vm-restore@router:20261008-033512   # restore (the VM must be stopped)
+lvconvert --merge <group>/router-undo            # undo the restore (VM stopped)
+```
 
-`install.sh` ставит rclone с rclone.org, если его нет или он старше 1.65: rclone 1.60 из Debian 13 с R2 не работает
-(ошибка `501 Not Implemented` на каждом файле).
+## Offsite copy (Cloudflare R2)
 
-1. **Cloudflare → R2 → Create bucket**: имя, например, `home-backups`, Location: **Europe (EU)**, класс Standard.
-2. **R2 → Manage API tokens → Create API token**: Object Read & Write, только этот бакет. Запиши Access Key ID,
-   Secret Access Key и endpoint `https://<account-id>.r2.cloudflarestorage.com` (для EU-бакета —
+A second copy of the backups outside your home: all of `/var/backups/vm` and an archive of the host's settings (`/etc`, `/root/.ssh`,
+`/var/lib/home-backend` without ISOs) go to an R2 bucket, **encrypted on the host** (rclone crypt: both the data
+and the file names are encrypted). This is done by `vm-offsite` (`deploy/offsite`), unit `vm-offsite.service`: every night after the VM backups,
+and with the Settings → Offsite backup → **Upload now** button.
+
+In the cloud:
+- `vm/` is a mirror of `/var/backups/vm` (whatever local retention deleted is deleted here too, but first…);
+- `trash/<time>/` …it moves here and stays for another 30 days.
+
+Safeguards (`/etc/vm-offsite/offsite.conf`, template `offsite.conf.example` next to it): at most 5 GB per run,
+nothing is uploaded if more than 60 GiB is stored locally or in the cloud, at most 20 deletions per run, bandwidth limited to 20 Mbit/s.
+If your router can do it, a monthly quota for the host's traffic to Cloudflare is a good extra safeguard (the author uses an nftables quota on the router).
+rclone uses IPv4 only (`--bind 0.0.0.0`) so that such a router quota can see it.
+
+### Setup (once)
+
+`install.sh` installs rclone from rclone.org if it is missing or older than 1.65: rclone 1.60 from Debian 13 does not work with R2
+(error `501 Not Implemented` on every file).
+
+1. **Cloudflare → R2 → Create bucket**: a name, for example `home-backups`, Location: **Europe (EU)**, class Standard.
+2. **R2 → Manage API tokens → Create API token**: Object Read & Write, this bucket only. Write down the Access Key ID,
+   the Secret Access Key and the endpoint `https://<account-id>.r2.cloudflarestorage.com` (for an EU bucket:
    `https://<account-id>.eu.r2.cloudflarestorage.com`).
-3. На хосте, ключи вводишь сам (в истории shell они не останутся):
+3. On the host, enter the keys yourself (they will not stay in the shell history):
    ```bash
    rclone config --config /etc/vm-offsite/rclone.conf
    ```
-   - `n` → имя **`r2`** → тип `s3` → provider `Cloudflare` → `access_key_id`, `secret_access_key` → endpoint из
-     шага 2 → остальное по умолчанию. В advanced config: **`no_check_bucket = true`** (токен на один бакет не
-     может создавать бакеты, без этого загрузка падает с AccessDenied).
-   - `n` → имя **`offsite`** → тип `crypt` → remote **`r2:home-backups`** → filename_encryption `standard` →
-     directory_name_encryption `true` → пароль: `g` (сгенерировать) или свой → второй пароль (salt) тоже.
-   - **Оба пароля сразу сохрани вне хоста** (менеджер паролей). Без них бэкапы в облаке не открыть, если хост умрёт.
-4. Проверка и первая выгрузка:
+   - `n` → name **`r2`** → type `s3` → provider `Cloudflare` → `access_key_id`, `secret_access_key` → endpoint from
+     step 2 → everything else default. In the advanced config: **`no_check_bucket = true`** (a token for a single bucket cannot
+     create buckets; without this, uploads fail with AccessDenied).
+   - `n` → name **`offsite`** → type `crypt` → remote **`r2:home-backups`** → filename_encryption `standard` →
+     directory_name_encryption `true` → password: `g` (generate) or your own → the second password (salt) the same way.
+   - **Save both passwords outside the host right away** (in a password manager). Without them you cannot open the cloud backups if the host dies.
+4. Check and run the first upload:
    ```bash
    chmod 600 /etc/vm-offsite/rclone.conf
-   rclone --config /etc/vm-offsite/rclone.conf lsd r2:home-backups     # бакет виден (пусто — нормально)
-   systemctl restart vm-offsite && journalctl -u vm-offsite -f         # или Upload now в вебморде
+   rclone --config /etc/vm-offsite/rclone.conf lsd r2:home-backups     # bucket is visible (empty is fine)
+   systemctl restart vm-offsite && journalctl -u vm-offsite -f         # or Upload now in the web UI
    ```
-   В Cloudflare в бакете будут папки и файлы с нечитаемыми именами: так и должно быть.
+   In Cloudflare the bucket will contain folders and files with unreadable names: this is expected.
 
-### Восстановление из облака
+### Restoring from the cloud
 
-С любой машины с rclone и тем же `rclone.conf` (его можно собрать заново: шаг 3 с теми же паролями):
+From any machine with rclone and the same `rclone.conf` (you can recreate it: step 3 with the same passwords):
 ```bash
-rclone --config rclone.conf lsf -R offsite:vm/router                  # что есть
+rclone --config rclone.conf lsf -R offsite:vm/router                  # what is there
 rclone --config rclone.conf copy offsite:vm/router/router-20261008-033512.img.zst /var/backups/vm/router/
 ```
-Файл ложится расшифрованным; дальше Restore в вебморде как обычно (рядом с `.img.zst` скопируй `.conf` и `.info`).
-Настройки хоста: `offsite:vm/_host/host-<время>.tar.zst` → `tar --zstd -xf … -C /tmp/restore` и разложить нужное.
+The file arrives decrypted. Then use Restore in the web UI as usual (copy the `.conf` and `.info` next to the `.img.zst`).
+Host settings: `offsite:vm/_host/host-<time>.tar.zst` → `tar --zstd -xf … -C /tmp/restore`, then put back what you need.
 
-## VM руками, без морды
+## Managing VMs by hand, without the web UI
 
 ```bash
-systemctl status vm@router            # состояние
-systemctl restart vm@router           # перезапуск: выключение через кнопку питания, потом старт
-qmp router system_powerdown           # «нажать кнопку питания»
-journalctl -u vm@router -n 50         # почему не стартует: vm-run пишет, какая строка .conf не так
-nano /etc/vm/router.conf              # правка; применится при следующем старте
+systemctl status vm@router            # state
+systemctl restart vm@router           # restart: shutdown via the power button, then start
+qmp router system_powerdown           # "press the power button"
+journalctl -u vm@router -n 50         # why it does not start: vm-run says which .conf line is wrong
+nano /etc/vm/router.conf              # edit; applied on the next start
 ```
 
-## Если что-то не так
+## Troubleshooting
 
 ```bash
-systemctl status home-backend                       # запущена ли служба
-journalctl -u home-backend -n 50                    # её лог
-curl -i http://127.0.0.1:5000/api/auth/me           # бэкенд напрямую: 401 = жив и ждёт входа
-curl -ik https://127.0.0.1/api/auth/me              # через nginx: тоже 401; 404 или 502 = конфиг nginx
+systemctl status home-backend                       # is the service running
+journalctl -u home-backend -n 50                    # its log
+curl -i http://127.0.0.1:5000/api/auth/me           # backend directly: 401 = alive and waiting for login
+curl -ik https://127.0.0.1/api/auth/me              # through nginx: also 401; 404 or 502 = nginx config
 pkcheck --action-id org.freedesktop.systemd1.manage-units --process $(systemctl show -p MainPID --value home-backend) \
-  --detail unit vm@router.service --detail verb restart   # разрешает ли polkit бэкенду перезапуск
+  --detail unit vm@router.service --detail verb restart   # does polkit allow the backend to restart it
 ```
 
-- `pkcheck` или кнопки: «Could not connect: No such file or directory» → не работает системная шина D-Bus: `apt-get install dbus && systemctl start dbus polkit`.
-- Кнопки дают «Interactive authentication required» → нет правила polkit или не стоит `polkitd`:
+- `pkcheck` or the buttons: "Could not connect: No such file or directory" → the D-Bus system bus is not running: `apt-get install dbus && systemctl start dbus polkit`.
+- The buttons give "Interactive authentication required" → the polkit rule is missing or `polkitd` is not installed:
   `ls /etc/polkit-1/rules.d/`, `systemctl status polkit`.
-- Консоль: «Failed to connect» и 502 → VM запущена старым `vm-run` без VNC-сокета: `systemctl restart vm@<имя>`.
-- Сохранение настроек: «Permission denied» → у `/etc/vm` не та группа: `bash /opt/home-ve/deploy/install.sh`.
+- Console: "Failed to connect" and 502 → the VM was started by an old `vm-run` without the VNC socket: `systemctl restart vm@<name>`.
+- Saving settings: "Permission denied" → `/etc/vm` has the wrong group: `bash /opt/home-ve/deploy/install.sh`.

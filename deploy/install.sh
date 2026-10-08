@@ -170,7 +170,7 @@ install_vm_tools() {
   install -d -m 0775 -o root -g home-backend "$VM_DIR"
   systemctl daemon-reload
   systemctl enable vm-autostart.service
-  # nightly backups, only once the backup volume is there (docs/deployment.md: "Бэкапы")
+  # nightly backups, only once the backup volume is there (docs/deployment.md: "Backups")
   if mountpoint -q /var/backups/vm; then
     install -d -m 0750 -g home-backend /var/backups/vm
     systemctl enable --now vm-backup-all.timer
@@ -178,7 +178,7 @@ install_vm_tools() {
     echo "note: /var/backups/vm is not mounted, nightly backups stay off (docs/deployment.md)" >&2
   fi
 
-  # offsite upload (docs/deployment.md, "Выгрузка наружу"): the script and unit always; it does nothing until
+  # offsite upload (docs/deployment.md, "Offsite copy"): the script and unit always; it does nothing until
   # /etc/vm-offsite/rclone.conf is set up by hand. The directory is root's, but home-backend may see whether
   # rclone.conf is there (x for others, no r) to tell "not set up" in the web UI.
   install -m 0755 "$DEPLOY_DIR/offsite/vm-offsite" /usr/local/sbin/
