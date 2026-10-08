@@ -87,6 +87,71 @@ lsblk
 
 Если `install.sh` уже запускали до того, как появился пул, запусти его ещё раз: он допишет группу в настройки.
 
+### Мост для сети VM
+
+Сетевая карта VM подключается к мосту на хосте: это виртуальный коммутатор, в который включены и настоящая
+карта хоста, и карты VM. Тогда VM — такое же устройство в домашней сети, как любое другое, и получает адрес
+от роутера. В морде при создании VM выбирается мост; пока мостов нет, сети у VM не будет.
+
+Делается через systemd-networkd: он уже есть в Debian, ставить ничего не нужно. **Делай это с клавиатуры
+хоста (или из консоли, если хост сам виртуальный), не по SSH**: сеть при переключении пропадёт. Wi-Fi-карту
+в мост включить нельзя, нужна проводная.
+
+Имя карты:
+
+```bash
+ip -br link
+```
+
+Нужна та, что `UP` и не `lo`, например `enp1s0` или `eno1`. Ниже вместо `enp1s0` подставь её имя.
+
+```bash
+printf '[NetDev]\nName=br0\nKind=bridge\n' > /etc/systemd/network/10-br0.netdev
+printf '[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nClientIdentifier=mac\n' > /etc/systemd/network/10-br0.network
+printf '[Match]\nName=enp1s0\n\n[Network]\nBridge=br0\n' > /etc/systemd/network/20-br0-port.network
+```
+
+- `10-br0.netdev` создаёт мост `br0`;
+- `10-br0.network`: адрес по DHCP получает мост. `ClientIdentifier=mac` — представляться роутеру по MAC,
+  так адрес не будет меняться;
+- `20-br0-port.network`: карта включается в мост и сама адреса больше не получает.
+
+Теперь убрать карту из старой настройки сети (ifupdown) и включить networkd:
+
+```bash
+cp /etc/network/interfaces /etc/network/interfaces.bak
+sed -i -E 's/^(allow-hotplug|auto) enp1s0$/# &/; s/^iface enp1s0 .*/# &/' /etc/network/interfaces
+systemctl enable systemd-networkd
+reboot
+```
+
+- `sed` комментирует строки про эту карту в `/etc/network/interfaces`, иначе ей будут управлять двое;
+- `/etc/resolv.conf` (DNS) остаётся таким, каким его оставил старый DHCP-клиент: он уже правильный. Если
+  DNS-сервер в сети потом сменится, поправь этот файл или поставь `systemd-resolved`.
+
+После загрузки:
+
+```bash
+networkctl                  # br0: routable configured, enp1s0: enslaved configured
+ip -br a                    # адрес теперь у br0
+getent hosts debian.org     # DNS работает
+```
+
+**Адрес хоста может смениться один раз**: роутер видит нового DHCP-клиента. Новый — в `ip -br a`. Чтобы
+адрес морды больше не менялся, закрепи его за хостом в настройках DHCP роутера.
+
+Откат (с клавиатуры хоста):
+
+```bash
+rm /etc/systemd/network/10-br0.* /etc/systemd/network/20-br0-port.network
+cp /etc/network/interfaces.bak /etc/network/interfaces
+reboot
+```
+
+Две сети (например, хост для VM-роутера: LAN и WAN) — два моста, так же: `br-lan` и `br-wan`, у каждого своя
+карта. Адрес хосту нужен только в одной из них; у второго моста в `.network` вместо `DHCP=` пишется
+`LinkLocalAddressing=no`.
+
 ## Первая установка
 
 Хост подготовлен (раздел выше). Всё на хосте под root.
