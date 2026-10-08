@@ -50,7 +50,8 @@ frozen=no
 # closed by qga_close only once every command has had its answer. Closing while an answer is on its way
 # leaves qemu-ga unable to send it, and it then spins on a CPU of the guest until restarted.
 pending=0 # commands sent, answers not read yet
-reply=''  # the last answer qga read
+reply=''  # the answer to the last qga command
+qga_seq=0 # numbers the commands: the agent puts the number ("id") into its answer
 
 # whether the guest has opened its end of the agent channel (QMP query-chardev: "frontend-open"), i.e. an
 # agent is listening; without one nothing is sent, so nothing waits for answers that never come
@@ -63,17 +64,32 @@ qga_open() {
   coproc QGA { exec socat - "UNIX-CONNECT:/run/vm-$name/qga.sock" 2>/dev/null; }
 }
 
-# qga <command>: sends it and puts the answer into $reply, or leaves it empty after 30 s. read wakes up as
-# soon as the answer is there. A late answer is still read: by the next qga or by qga_close. Call it
-# directly, not in a pipe or $(...): those run it in a subshell, which would lose count of the answers.
+# qga <command>: sends it with the next id and puts the answer carrying that id into $reply, or leaves it
+# empty after 30 s. Answers to earlier commands that come late are counted and skipped, so every command
+# gets its own answer. read wakes up as soon as a line is there. Call it directly, not in a pipe or $(...):
+# those run it in a subshell, which would lose count of the answers.
 qga() {
+  local id line left re
   reply=''
   [ -n "${QGA[1]:-}" ] || return 0 # not open, or socat is gone
+  qga_seq=$((qga_seq + 1))
+  id=$qga_seq
+  re="\"id\": *${id}[^0-9]" # "id": 12 is not "id": 1
   # a socat that just died must not kill the script with SIGPIPE
   trap '' PIPE
-  printf '{"execute":"%s"}\n' "$1" 1>&"${QGA[1]}" 2>/dev/null && pending=$((pending + 1))
+  printf '{"execute":"%s","id":%d}\n' "$1" "$id" 1>&"${QGA[1]}" 2>/dev/null && pending=$((pending + 1))
   trap - PIPE
-  if IFS= read -r -t 30 reply <&"${QGA[0]}"; then pending=$((pending - 1)); fi
+  local deadline=$((SECONDS + 30))
+  while [ "$pending" -gt 0 ] && [ -n "${QGA[0]:-}" ]; do
+    left=$((deadline - SECONDS))
+    [ "$left" -gt 0 ] || break
+    IFS= read -r -t "$left" line <&"${QGA[0]}" || break
+    pending=$((pending - 1))
+    if [[ $line =~ $re ]]; then
+      reply=$line
+      break
+    fi
+  done
 }
 
 # waits up to 2 minutes more for answers still owed, then closes (socat sees the end of its input)
