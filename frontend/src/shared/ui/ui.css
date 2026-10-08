@@ -42,6 +42,8 @@
 
 .segmented {
   display: inline-flex;
+  /* the buttons' offsetLeft counts from here (Segmented.tsx scrolls the chosen one into sight) */
+  position: relative;
   max-width: 100%;
   /* more tabs than a phone is wide: they scroll sideways inside the bar, not the whole page */
   overflow-x: auto;
@@ -243,4 +245,44 @@ dl.kv .kv-row {
   max-height: none;
   /* reaching the end of the log doesn't start scrolling the page */
   overscroll-behavior: contain;
+}
+
+/* --- head-inline: controls on the title's line ------------------------------ */
+
+/* Other cards put their controls on a line of their own on a phone; these keep them next to the title, on
+   the right. A select may get narrower and cut its text rather than push the card wider. */
+.card.head-inline .card-head {
+  flex-wrap: nowrap;
+}
+.card.head-inline .card-head h2 {
+  flex-shrink: 0;
+}
+.card.head-inline .card-actions {
+  width: auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+.card.head-inline .card-actions select {
+  min-width: 0;
+}
+
+/* --- fill-screen: a page whose last card takes the rest of the screen -------- */
+
+/* The page is exactly as tall as the screen between the bars, and its .fit-screen card (a log) stretches
+   over what the cards above leave, so the page doesn't scroll at all: only the log does. */
+.page.fill-screen {
+  height: calc(100vh - 125px);
+  height: calc(100dvh - 125px);
+}
+@media (max-width: 860px) {
+  .page.fill-screen {
+    height: calc(100vh - 173px - env(safe-area-inset-bottom));
+    height: calc(100dvh - 173px - env(safe-area-inset-bottom));
+  }
+}
+.page.fill-screen > .card.fit-screen {
+  flex: 1 1 0;
+  min-height: 180px;
+  max-height: none;
 }

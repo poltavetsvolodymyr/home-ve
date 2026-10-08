@@ -34,7 +34,8 @@ export function VmPage() {
   const [status, label] = vm ? stateBadge(vm.state) : ['neutral' as const, '']
 
   return (
-    <div className="page">
+    // on the Logs tab the log takes the rest of the screen: no page scrolling, only the log scrolls
+    <div className={tab === 'logs' ? 'page fill-screen' : 'page'}>
       <Link className="back-link" to="/vms">
         <ArrowLeft size={16} aria-hidden /> All VMs
       </Link>

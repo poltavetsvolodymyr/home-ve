@@ -17,7 +17,7 @@ export function VmLogs({ name }: { name: string }) {
   return (
     <Card
       title="Log"
-      className="fit-screen"
+      className="fit-screen head-inline"
       actions={
         <select value={lines} onChange={e => setLines(Number(e.target.value))} aria-label="Lines">
           {lineCounts.map(n => (

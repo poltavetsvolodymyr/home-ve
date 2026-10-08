@@ -117,7 +117,7 @@ export default function VmConsole({ name }: { name: string }) {
 
   return (
     <Card
-      className="vm-console"
+      className="vm-console head-inline"
       title={
         <>
           Console <Badge status={statusBadge[status]}>{status}</Badge>

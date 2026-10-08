@@ -160,19 +160,13 @@ button.danger {
   /* noVNC scales the screen into this box */
   height: min(70vh, 640px);
 }
-/* the console's buttons stay next to its title, also on a phone (cards elsewhere drop them below) */
-.vm-console .card-head {
-  flex-wrap: nowrap;
-}
+/* the title and the connection state on one line, next to the buttons (head-inline) */
 .vm-console .card-head h2 {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
 }
 .vm-console .card-actions {
-  width: auto;
-  flex-wrap: nowrap;
   flex-shrink: 0;
 }
 /* the status as a small note after the title; compact buttons so that all fits a 375px phone */
