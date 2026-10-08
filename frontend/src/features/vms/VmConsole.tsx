@@ -1,12 +1,14 @@
 import RFB from '@novnc/novnc'
 import { CornerDownLeft, Keyboard, Maximize, RotateCcw, X } from 'lucide-react'
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
-import { Card } from '@/shared/ui'
+import { Badge, Card, type Status as BadgeStatus } from '@/shared/ui'
 import { consoleUrl } from './api'
 import { lineEdit, panelKeyEvents, panelKeys, textEvents, type KeyEvent, type Modifier, type PanelKey } from './keysyms'
 import { VmKeys } from './VmKeys'
 
 type Status = 'connecting' | 'connected' | 'closed'
+
+const statusBadge: Record<Status, BadgeStatus> = { connecting: 'warning', connected: 'good', closed: 'neutral' }
 
 /** After a lost connection (a reboot: QEMU goes and a new one comes), try again every 2 s for a minute. */
 const retryMs = 2000
@@ -100,22 +102,16 @@ export default function VmConsole({ name }: { name: string }) {
 
   return (
     <Card
-      title="Console"
+      className="vm-console"
+      title={
+        <>
+          Console <Badge status={statusBadge[status]}>{status}</Badge>
+        </>
+      }
       actions={
         <>
-          <span className="muted vm-console-status">{status}</span>
-          <button disabled={status !== 'connected'} onClick={() => rfb.current?.sendCtrlAltDel()}>
-            Ctrl+Alt+Del
-          </button>
-          <button
-            className="icon-button"
-            title="Full screen"
-            aria-label="Full screen"
-            onClick={() => screen.current?.requestFullscreen?.()}
-          >
-            <Maximize size={16} aria-hidden />
-          </button>
-          {status === 'closed' && (
+          {/* a lost connection makes Ctrl+Alt+Del useless: Reconnect takes its place */}
+          {status === 'closed' ? (
             <button
               onClick={() => {
                 failures.current = 0
@@ -124,7 +120,19 @@ export default function VmConsole({ name }: { name: string }) {
             >
               <RotateCcw size={15} aria-hidden /> Reconnect
             </button>
+          ) : (
+            <button disabled={status !== 'connected'} onClick={() => rfb.current?.sendCtrlAltDel()}>
+              Ctrl+Alt+Del
+            </button>
           )}
+          <button
+            className="icon-button"
+            title="Full screen"
+            aria-label="Full screen"
+            onClick={() => screen.current?.requestFullscreen?.()}
+          >
+            <Maximize size={16} aria-hidden />
+          </button>
         </>
       }
     >
