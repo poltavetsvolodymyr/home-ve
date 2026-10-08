@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 # vm-backup <name>: backs up a VM's disk into /var/backups/vm/<name>/ without stopping it, then thins out
 # the old backups. vm-backup@<name>.service runs it as root (the web UI's "Back up now", the nightly timer).
 #
-#   1. if the VM runs and has a guest agent: freeze its file systems for a moment (fsfreeze), so the
-#      copy is as clean as after a proper shutdown; without an agent it's like a power cut, still fine
+#   1. if the VM runs and its guest agent is listening: freeze its file systems for a moment (fsfreeze),
+#      so the copy is as clean as after a proper shutdown; without an agent it's like a power cut, still fine
 #   2. a thin snapshot of the disk: instant, takes no space until the VM writes
 #   3. thaw the guest, which goes on working while the snapshot is compressed (zstd) into the backup
 #   4. remove the snapshot; keep the newest backup of each of the last 7 days and of 4 weeks before
@@ -46,14 +46,52 @@ out=$DIR/$name
 base=$out/$name-$stamp
 frozen=no
 
-# one QMP-like command to the guest agent; its answer, or nothing within 10 s
+# The guest agent (qemu-ga) is talked to over one connection for the whole backup, opened by qga_open and
+# closed by qga_close only once every command has had its answer. Closing while an answer is on its way
+# leaves qemu-ga unable to send it, and it then spins on a CPU of the guest until restarted.
+pending=0 # commands sent, answers not read yet
+reply=''  # the last answer qga read
+
+# whether the guest has opened its end of the agent channel (QMP query-chardev: "frontend-open"), i.e. an
+# agent is listening; without one nothing is sent, so nothing waits for answers that never come
+qga_listening() {
+  qmp "$name" query-chardev 2>/dev/null | grep -o '{[^{}]*"label": "qga"[^{}]*}' | grep -q '"frontend-open": true'
+}
+
+# socat in the background (coproc): QGA[1] writes to the agent, QGA[0] reads its answers
+qga_open() {
+  coproc QGA { exec socat - "UNIX-CONNECT:/run/vm-$name/qga.sock" 2>/dev/null; }
+}
+
+# qga <command>: sends it and puts the answer into $reply, or leaves it empty after 30 s. read wakes up as
+# soon as the answer is there. A late answer is still read: by the next qga or by qga_close. Call it
+# directly, not in a pipe or $(...): those run it in a subshell, which would lose count of the answers.
 qga() {
-  printf '{"execute":"%s"}\n' "$1" | timeout 15 socat -t 10 - "UNIX-CONNECT:/run/vm-$name/qga.sock" 2>/dev/null || true
+  reply=''
+  [ -n "${QGA[1]:-}" ] || return 0 # not open, or socat is gone
+  # a socat that just died must not kill the script with SIGPIPE
+  trap '' PIPE
+  printf '{"execute":"%s"}\n' "$1" 1>&"${QGA[1]}" 2>/dev/null && pending=$((pending + 1))
+  trap - PIPE
+  if IFS= read -r -t 30 reply <&"${QGA[0]}"; then pending=$((pending - 1)); fi
+}
+
+# waits up to 2 minutes more for answers still owed, then closes (socat sees the end of its input)
+qga_close() {
+  [ -n "${QGA_PID:-}" ] || return 0
+  while [ "$pending" -gt 0 ] && [ -n "${QGA[0]:-}" ] && IFS= read -r -t 120 _ <&"${QGA[0]}"; do
+    pending=$((pending - 1))
+  done
+  if [ "$pending" -gt 0 ]; then echo "the guest agent still owes $pending answer(s): it may need a restart in the guest"; fi
+  if [ -n "${QGA[1]:-}" ]; then eval "exec ${QGA[1]}>&-"; fi
+  wait "$QGA_PID" 2>/dev/null || true
+  QGA_PID=''
 }
 
 # whatever happens: thaw the guest, drop the snapshot, and no half backup left behind
 cleanup() {
-  if [ "$frozen" = yes ]; then qga guest-fsfreeze-thaw >/dev/null; fi
+  if [ "$frozen" = yes ]; then qga guest-fsfreeze-thaw; fi
+  qga_close
   lvremove -qy -- "$snap" >/dev/null 2>&1 || true
   rm -f -- "$base.img.zst.part"
   if [ ! -e "$base.img.zst" ]; then rm -f -- "$base.conf" "$base.info"; fi
@@ -65,17 +103,21 @@ trap 'exit 1' INT TERM
 install -d -m 0750 -g home-backend -- "$DIR" "$out"
 
 lvremove -qy -- "$snap" >/dev/null 2>&1 || true # left over from an interrupted run
-if systemctl is-active -q "vm@$name.service" && [ -S "/run/vm-$name/qga.sock" ]; then
-  frozen=yes # set before asking: should the answer get lost, cleanup still thaws
-  if qga guest-fsfreeze-freeze | grep -q '"return"'; then
+if systemctl is-active -q "vm@$name.service" && qga_listening; then
+  qga_open
+  frozen=yes # set before asking: should the answer be late, the thaw still goes out
+  qga guest-fsfreeze-freeze
+  if [[ $reply == *'"return"'* ]]; then
     echo "guest file systems frozen"
   else
-    echo "no answer from a guest agent: the copy is like after a power cut"
+    echo "the guest agent didn't confirm the freeze within 30 s: the copy may be like after a power cut"
   fi
+else
+  echo "no guest agent listening: the copy is like after a power cut"
 fi
 lvcreate -qq --snapshot --setactivationskip n --name "${snap#*/}" -- "$lv"
 if [ "$frozen" = yes ]; then
-  qga guest-fsfreeze-thaw >/dev/null
+  qga guest-fsfreeze-thaw
   frozen=no
 fi
 lvchange -qq -ay -K -- "$snap"
