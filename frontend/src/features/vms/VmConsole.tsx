@@ -1,5 +1,5 @@
 import RFB from '@novnc/novnc'
-import { Keyboard, Maximize, RotateCcw } from 'lucide-react'
+import { CornerDownLeft, Keyboard, Maximize, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Card } from '@/shared/ui'
 import { consoleUrl } from './api'
@@ -11,6 +11,23 @@ type Status = 'connecting' | 'connected' | 'closed'
 /** After a lost connection (a reboot: QEMU goes and a new one comes), try again every 2 s for a minute. */
 const retryMs = 2000
 const maxRetries = 30
+
+/** Whether Send presses Enter after the text: remembered in this browser, on unless switched off. */
+const enterKey = 'home-ve.console.enter'
+function readEnter(): boolean {
+  try {
+    return localStorage.getItem(enterKey) !== 'off'
+  } catch {
+    return true
+  }
+}
+function saveEnter(on: boolean) {
+  try {
+    localStorage.setItem(enterKey, on ? 'on' : 'off')
+  } catch {
+    /* private mode: just not remembered */
+  }
+}
 
 /**
  * The VM's screen (noVNC over /api/vms/{name}/console). Scaled to fit; click it to type with a real keyboard.
@@ -26,6 +43,7 @@ export default function VmConsole({ name }: { name: string }) {
   const failures = useRef(0)
   const [text, setText] = useState('')
   const [mods, setMods] = useState<Modifier[]>([])
+  const [withEnter, setWithEnter] = useState(readEnter)
 
   useEffect(() => {
     if (!screen.current) return
@@ -63,13 +81,20 @@ export default function VmConsole({ name }: { name: string }) {
   const toggle = (m: Modifier) => setMods(ms => (ms.includes(m) ? ms.filter(x => x !== m) : [...ms, m]))
   const pressKey = (k: PanelKey) => send(panelKeyEvents(k, mods))
 
-  // with Ctrl or Alt on, the line is a shortcut (Ctrl+C), so no Enter after it
+  // Enter after the text only when the ⏎ toggle is on, and never after a shortcut (Ctrl+C) with Ctrl or Alt;
+  // off, a password and its repeat can go into two fields, with Tab or Enter from the panel in between
   const type = (e: FormEvent) => {
     e.preventDefault()
     const shortcut = mods.includes('ctrl') || mods.includes('alt')
-    send([...textEvents(text, mods), ...(shortcut ? [] : panelKeyEvents(panelKeys.enter))])
+    send([...textEvents(text, mods), ...(withEnter && !shortcut ? panelKeyEvents(panelKeys.enter) : [])])
     setText('')
   }
+
+  const toggleEnter = () =>
+    setWithEnter(on => {
+      saveEnter(!on)
+      return !on
+    })
 
   return (
     <Card
@@ -107,7 +132,7 @@ export default function VmConsole({ name }: { name: string }) {
         <Keyboard size={16} aria-hidden className="muted" />
         <input
           className="mono"
-          placeholder={mods.length ? `${mods.join('+')} + …` : 'Type a line, Enter sends it'}
+          placeholder={mods.length ? `${mods.join('+')} + …` : withEnter ? 'Text, then Enter' : 'Text only, no Enter'}
           value={text}
           onChange={e => setText(e.target.value)}
           autoCapitalize="off"
@@ -115,6 +140,16 @@ export default function VmConsole({ name }: { name: string }) {
           spellCheck={false}
           disabled={status !== 'connected'}
         />
+        <button
+          type="button"
+          className={`icon-button vm-enter${withEnter ? ' on' : ''}`}
+          aria-pressed={withEnter}
+          title={withEnter ? 'Send presses Enter after the text' : 'Send types the text only'}
+          aria-label="Press Enter after the text"
+          onClick={toggleEnter}
+        >
+          <CornerDownLeft size={16} aria-hidden />
+        </button>
         <button disabled={status !== 'connected'}>Send</button>
       </form>
     </Card>
