@@ -8,5 +8,5 @@
 
 ## Contributor License Agreement
 
-- [ ] I agree to the Contributor License Agreement in [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) for this and my
+- [ ] I agree to the Contributor License Agreement in [CONTRIBUTING.md](https://github.com/poltavetsvolodymyr/home-ve/blob/main/CONTRIBUTING.md) for this and my
       future contributions to home-ve.
