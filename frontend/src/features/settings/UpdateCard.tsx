@@ -51,10 +51,13 @@ export function UpdateCard() {
       {!running && <ErrorNote error={error} />}
       <ErrorNote error={startError} />
 
+      {/* state, started and finished one under another; Reload on the right */}
       <div className="update-state">
-        {badge ? <Badge status={badge.status}>{badge.label}</Badge> : <Skeleton width="8em" />}
-        {data?.startedAt && <span className="muted">started {dateTime(data.startedAt)}</span>}
-        {data?.finishedAt && <span className="muted">finished {dateTime(data.finishedAt)}</span>}
+        <div className="update-times">
+          {badge ? <Badge status={badge.status}>{badge.label}</Badge> : <Skeleton width="8em" />}
+          {data?.startedAt && <span className="muted">started {dateTime(data.startedAt)}</span>}
+          {data?.finishedAt && <span className="muted">finished {dateTime(data.finishedAt)}</span>}
+        </div>
         {startedHere && data?.state === 'succeeded' && (
           <button onClick={() => location.reload()}>
             <RefreshCw size={15} aria-hidden /> Reload page

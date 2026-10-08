@@ -2,9 +2,16 @@
 
 .update-state {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 14px;
+  justify-content: space-between;
+  gap: 12px;
+}
+.update-times {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
 }
 /* update.sh's output reads like a terminal: one plain block, no columns or row lines */
 .update-log {
