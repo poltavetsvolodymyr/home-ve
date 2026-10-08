@@ -8,10 +8,13 @@ export const updateBadge: Record<UpdateState, { status: Status; label: string }>
   failed: { status: 'critical', label: 'Failed' },
 }
 
+/** What an update does: said in the dialog before it starts. */
 export const confirmUpdate: ConfirmOptions = {
   title: 'Update home-ve now?',
   message:
-    'The host pulls the latest version from GitHub and runs install.sh as root: backend, web UI and VM tools. ' +
-    'The page loses the server for a few seconds while the backend restarts. The VMs keep running.',
+    'Runs /opt/home-ve/deploy/update.sh as root: pulls the latest version from GitHub and installs the backend, ' +
+    'this web UI, vm-run and the units.\n\n' +
+    'The page loses the server for a few seconds while the backend restarts. The VMs keep running; a VM picks up ' +
+    'a new vm-run at its next restart.',
   confirmLabel: 'Update',
 }

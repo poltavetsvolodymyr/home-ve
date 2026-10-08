@@ -40,18 +40,13 @@ export function UpdateCard() {
   return (
     <Card
       title="Update"
-      className="fit-screen"
+      className="fit-screen head-inline"
       actions={
         <button className="primary" disabled={!data || running || starting} onClick={start}>
           <Download size={15} aria-hidden /> {running || starting ? 'Updating…' : 'Update now'}
         </button>
       }
     >
-      <p className="muted update-hint">
-        Runs <span className="mono">/opt/home-ve/deploy/update.sh</span>: pulls the latest version from GitHub and
-        installs the backend, this web UI, vm-run and the units. The VMs keep running; a VM picks up a new vm-run at its
-        next restart.
-      </p>
       {/* the backend restarts during an update: a failed poll then is expected, not news */}
       {!running && <ErrorNote error={error} />}
       <ErrorNote error={startError} />

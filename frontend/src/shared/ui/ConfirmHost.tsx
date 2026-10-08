@@ -13,16 +13,21 @@ function ConfirmDialog({ request }: { request: ConfirmRequest }) {
   const { title, message, confirmLabel = 'OK', danger = false, typeToConfirm } = request
   const ready = !typeToConfirm || typed.trim() === typeToConfirm
 
-  // showModal: on top of everything, the page behind inert, Esc closes it (the "cancel" event)
+  // showModal: on top of everything, the page behind inert, Esc closes it (the "cancel" event). It focuses
+  // the first button, which would show a focus ring on Cancel: the dialog itself takes the focus instead
+  // (Tab still reaches the buttons), unless there is a name to type.
   useEffect(() => {
     const d = dialog.current
-    if (d && !d.open) d.showModal()
-  }, [])
+    if (!d || d.open) return
+    d.showModal()
+    if (!typeToConfirm) d.focus()
+  }, [typeToConfirm])
 
   return (
     <dialog
       ref={dialog}
       className="confirm"
+      tabIndex={-1}
       aria-labelledby="confirm-title"
       onCancel={e => {
         e.preventDefault()
@@ -58,7 +63,7 @@ function ConfirmDialog({ request }: { request: ConfirmRequest }) {
           </label>
         )}
         <div className="confirm-buttons">
-          <button type="button" onClick={() => answer(false)} autoFocus={!typeToConfirm}>
+          <button type="button" onClick={() => answer(false)}>
             Cancel
           </button>
           <button className={danger ? 'danger-solid' : 'primary'} disabled={!ready}>

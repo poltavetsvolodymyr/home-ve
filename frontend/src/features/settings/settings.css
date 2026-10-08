@@ -1,8 +1,5 @@
 /* Settings page. */
 
-.update-hint {
-  margin: 0 0 12px;
-}
 .update-state {
   display: flex;
   flex-wrap: wrap;
