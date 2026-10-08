@@ -52,7 +52,7 @@ bash /opt/home-ve/deploy/install.sh
 
 .NET на хост не ставится. Что делает скрипт:
 
-- ставит недостающее из `qemu-system-x86`, `socat`, `lvm2`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
+- ставит недостающее из `qemu-system-x86`, `socat`, `lvm2`, `thin-provisioning-tools`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
   `nginx`, `openssl`. Через D-Bus `systemctl` от обычного пользователя разговаривает с systemd, а в минимальном
   Debian его может не быть;
 - создаёт системного пользователя `home-backend` (без shell и home);
