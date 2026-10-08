@@ -19,9 +19,12 @@ export function Segmented<T extends string | number>({ value, options, onChange,
     const r = row.current
     const on = r?.querySelector<HTMLElement>('button.on')
     if (!r || !on) return
-    if (on.offsetLeft < r.scrollLeft) r.scrollLeft = on.offsetLeft
-    else if (on.offsetLeft + on.offsetWidth > r.scrollLeft + r.clientWidth)
-      r.scrollLeft = on.offsetLeft + on.offsetWidth - r.clientWidth
+    // the row's 2px padding and the chosen button's 1px outline come into sight too
+    const edge = 3
+    const left = on.offsetLeft - edge
+    const right = on.offsetLeft + on.offsetWidth + edge
+    if (left < r.scrollLeft) r.scrollLeft = left
+    else if (right > r.scrollLeft + r.clientWidth) r.scrollLeft = right - r.clientWidth
   }, [value])
 
   return (
