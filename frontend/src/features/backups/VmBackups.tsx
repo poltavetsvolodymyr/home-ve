@@ -111,7 +111,7 @@ export function VmBackups({ vm }: { vm: Vm }) {
       </Card>
 
       {data && data.log.length > 0 && (
-        <Card title="Log">
+        <Card title="Log" className="fit-screen">
           <div className="log">
             {data.log.map((l, i) => (
               <div key={i} className={`log-line ${levelClass(l.priority)}`}>
