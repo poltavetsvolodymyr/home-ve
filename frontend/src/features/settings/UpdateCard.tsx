@@ -40,6 +40,7 @@ export function UpdateCard() {
   return (
     <Card
       title="Update"
+      className="update-card"
       actions={
         <button className="primary" disabled={!data || running || starting} onClick={start}>
           <Download size={15} aria-hidden /> {running || starting ? 'Updating…' : 'Update now'}

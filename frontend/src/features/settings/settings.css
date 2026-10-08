@@ -9,11 +9,32 @@
   align-items: center;
   gap: 8px 14px;
 }
+/* The card is never taller than the screen between the top bar and the bottom (tab bar on phones): the
+   log takes the room that's left and scrolls on its own, so the page never has to scroll as well.
+   100vh first for browsers without dvh (the height that follows Safari's bars). */
+.update-card {
+  display: flex;
+  flex-direction: column;
+  /* top bar 57px, main's padding 20px above and 48px below */
+  max-height: calc(100vh - 125px);
+  max-height: calc(100dvh - 125px);
+}
+@media (max-width: 860px) {
+  .update-card {
+    /* top bar 57px, main's padding 20px above and 96px + the iPhone's home bar below (room for the tab bar) */
+    max-height: calc(100vh - 173px - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 173px - env(safe-area-inset-bottom));
+  }
+}
 /* update.sh's output reads like a terminal: one plain block, no columns or row lines */
 .update-log {
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: none;
   margin-top: 12px;
-  max-height: 60vh;
   padding: 8px 0;
+  /* reaching the end of the log doesn't start scrolling the page */
+  overscroll-behavior: contain;
 }
 .update-log .log-line {
   display: block;
