@@ -81,3 +81,25 @@ git commit -m "..."; git push
 - [docs/development.md](docs/development.md): запуск, тесты, линтеры, соглашения
 - [docs/deployment.md](docs/deployment.md): первая установка на хост, nginx и сертификат, настройки, откат
 - [deploy/README.md](deploy/README.md): шпаргалка для хоста (там лежит только `deploy/`)
+
+## Лицензия
+
+[PolyForm Noncommercial 1.0.0](LICENSE) с дополнительным разрешением ниже. Коротко: дома, для хобби, учёбы,
+некоммерческих организаций, а также частному лицу для собственной работы — бесплатно, в том числе менять и
+распространять. Фирме, а также любому, кто на этом зарабатывает (продаёт, встраивает в продукт или устройство,
+предоставляет как сервис, ставит клиентам за деньги), нужна коммерческая лицензия: напишите автору через
+[GitHub](https://github.com/poltavetsvolodymyr).
+
+Юридически действует английский текст:
+
+> **Additional permission.** An individual — including a freelancer or sole proprietor working on their own
+> account — may use this software for their own work, commercial or not, free of charge.
+>
+> A commercial license is needed for any use by or on behalf of a company or other organization, including
+> installing it on computers or servers used by its employees, and for selling it, shipping it in a product or
+> device, offering it as a hosted service, or running it for paying clients.
+
+Required Notice: Copyright 2026 Volodymyr Poltavets (https://github.com/poltavetsvolodymyr)
+
+Сторонние части сохраняют свои лицензии: noVNC (MPL-2.0, без изменений, из пакета `@novnc/novnc`,
+исходники — https://github.com/novnc/noVNC), React (MIT), lucide-react (ISC), .NET (MIT).
