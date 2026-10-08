@@ -164,7 +164,12 @@ cat /etc/systemd/network/20-br0-port.network
 - `20-br0-port.network`: the card is added to the bridge and no longer gets an address of its own. `%s` is replaced
   with the name in `NIC`; `cat` shows the result: `Name=` must be your card.
 
-Now remove the card from the old network configuration (ifupdown) and enable networkd:
+Now remove the card from the old network configuration (ifupdown) and enable networkd.
+
+> **After this reboot the host will most likely have a different IP address** (the router sees a new DHCP client, see
+> below). SSH and the web UI at the old address stop working. Find the new address on the host's own screen
+> (`ip -br a`, the line for `br0`) or in your router's list of devices (look for the host's name), and connect to that.
+
 
 ```bash
 cp /etc/network/interfaces /etc/network/interfaces.bak
@@ -187,7 +192,7 @@ ip -br a                    # the address is now on br0
 getent hosts debian.org     # DNS works
 ```
 
-**The host's address may change once**: the router sees a new DHCP client. The new address is in `ip -br a`. To keep
+**The host's address usually changes once**: the router sees a new DHCP client. The new address is in `ip -br a`. To keep
 the web UI's address from changing again, reserve it for the host in your router's DHCP settings.
 
 Rollback (from the host's keyboard):
