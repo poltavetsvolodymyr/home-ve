@@ -40,6 +40,9 @@ conf=/etc/vm/$name.conf
 disk=$(sed -n 's/^[[:space:]]*DISK=//p' "$conf" | tail -1)
 printf '%s\n' "$disk" | grep -Eqx '/dev/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*' || die "bad DISK '$disk' in $conf"
 lv=${disk#/dev/}
+# only the VM's own disk (<group>/<name>), like vm-disk-remove: a .conf pointing at another VM's disk
+# would otherwise have this overwrite that one, running or not
+[ "$lv" = "${lv%%/*}/$name" ] || die "$disk isn't named after the VM: restore it by hand"
 [ "$(lvs --noheadings -o pool_lv -- "$lv" 2>/dev/null | tr -d ' ')" = "$POOL" ] || die "$lv is not a thin volume in the pool $POOL"
 lvchange -qq -ay -- "$lv"
 
