@@ -115,8 +115,17 @@ label.check {
   gap: 6px;
   color: var(--ink-2);
 }
-label.check input {
-  min-height: 0;
+/* checkboxes and radios stay the browser's own: the field look above (background, border, padding) turned
+   an unticked box on iOS into a dark blob. Only the tick colour and the size are ours. */
+input[type='checkbox'],
+input[type='radio'] {
+  all: revert;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* --- tables -------------------------------------------------------------- */
