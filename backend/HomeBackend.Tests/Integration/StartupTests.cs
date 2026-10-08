@@ -40,4 +40,14 @@ public class StartupTests
         Assert.Equal(["http://127.0.0.1:5000"], options.Urls);
         Assert.Equal("/etc/vm", options.VmConfigDir);
     }
+
+    [Fact]
+    public void Without_a_config_every_private_network_gets_in_and_no_disk_group_is_guessed()
+    {
+        var options = new HomeBackendOptions().WithDefaults();
+
+        Assert.Equal(["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "::1/128"], options.AllowedNetworks);
+        Assert.Equal("", options.DiskGroup);
+        Assert.Equal("home", new HomeBackendOptions { Mock = true }.WithDefaults().DiskGroup);
+    }
 }

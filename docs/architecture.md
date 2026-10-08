@@ -4,9 +4,9 @@
 
 ```
 браузер в LAN или через VPN
-   │  https://home.vladpolt.com
+   │  https://<хост>
    ▼
-nginx (на хосте home)
+nginx (на хосте)
    ├── /          → файлы из /var/www/home            (frontend, собранный Vite)
    └── /api/      → http://127.0.0.1:5000             (backend, Kestrel; консоль — WebSocket)
                         │

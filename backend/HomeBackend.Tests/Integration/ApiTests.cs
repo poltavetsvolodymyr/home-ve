@@ -157,8 +157,8 @@ public class ApiTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Clients_outside_the_allowed_networks_get_no_answer_at_all()
     {
-        // another network: the connection is dropped, not even a status code
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => app.CreateClient("192.168.179.20").GetAsync("/api/auth/me", Ct));
+        // a public address: the connection is dropped, not even a status code
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => app.CreateClient("203.0.113.20").GetAsync("/api/auth/me", Ct));
     }
 
     [Fact]

@@ -107,6 +107,8 @@ public static class VmsFeature
         if (VmConfigFile.ReservedNames.Contains(name))
             return TypedResults.BadRequest(new ErrorResponse($"'{name}' is reserved"));
         if (host.ConfigExists(name)) return TypedResults.Conflict(new ErrorResponse($"there already is a VM {name}"));
+        if (options.Value.DiskGroup.Length == 0)
+            return TypedResults.Conflict(new ErrorResponse("no LVM group for VM disks: set DiskGroup in /etc/home-backend/config.json (install.sh does it once the thin pool \"data\" exists)"));
 
         var config = new VmConfig(name, request.Cpus, request.MemoryMb, $"/dev/{options.Value.DiskGroup}/{name}",
             request.Nets.Select(n => new VmNet(n.Bridge, n.Mac.ToUpperInvariant())).ToList(), request.Autostart,

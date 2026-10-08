@@ -9,14 +9,14 @@ deploy/
   home-backend.service    systemd-юнит бэкенда
   config.example.json     образец /etc/home-backend/config.json
   vm/                     vm-run, qmp, vm@.service, vm-autostart(.service), правило polkit
-  nginx/home.conf         сайт nginx
+  nginx/home.conf         сайт nginx (install.sh ставит его сам)
   install.sh              установка и любое обновление (идемпотентный)
   update.sh               git pull + install.sh
 ```
 
 ## Первая установка
 
-Всё на хосте под root (`ssh root@192.168.178.2`).
+Хост: Debian 13 (trixie), LVM с тонким пулом `data` для дисков VM. Всё на хосте под root.
 
 ### 1. Ключ для чтения репозитория
 
@@ -52,74 +52,87 @@ bash /opt/home-ve/deploy/install.sh
 
 .NET на хост не ставится. Что делает скрипт:
 
-- ставит недостающее из `qemu-system-x86`, `socat`, `dbus`, `polkitd`. Через D-Bus `systemctl` от обычного пользователя разговаривает с systemd, а в минимальном Debian его может не быть;
+- ставит недостающее из `qemu-system-x86`, `socat`, `lvm2`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
+  `nginx`, `openssl`. Через D-Bus `systemctl` от обычного пользователя разговаривает с systemd, а в минимальном
+  Debian его может не быть;
 - создаёт системного пользователя `home-backend` (без shell и home);
 - создаёт `/etc/home-backend/config.json` из образца (права 0640) и спрашивает пароль для морды;
+- **находит, куда класть диски VM**: группу LVM, в которой есть тонкий пул `data`, и пишет её в `DiskGroup`
+  (только если там ещё пусто). Пула нет — скрипт подскажет, как его сделать, например
+  `lvcreate --type thin-pool -l 90%FREE -n data <группа>`; пока его нет и `install.sh` не запущен снова,
+  морда не создаёт VM;
 - **переводит старые `.conf`** на новый формат: `NETS="br-lan=… br-wan=…"` → строки `NET=br-lan …`,
   и если `vm@<имя>` был включён (`enable`), пишет `AUTOSTART=yes` и выключает этот `enable`. Теперь при
   загрузке VM запускает `vm-autostart.service`. Старый файл остаётся рядом как `<имя>.conf.bak`;
 - ставит `vm-run`, `qmp`, `vm-autostart` в `/usr/local/sbin`, юниты в `/etc/systemd/system`, правило polkit
   в `/etc/polkit-1/rules.d`; `/etc/vm` получает группу `home-backend` и права 0775;
 - ставит юнит бэкенда, включает и перезапускает его;
-- целиком заменяет `/var/www/home` свежим фронтом.
+- целиком заменяет `/var/www/home` свежим фронтом;
+- **nginx**: сайт `/etc/nginx/sites-available/home` берётся из `deploy/nginx/home.conf` при каждом запуске
+  (предыдущий остаётся рядом как `home.bak`, и если `nginx -t` новый не принимает, возвращается он). Какой
+  сертификат — написано в `/etc/nginx/home-ve/tls.conf`: его скрипт создаёт один раз и дальше не трогает.
+  Сначала там самоподписанный сертификат на имя и адреса хоста (`/etc/nginx/home-ve/selfsigned.*`, на 825 дней;
+  за 30 дней до конца скрипт делает новый). Если сайт уже был настроен руками, `tls.conf` получает его сертификат.
+
+Готово: морда открывается по `https://<адрес хоста>/`. С самоподписанным сертификатом браузер один раз
+предупредит (соединение всё равно шифруется). Без предупреждения — свой домен и сертификат, шаг 4.
 
 Работающие VM скрипт не трогает. Новый `vm-run` (и с ним консоль в браузере) VM получит при следующем
-перезапуске. Для роутера это ~30 секунд без интернета, так что выбери удобный момент:
+перезапуске. Если в VM роутер, это ~30 секунд без интернета, так что выбери удобный момент:
 
 ```bash
 systemctl restart vm@router
 ls -l /run/vm-router/      # vnc.sock: srw-rw---- root home-backend; остальные сокеты только root
 ```
 
-### 4. Имя `home.vladpolt.com`
+### 4. Свой домен и сертификат (по желанию)
 
-В Cloudflare → vladpolt.com → DNS → Add record, так же, как для `router`:
+Так сделано у автора: домен в Cloudflare, сертификат Let's Encrypt через acme.sh с проверкой через DNS, поэтому
+хост не должен быть виден из интернета. Ниже `example.com`, `home.example.com` и `192.168.1.2` — подставь свои.
+
+**Имя.** Cloudflare → домен → DNS → Add record:
 
 | Type | Name | IPv4 | Proxy |
 |---|---|---|---|
-| A | `home` | `192.168.178.2` | DNS only (серое облако) |
+| A | `home` | `192.168.1.2` | DNS only (серое облако) |
 
-Снаружи по этому адресу ничего нет (это адрес в домашней сети), а дома и через VPN он ведёт на хост.
-`rebind-domain-ok=/vladpolt.com/` в dnsmasq роутера уже разрешает такие ответы. Проверка с хоста:
-`getent hosts home.vladpolt.com` → `192.168.178.2`.
+Снаружи по этому адресу ничего нет (это адрес в домашней сети), а дома и через VPN он ведёт на хост. Если
+DNS-сервер роутера защищён от DNS rebinding (dnsmasq со `stop-dns-rebind`), разреши свой домен:
+`rebind-domain-ok=/example.com/`. Проверка с хоста: `getent hosts home.example.com` → `192.168.1.2`.
 
-### 5. Сертификат
-
-Хост получает свой wildcard-сертификат, тем же acme.sh и тем же способом, что роутер. Он не зависит
-от роутера: морда хоста нужна именно тогда, когда с роутером что-то не так.
+**Сертификат.** Нужен API-токен Cloudflare с правом Zone → DNS → Edit на этот домен и Zone ID (страница домена,
+справа внизу).
 
 ```bash
-apt-get install -y --no-install-recommends nginx curl openssl ca-certificates
 git clone --depth 1 https://github.com/acmesh-official/acme.sh.git /tmp/acme.sh
 cd /tmp/acme.sh
 ./acme.sh --install --nocron --noprofile --home /opt/acme.sh --config-home /etc/acme.sh --accountemail твой@email
 cd / && rm -rf /tmp/acme.sh
 chmod 700 /etc/acme.sh
-```
-
-Токен и Zone ID берём из `/etc/ddns.conf` роутера (`cat` там) и вставляем на хосте. root на роутер по ssh
-с паролем не пускают (`PermitRootLogin prohibit-password`, так и оставляем), поэтому через буфер обмена:
-
-```bash
 read -rsp 'CF token: ' CF_TOKEN; echo
 read -rp 'CF zone id: ' CF_ZONE
 CF_Token=$CF_TOKEN CF_Zone_ID=$CF_ZONE /opt/acme.sh/acme.sh --config-home /etc/acme.sh \
-  --issue --server letsencrypt --dns dns_cf -d vladpolt.com -d '*.vladpolt.com'
+  --issue --server letsencrypt --dns dns_cf -d example.com -d '*.example.com'
 unset CF_TOKEN CF_ZONE
 ```
 
 - `read -s` не показывает ввод, и вставленное через `read` не попадает в историю команд.
 - Вставлять только значение, без `CF_TOKEN=` и кавычек.
-- acme.sh запоминает токен в `/etc/acme.sh/account.conf` (только root) для продлений, как на роутере.
+- acme.sh запоминает токен в `/etc/acme.sh/account.conf` (только root) для продлений.
 
-Положить для nginx и продлевать раз в сутки:
+Положить для nginx, сказать nginx, что брать его, и продлевать раз в сутки:
 
 ```bash
 install -d -m 700 /etc/nginx/tls
-/opt/acme.sh/acme.sh --config-home /etc/acme.sh --install-cert -d vladpolt.com \
-  --key-file /etc/nginx/tls/vladpolt.com.key \
-  --fullchain-file /etc/nginx/tls/vladpolt.com.crt \
+/opt/acme.sh/acme.sh --config-home /etc/acme.sh --install-cert -d example.com \
+  --key-file /etc/nginx/tls/example.com.key \
+  --fullchain-file /etc/nginx/tls/example.com.crt \
   --reloadcmd 'systemctl reload nginx'
+cat > /etc/nginx/home-ve/tls.conf <<'EOF'
+ssl_certificate     /etc/nginx/tls/example.com.crt;
+ssl_certificate_key /etc/nginx/tls/example.com.key;
+EOF
+nginx -t && systemctl reload nginx
 cat > /etc/systemd/system/acme-renew.service <<'EOF'
 [Unit]
 Description=Renew certificates with acme.sh when due
@@ -144,28 +157,19 @@ EOF
 systemctl daemon-reload && systemctl enable --now acme-renew.timer
 ```
 
-Те же таймер и служба, что на роутере. Куда класть новый сертификат и что перезагружать, `--cron` берёт
-из `/etc/acme.sh/vladpolt.com_ecc/vladpolt.com.conf` (`Le_RealKeyPath`, `Le_RealFullChainPath`,
-`Le_ReloadCmd`): их туда записал `--install-cert`.
+Куда класть новый сертификат и что перезагружать, `--cron` берёт из `/etc/acme.sh/example.com_ecc/example.com.conf`
+(`Le_RealKeyPath`, `Le_RealFullChainPath`, `Le_ReloadCmd`): их туда записал `--install-cert`.
 
-### 6. nginx
+Открыть `https://home.example.com`.
 
-```bash
-install -m 0644 /opt/home-ve/deploy/nginx/home.conf /etc/nginx/sites-available/home
-ln -sf /etc/nginx/sites-available/home /etc/nginx/sites-enabled/home
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
-```
-
-Открыть `https://home.vladpolt.com`. Что в `home.conf`, помимо того же, что у роутера:
+### Что в `home.conf`
 
 - `map $http_upgrade $connection_upgrade` и `location ~ ^/api/vms/[^/]+/console$` — консоль работает
   через WebSocket. nginx по умолчанию разговаривает с бэкендом по HTTP/1.0 и выбрасывает заголовки
   `Upgrade`/`Connection`, а здесь передаёт их, и соединение «переключается» в WebSocket.
 - `proxy_read_timeout 1h` — без этого nginx закроет консоль через 60 секунд тишины на экране.
 - Регулярный `location ~` важнее обычного префиксного `/api/`, поэтому консоль попадает именно в него.
-
-Сайт nginx `install.sh` не трогает: это настройка один раз, правится руками.
+- Свои правки сайта `install.sh` затрёт при следующем обновлении; сертификат — только в `tls.conf`.
 
 ## Обновление
 
@@ -201,7 +205,8 @@ bash deploy/install.sh           # применить
 ## Безопасность
 
 - Снаружи доступен только nginx. Kestrel слушает `127.0.0.1:5000`.
-- Запросы не из `AllowedNetworks` (LAN `192.168.178.0/24` и VPN `10.8.0.0/24`) обрываются без ответа.
+- Запросы не из `AllowedNetworks` (по умолчанию частные сети `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` и сам
+  хост) обрываются без ответа. Сузить до своих сетей: `AllowedNetworks` в `config.json`.
 - Вход по паролю, хеш PBKDF2 в `/etc/home-backend/config.json`. Cookie сессии живёт 7 дней и `Secure`
   (nginx передаёт `X-Forwarded-Proto`). Попыток входа не больше 10 за 5 минут с одного IP.
 - Бэкенд без root. Что именно ему разрешено (polkit, `/etc/vm`, сокет консоли), см.
@@ -219,7 +224,8 @@ bash deploy/install.sh           # применить
 | Ключ | По умолчанию | |
 |---|---|---|
 | `Urls` | `http://127.0.0.1:5000` | где слушает Kestrel; nginx проксирует сюда `/api/` |
-| `AllowedNetworks` | `192.168.178.0/24`, `10.8.0.0/24`, `127.0.0.0/8` | кого пускать |
+| `AllowedNetworks` | `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `::1/128` | кого пускать |
+| `DiskGroup` | — (находит `install.sh`) | группа LVM с тонким пулом `data`: диск новой VM — `/dev/<группа>/<имя>` |
 | `VmConfigDir` | `/etc/vm` | где `.conf` (vm-run всегда читает `/etc/vm`) |
 | `VmRuntimeDir` | `/run` | где папки `vm-<имя>` с сокетами |
 | `DataDir` | `/var/lib/home-backend` | ключи cookie |
@@ -237,7 +243,7 @@ bash deploy/install.sh           # применить
    сам в `/var/lib/home-backend/iso`, телефон можно закрыть.
 2. **New VM**: имя, ядра, память, размер диска, ISO в CD-приводе, сетевые карты. С галкой «Start now» VM сразу
    стартует, и открывается консоль с установщиком.
-3. При первом старте `vm-run` создаёт диск `/dev/home/<имя>` (тонкий том в пуле `data`): место занимается
+3. При первом старте `vm-run` создаёт диск `/dev/<DiskGroup>/<имя>` (тонкий том в пуле `data`): место занимается
    по мере записи. Пустой диск не грузится, и BIOS загружает CD. После установки грузится уже диск, так что ISO
    можно оставить, а можно убрать в Settings → CD drive.
 
@@ -346,7 +352,7 @@ nano /etc/vm/router.conf              # правка; применится пр�
 systemctl status home-backend                       # запущена ли служба
 journalctl -u home-backend -n 50                    # её лог
 curl -i http://127.0.0.1:5000/api/auth/me           # бэкенд напрямую: 401 = жив и ждёт входа
-curl -i https://home.vladpolt.com/api/auth/me       # через nginx: тоже 401; 404 или 502 = конфиг nginx
+curl -ik https://127.0.0.1/api/auth/me              # через nginx: тоже 401; 404 или 502 = конфиг nginx
 pkcheck --action-id org.freedesktop.systemd1.manage-units --process $(systemctl show -p MainPID --value home-backend) \
   --detail unit vm@router.service --detail verb restart   # разрешает ли polkit бэкенду перезапуск
 ```

@@ -35,8 +35,11 @@ public sealed class HomeBackendOptions
     /// <summary>Where the VM backups are (deploy/vm/vm-backup): <c>&lt;dir&gt;/&lt;vm&gt;/&lt;vm&gt;-&lt;stamp&gt;.img.zst</c>.</summary>
     public string BackupDir { get; set; } = "/var/backups/vm";
 
-    /// <summary>LVM volume group of the thin pool "data": a new VM's disk is /dev/&lt;group&gt;/&lt;name&gt;.</summary>
-    public string DiskGroup { get; set; } = "home";
+    /// <summary>
+    /// LVM volume group of the thin pool "data": a new VM's disk is /dev/&lt;group&gt;/&lt;name&gt;. install.sh fills it
+    /// in from the host's LVM; while it is empty, no VM can be created.
+    /// </summary>
+    public string DiskGroup { get; set; } = "";
 
     /// <summary>Writable directory for the cookie key ring.</summary>
     public string DataDir { get; set; } = "/var/lib/home-backend";
@@ -49,7 +52,10 @@ public sealed class HomeBackendOptions
     public HomeBackendOptions WithDefaults()
     {
         if (Urls.Length == 0) Urls = ["http://127.0.0.1:5000"];
-        if (AllowedNetworks.Length == 0) AllowedNetworks = ["192.168.178.0/24", "10.8.0.0/24", "127.0.0.0/8"];
+        // the private ranges (home networks, VPNs) and the host itself
+        if (AllowedNetworks.Length == 0) AllowedNetworks = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "::1/128"];
+        // the mock VMs' disks are in /dev/home
+        if (DiskGroup.Length == 0 && Mock) DiskGroup = "home";
         return this;
     }
 }

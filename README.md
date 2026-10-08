@@ -41,7 +41,7 @@ frontend/
   src/styles/               цвета (токены) и базовые стили
 deploy/                     то, что тянет хост: бинарник, собранный фронт, юниты, скрипты
   vm/                       vm-run, qmp, vm@.service, автозапуск, правило polkit
-  nginx/                    сайт nginx для home.vladpolt.com
+  nginx/                    сайт nginx (HTTPS, консоль через WebSocket)
 docs/                       архитектура, разработка, выкладка
 build.ps1 / build.sh        сборка фронта и бэкенда в deploy/
 ```
