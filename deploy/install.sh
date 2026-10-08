@@ -19,6 +19,7 @@ main() {
   create_service_user
   create_config
   migrate_vm_configs
+  install_rclone
   install_vm_tools
   install_service
   install_frontend
@@ -44,7 +45,7 @@ note_unusual_location() {
 # (debootstrap) Debian may not have yet: dbus provides it.
 install_packages() {
   local missing=()
-  for p in qemu-system-x86 socat dbus polkitd zstd rclone; do
+  for p in qemu-system-x86 socat dbus polkitd zstd curl; do
     dpkg -s "$p" &>/dev/null || missing+=("$p")
   done
   if (( ${#missing[@]} )); then
@@ -105,6 +106,24 @@ migrate_vm_configs() {
 }
 
 # vm-run, qmp, the vm@ unit, autostart at boot, and what the backend may do to them
+# rclone for the offsite upload. Debian's (1.60 in trixie) fails against Cloudflare R2 with "501 Not
+# Implemented", so anything older than RCLONE_MIN is replaced by the current release from rclone.org (one .deb,
+# no dependencies). apt never downgrades it afterwards: its version is the older one.
+RCLONE_MIN=1.65
+install_rclone() {
+  local have
+  have=$(rclone version 2>/dev/null | sed -n '1s/^rclone v\([0-9]*\.[0-9]*\).*/\1/p')
+  if [[ -n $have && $(printf '%s\n' "$RCLONE_MIN" "$have" | sort -V | head -1) == "$RCLONE_MIN" ]]; then
+    return
+  fi
+  echo "==> rclone ${have:-missing}: installing the current release from rclone.org (R2 needs $RCLONE_MIN or newer)"
+  local tmp
+  tmp=$(mktemp -d)
+  curl -fsSL -o "$tmp/rclone.deb" "https://downloads.rclone.org/rclone-current-linux-$(dpkg --print-architecture).deb"
+  dpkg -i "$tmp/rclone.deb"
+  rm -rf -- "${tmp:?}"
+}
+
 install_vm_tools() {
   echo "==> VM tools"
   install -m 0755 "$DEPLOY_DIR/vm/vm-run" "$DEPLOY_DIR/vm/qmp" "$DEPLOY_DIR/vm/vm-autostart" \

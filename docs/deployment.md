@@ -295,6 +295,9 @@ rclone ходит строго по IPv4 (`--bind 0.0.0.0`), чтобы квот
 
 ### Настройка (один раз)
 
+`install.sh` ставит rclone с rclone.org, если его нет или он старше 1.65: rclone 1.60 из Debian 13 с R2 не работает
+(ошибка `501 Not Implemented` на каждом файле).
+
 1. **Cloudflare → R2 → Create bucket**: имя, например, `home-backups`, Location: **Europe (EU)**, класс Standard.
 2. **R2 → Manage API tokens → Create API token**: Object Read & Write, только этот бакет. Запиши Access Key ID,
    Secret Access Key и endpoint `https://<account-id>.r2.cloudflarestorage.com` (для EU-бакета —

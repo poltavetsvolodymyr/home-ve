@@ -54,8 +54,9 @@ fi
 [[ -f $RCLONE_CONF ]] || die "not set up: there is no $RCLONE_CONF (docs/deployment.md, «Выгрузка наружу»)"
 mountpoint -q "$DIR" || die "$DIR is not mounted: an empty folder there would look like every backup was deleted"
 
+# JOURNAL_STREAM unset: under systemd rclone would write its log straight into the journal, past the sed below
 rc() {
-  rclone --config "$RCLONE_CONF" --bind 0.0.0.0 "$@"
+  env -u JOURNAL_STREAM rclone --config "$RCLONE_CONF" --bind 0.0.0.0 "$@"
 }
 
 stamp=$(date +%Y%m%d-%H%M%S)
