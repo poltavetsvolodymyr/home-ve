@@ -1,9 +1,9 @@
 import RFB from '@novnc/novnc'
-import { CornerDownLeft, Keyboard, Maximize, RotateCcw } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { CornerDownLeft, Keyboard, Maximize, RotateCcw, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { Card } from '@/shared/ui'
 import { consoleUrl } from './api'
-import { panelKeyEvents, panelKeys, textEvents, type KeyEvent, type Modifier, type PanelKey } from './keysyms'
+import { lineEdit, panelKeyEvents, panelKeys, textEvents, type KeyEvent, type Modifier, type PanelKey } from './keysyms'
 import { VmKeys } from './VmKeys'
 
 type Status = 'connecting' | 'connected' | 'closed'
@@ -12,27 +12,10 @@ type Status = 'connecting' | 'connected' | 'closed'
 const retryMs = 2000
 const maxRetries = 30
 
-/** Whether Send presses Enter after the text: remembered in this browser, on unless switched off. */
-const enterKey = 'home-ve.console.enter'
-function readEnter(): boolean {
-  try {
-    return localStorage.getItem(enterKey) !== 'off'
-  } catch {
-    return true
-  }
-}
-function saveEnter(on: boolean) {
-  try {
-    localStorage.setItem(enterKey, on ? 'on' : 'off')
-  } catch {
-    /* private mode: just not remembered */
-  }
-}
-
 /**
  * The VM's screen (noVNC over /api/vms/{name}/console). Scaled to fit; click it to type with a real keyboard.
  * A phone has none that noVNC can capture, so there's a panel of keys (arrows, Esc, F-keys, Ctrl…) and a
- * text box that types into the VM key by key.
+ * text box that types into the VM as you type in it: every change to the box goes out as keys at once.
  */
 export default function VmConsole({ name }: { name: string }) {
   const screen = useRef<HTMLDivElement>(null)
@@ -43,7 +26,6 @@ export default function VmConsole({ name }: { name: string }) {
   const failures = useRef(0)
   const [text, setText] = useState('')
   const [mods, setMods] = useState<Modifier[]>([])
-  const [withEnter, setWithEnter] = useState(readEnter)
 
   useEffect(() => {
     if (!screen.current) return
@@ -79,22 +61,42 @@ export default function VmConsole({ name }: { name: string }) {
   }
 
   const toggle = (m: Modifier) => setMods(ms => (ms.includes(m) ? ms.filter(x => x !== m) : [...ms, m]))
-  const pressKey = (k: PanelKey) => send(panelKeyEvents(k, mods))
 
-  // Enter after the text only when the ⏎ toggle is on, and never after a shortcut (Ctrl+C) with Ctrl or Alt;
-  // off, a password and its repeat can go into two fields, with Tab or Enter from the panel in between
-  const type = (e: FormEvent) => {
-    e.preventDefault()
-    const shortcut = mods.includes('ctrl') || mods.includes('alt')
-    send([...textEvents(text, mods), ...(withEnter && !shortcut ? panelKeyEvents(panelKeys.enter) : [])])
-    setText('')
+  // The box mirrors the line typed in the VM since the last Enter, so the panel's Enter and ⌫ keep it in step
+  const pressKey = (k: PanelKey) => {
+    send(panelKeyEvents(k, mods))
+    if (k === panelKeys.enter) setText('')
+    if (k === panelKeys.backspace) setText(t => [...t].slice(0, -1).join(''))
   }
 
-  const toggleEnter = () =>
-    setWithEnter(on => {
-      saveEnter(!on)
-      return !on
-    })
+  // Every change goes to the VM right away: Backspaces for what was removed, then what was added
+  // (lineEdit), so autocorrect or a picked suggestion swapping a word comes out right too. With Ctrl or Alt
+  // on, the characters are a shortcut (Ctrl+C), sent but not kept in the box.
+  const edit = (e: ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value
+    const { backspaces, typed } = lineEdit(text, next)
+    if (!backspaces && !typed) return
+    const shortcut = mods.includes('ctrl') || mods.includes('alt')
+    send([
+      ...Array.from({ length: backspaces }, () => panelKeyEvents(panelKeys.backspace)).flat(),
+      ...textEvents(typed, mods),
+    ])
+    if (!shortcut) setText(next)
+  }
+
+  // ⌫ in an empty box changes nothing in it, so no change event: it goes to the VM from here
+  const keyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && text === '') {
+      e.preventDefault()
+      send(panelKeyEvents(panelKeys.backspace, mods))
+    }
+  }
+
+  // the phone keyboard's Return and the Enter button: Enter in the VM, a fresh line in the box
+  const enter = (e?: FormEvent) => {
+    e?.preventDefault()
+    pressKey(panelKeys.enter)
+  }
 
   return (
     <Card
@@ -128,29 +130,35 @@ export default function VmConsole({ name }: { name: string }) {
     >
       <div ref={screen} className="vm-screen" onClick={() => rfb.current?.focus()} />
       <VmKeys disabled={status !== 'connected'} mods={mods} onToggle={toggle} onKey={pressKey} />
-      <form className="vm-type" onSubmit={type}>
+      <form className="vm-type" onSubmit={enter}>
         <Keyboard size={16} aria-hidden className="muted" />
         <input
           className="mono"
-          placeholder={mods.length ? `${mods.join('+')} + …` : withEnter ? 'Text, then Enter' : 'Text only, no Enter'}
+          placeholder={mods.length ? `${mods.join('+')} + …` : 'Type into the VM'}
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={edit}
+          onKeyDown={keyDown}
           autoCapitalize="off"
           autoCorrect="off"
+          autoComplete="off"
           spellCheck={false}
+          enterKeyHint="enter"
           disabled={status !== 'connected'}
         />
-        <button
-          type="button"
-          className={`icon-button vm-enter${withEnter ? ' on' : ''}`}
-          aria-pressed={withEnter}
-          title={withEnter ? 'Send presses Enter after the text' : 'Send types the text only'}
-          aria-label="Press Enter after the text"
-          onClick={toggleEnter}
-        >
-          <CornerDownLeft size={16} aria-hidden />
+        {text && (
+          <button
+            type="button"
+            className="icon-button"
+            title="Clear the box (the VM keeps what was typed)"
+            aria-label="Clear the box"
+            onClick={() => setText('')}
+          >
+            <X size={16} aria-hidden />
+          </button>
+        )}
+        <button disabled={status !== 'connected'}>
+          <CornerDownLeft size={15} aria-hidden /> Enter
         </button>
-        <button disabled={status !== 'connected'}>Send</button>
       </form>
     </Card>
   )

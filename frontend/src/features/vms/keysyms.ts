@@ -93,3 +93,17 @@ export function textEvents(text: string, mods: Modifier[] = []): KeyEvent[] {
   })
   return withModifiers(mods, presses)
 }
+
+/**
+ * What changed between two versions of the console's text field, as keys for the VM: Backspaces down to
+ * where the two first differ, then the rest of the new text. Typing at the end gives just the new
+ * characters; autocorrect or a picked suggestion that swaps a whole word gives Backspaces and the new
+ * word; an edit in the middle retypes the line from there (the VM's cursor is at the end).
+ */
+export function lineEdit(before: string, after: string): { backspaces: number; typed: string } {
+  const a = [...before]
+  const b = [...after]
+  let same = 0
+  while (same < a.length && same < b.length && a[same] === b[same]) same++
+  return { backspaces: a.length - same, typed: b.slice(same).join('') }
+}

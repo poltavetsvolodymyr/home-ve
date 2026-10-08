@@ -196,11 +196,6 @@ button.danger {
   flex: 1;
   min-width: 0;
 }
-.vm-type .vm-enter.on {
-  background: var(--accent);
-  border-color: transparent;
-  color: #fff;
-}
 
 @media (max-width: 640px) {
   .vm-form > label:not(.check) {

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { KEY_SHIFT, functionKeys, keysymOf, needsShift, panelKeyEvents, panelKeys, textEvents } from './keysyms'
+import {
+  KEY_SHIFT,
+  functionKeys,
+  keysymOf,
+  lineEdit,
+  needsShift,
+  panelKeyEvents,
+  panelKeys,
+  textEvents,
+} from './keysyms'
 
 describe('keysymOf', () => {
   it('uses ASCII and Latin-1 as they are', () => {
@@ -50,4 +59,19 @@ describe('panel keys', () => {
 
   it('a capital gets Shift around it', () =>
     expect(textEvents('A').map(([sym]) => sym)).toEqual([KEY_SHIFT, 0x41, 0x41, KEY_SHIFT]))
+})
+
+describe('lineEdit', () => {
+  it('types what was added at the end', () =>
+    expect(lineEdit('ls', 'ls -la')).toEqual({ backspaces: 0, typed: ' -la' }))
+
+  it('erases what was deleted', () => expect(lineEdit('ls -la', 'ls -')).toEqual({ backspaces: 2, typed: '' }))
+
+  it('turns a swapped word into Backspaces and the new word', () =>
+    expect(lineEdit('sudo teh', 'sudo the ')).toEqual({ backspaces: 2, typed: 'he ' }))
+
+  it('retypes the line from an edit in the middle', () =>
+    expect(lineEdit('cat fiel.txt', 'cat file.txt')).toEqual({ backspaces: 6, typed: 'le.txt' }))
+
+  it('counts characters, not UTF-16 units', () => expect(lineEdit('a😀', 'a')).toEqual({ backspaces: 1, typed: '' }))
 })
