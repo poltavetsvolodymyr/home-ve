@@ -15,6 +15,7 @@ namespace HomeBackend.Features.Vms;
 /// AUTOSTART=yes
 /// DISK_SIZE=20          (GiB; vm-run creates the disk with it when the volume doesn't exist yet)
 /// CDROM=debian-13.iso   (a file in the ISO directory, in the VM's CD drive)
+/// BACKUP=no             (left out of the nightly backups; without the line it's backed up)
 /// </code>
 /// Plain KEY=VALUE lines, no shell: nothing in the file is ever executed.
 /// </summary>
@@ -41,6 +42,7 @@ public static partial class VmConfigFile
         string? disk = null, cdrom = null;
         int? diskSize = null;
         var autostart = false;
+        var backup = true;
         var nets = new List<VmNet>();
 
         foreach (var raw in lines)
@@ -57,6 +59,7 @@ public static partial class VmConfigFile
                 case "MEMORY": memory = ParseInt(key, value); break;
                 case "DISK": disk = value; break;
                 case "AUTOSTART": autostart = value == "yes"; break;
+                case "BACKUP": backup = value != "no"; break;
                 case "DISK_SIZE": diskSize = ParseInt(key, value); break;
                 case "CDROM": cdrom = value.Length == 0 ? null : value; break;
                 case "NET":
@@ -71,7 +74,7 @@ public static partial class VmConfigFile
             cpus ?? throw new FormatException("CPUS is missing"),
             memory ?? throw new FormatException("MEMORY is missing"),
             disk ?? throw new FormatException("DISK is missing"),
-            nets, autostart, diskSize, cdrom);
+            nets, autostart, diskSize, cdrom, backup);
         if (Validate(config) is { } error) throw new FormatException(error);
         return config;
     }
@@ -88,6 +91,7 @@ public static partial class VmConfigFile
         sb.Append(CultureInfo.InvariantCulture, $"AUTOSTART={(c.Autostart ? "yes" : "no")}\n");
         if (c.DiskSizeGb is { } size) sb.Append(CultureInfo.InvariantCulture, $"DISK_SIZE={size}\n");
         if (c.Cdrom is { } iso) sb.Append(CultureInfo.InvariantCulture, $"CDROM={iso}\n");
+        if (!c.Backup) sb.Append("BACKUP=no\n");
         return sb.ToString();
     }
 

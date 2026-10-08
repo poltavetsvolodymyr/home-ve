@@ -1,0 +1,43 @@
+/* VM page, tab Backups. */
+
+.backups-hint {
+  margin-top: 0;
+}
+.backups-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.backups-job {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.backups-job .error-text {
+  color: var(--critical);
+  overflow-wrap: anywhere;
+}
+.backup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--grid);
+}
+.backup-row:first-of-type {
+  border-top: 0;
+}
+.backup-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.backup-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}

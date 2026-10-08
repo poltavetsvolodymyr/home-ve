@@ -24,6 +24,8 @@ export interface VmConfig {
   diskSizeGb: number | null
   /** ISO file in the CD drive; null when empty */
   cdrom: string | null
+  /** in the nightly backups */
+  backup: boolean
 }
 
 export type VmState = 'running' | 'starting' | 'stopping' | 'stopped' | 'failed'

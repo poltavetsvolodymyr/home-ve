@@ -32,4 +32,4 @@ export const post = <T>(path: string, body?: unknown) =>
 
 export const put = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
 
-export const del = (path: string) => request<void>(path, { method: 'DELETE' })
+export const del = <T = void>(path: string) => request<T>(path, { method: 'DELETE' })

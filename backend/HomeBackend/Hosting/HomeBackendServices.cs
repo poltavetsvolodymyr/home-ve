@@ -1,6 +1,7 @@
 using HomeBackend.Api;
 using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
+using HomeBackend.Features.Backups;
 using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
 using HomeBackend.Features.SystemStatus;
@@ -32,7 +33,8 @@ public static class HomeBackendServices
             .AddVmsFeature(options.Mock)
             .AddIsosFeature()
             .AddLogsFeature(options.Mock)
-            .AddUpdateFeature(options.Mock);
+            .AddUpdateFeature(options.Mock)
+            .AddBackupsFeature(options.Mock);
 
         return builder;
     }

@@ -114,6 +114,10 @@ export function NewVmPage() {
             <input type="checkbox" checked={form.autostart} onChange={e => update({ autostart: e.target.checked })} />
             Start at boot
           </label>
+          <label className="check">
+            <input type="checkbox" checked={form.backup} onChange={e => update({ backup: e.target.checked })} />
+            Back up every night
+          </label>
 
           <NetsEditor nets={nets} bridges={bridges.data ?? []} onChange={nets => update({ nets })} />
 

@@ -1,0 +1,10 @@
+# Restores a backup onto a stopped VM's disk (deploy/vm/vm-restore); the instance is <vm>:<stamp>.
+# Started by the web UI's "Restore"; polkit lets home-backend start it.
+[Unit]
+Description=Restore VM backup %i
+RequiresMountsFor=/var/backups/vm
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-restore %i
+TimeoutStartSec=2h

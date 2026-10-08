@@ -8,7 +8,7 @@ import { NetsEditor } from './NetsEditor'
 import { needsRestart, settingsFrom, validateSettings } from './settings'
 
 /**
- * CPUs, memory, CD drive, network cards and autostart. Hardware changes apply at the VM's next start (like on a real
+ * CPUs, memory, CD drive, network cards, autostart and the nightly backup. Hardware changes apply at the VM's next start (like on a real
  * machine), so after saving a running VM the form offers to reboot it.
  */
 export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void }) {
@@ -82,6 +82,10 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
         <label className="check">
           <input type="checkbox" checked={form.autostart} onChange={e => update({ autostart: e.target.checked })} />
           Start at boot
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={form.backup} onChange={e => update({ backup: e.target.checked })} />
+          Back up every night
         </label>
 
         <CdromField value={form.cdrom} onChange={cdrom => update({ cdrom })} />

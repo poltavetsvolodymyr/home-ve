@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HomeBackend.Features.Auth;
+using HomeBackend.Features.Backups;
 using HomeBackend.Features.Host;
 using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
@@ -28,5 +29,6 @@ namespace HomeBackend.Api;
 [JsonSerializable(typeof(IReadOnlyList<LogEntry>))]
 [JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(UpdateStatus))]
+[JsonSerializable(typeof(VmBackups))]
 [JsonSerializable(typeof(ProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

@@ -17,6 +17,7 @@ export const settingsFrom = (c: VmConfig): VmSettings => ({
   nets: c.nets.map(n => ({ ...n })),
   autostart: c.autostart,
   cdrom: c.cdrom,
+  backup: c.backup,
 })
 
 /** A new VM's starting point: small, one card on the first bridge, started for installing. */
@@ -28,6 +29,7 @@ export const newVm = (bridge: string): VmCreate => ({
   nets: [newNet(bridge)],
   autostart: false,
   cdrom: null,
+  backup: true,
   start: true,
 })
 

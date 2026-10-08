@@ -1,0 +1,20 @@
+#!/bin/sh
+# vm-backup-delete <name>:<YYYYmmdd-HHMMSS>: deletes one backup. vm-backup-delete@<name>:<stamp>.service
+# runs it as root (the web UI's delete button): the backups are root's, the web UI only lists them.
+set -eu
+
+die() {
+  echo "vm-backup-delete: $*" >&2
+  exit 1
+}
+
+arg=${1:-}
+name=${arg%%:*}
+stamp=${arg#*:}
+printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' || die "bad VM name '$name'"
+printf '%s\n' "$stamp" | grep -Eqx '[0-9]{8}-[0-9]{6}' || die "bad backup '$stamp'"
+
+base=/var/backups/vm/$name/$name-$stamp
+[ -e "$base.img.zst" ] || die "no backup $base.img.zst"
+rm -f -- "$base.img.zst" "$base.conf" "$base.info"
+echo "deleted $base"

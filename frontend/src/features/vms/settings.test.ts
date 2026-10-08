@@ -14,6 +14,7 @@ const router: VmConfig = {
   autostart: true,
   diskSizeGb: null,
   cdrom: null,
+  backup: true,
 }
 
 describe('vm settings', () => {

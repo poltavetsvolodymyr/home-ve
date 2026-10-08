@@ -1,0 +1,104 @@
+#!/bin/sh
+# vm-backup <name>: backs up a VM's disk into /var/backups/vm/<name>/ without stopping it, then thins out
+# the old backups. vm-backup@<name>.service runs it as root (the web UI's "Back up now", the nightly timer).
+#
+#   1. if the VM runs and has a guest agent: freeze its file systems for a moment (fsfreeze), so the
+#      copy is as clean as after a proper shutdown; without an agent it's like a power cut, still fine
+#   2. a thin snapshot of the disk: instant, takes no space until the VM writes
+#   3. thaw the guest, which goes on working while the snapshot is compressed (zstd) into the backup
+#   4. remove the snapshot; keep the newest backup of each of the last 7 days and of 4 weeks before
+#
+# Files: <name>-<YYYYmmdd-HHMMSS>.img.zst (the disk), .conf (the VM's settings then), .info (the disk size).
+set -eu
+
+POOL=data
+DIR=/var/backups/vm
+KEEP_DAILY=7
+KEEP_WEEKLY=4
+
+die() {
+  echo "vm-backup: $*" >&2
+  exit 1
+}
+
+name=${1:-}
+printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' || die "bad VM name '$name'"
+conf=/etc/vm/$name.conf
+[ -f "$conf" ] || die "no $conf"
+mountpoint -q "$DIR" || die "$DIR is not mounted: no backup into the root file system"
+# a disk being restored is half old, half new: nothing worth keeping
+if systemctl list-units --no-legend --state=activating "vm-restore@$name:*" | grep -q .; then
+  die "a backup is being restored onto $name"
+fi
+
+# the disk, checked like vm-run does: a thin volume in the pool
+disk=$(sed -n 's/^[[:space:]]*DISK=//p' "$conf" | tail -1)
+printf '%s\n' "$disk" | grep -Eqx '/dev/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*' || die "bad DISK '$disk' in $conf"
+lv=${disk#/dev/}
+[ "$(lvs --noheadings -o pool_lv -- "$lv" 2>/dev/null | tr -d ' ')" = "$POOL" ] || die "$lv is not a thin volume in the pool $POOL"
+
+snap=${lv%%/*}/$name-backup
+stamp=$(date +%Y%m%d-%H%M%S)
+out=$DIR/$name
+base=$out/$name-$stamp
+frozen=no
+
+# one QMP-like command to the guest agent; its answer, or nothing within 10 s
+qga() {
+  printf '{"execute":"%s"}\n' "$1" | timeout 15 socat -t 10 - "UNIX-CONNECT:/run/vm-$name/qga.sock" 2>/dev/null || true
+}
+
+# whatever happens: thaw the guest, drop the snapshot, and no half backup left behind
+cleanup() {
+  if [ "$frozen" = yes ]; then qga guest-fsfreeze-thaw >/dev/null; fi
+  lvremove -qy -- "$snap" >/dev/null 2>&1 || true
+  rm -f -- "$base.img.zst.part"
+  if [ ! -e "$base.img.zst" ]; then rm -f -- "$base.conf" "$base.info"; fi
+}
+trap cleanup EXIT
+trap 'exit 1' INT TERM
+
+# the directories: the web UI may list them (group home-backend), the files stay root's
+install -d -m 0750 -g home-backend -- "$DIR" "$out"
+
+lvremove -qy -- "$snap" >/dev/null 2>&1 || true # left over from an interrupted run
+if systemctl is-active -q "vm@$name.service" && [ -S "/run/vm-$name/qga.sock" ]; then
+  frozen=yes # set before asking: should the answer get lost, cleanup still thaws
+  if qga guest-fsfreeze-freeze | grep -q '"return"'; then
+    echo "guest file systems frozen"
+  else
+    echo "no answer from a guest agent: the copy is like after a power cut"
+  fi
+fi
+lvcreate -qq --snapshot --setactivationskip n --name "${snap#*/}" -- "$lv"
+if [ "$frozen" = yes ]; then
+  qga guest-fsfreeze-thaw >/dev/null
+  frozen=no
+fi
+lvchange -qq -ay -K -- "$snap"
+
+echo "compressing /dev/$lv into $base.img.zst"
+umask 077
+blockdev --getsize64 "/dev/$snap" | sed 's/^/SIZE=/' >"$base.info"
+cp -- "$conf" "$base.conf"
+zstd -q -T0 -3 <"/dev/$snap" >"$base.img.zst.part"
+mv -- "$base.img.zst.part" "$base.img.zst"
+echo "done: $(du -h "$base.img.zst" | cut -f1)"
+
+# retention: the newest backup of each of the last $KEEP_DAILY days, then of $KEEP_WEEKLY more weeks
+days='' weeks='' nd=0 nw=0
+for f in $(find "$out" -maxdepth 1 -name "$name-*.img.zst" | sort -r); do
+  stamp=${f##*/"$name"-}
+  stamp=${stamp%.img.zst}
+  day=${stamp%%-*}
+  week=$(date -d "$day" +%G%V)
+  if [ "$nd" -lt "$KEEP_DAILY" ] && ! echo "$days" | grep -qw "$day"; then
+    days="$days $day" nd=$((nd + 1))
+    echo "$weeks" | grep -qw "$week" || weeks="$weeks $week"
+  elif [ "$nw" -lt "$KEEP_WEEKLY" ] && ! echo "$weeks" | grep -qw "$week"; then
+    weeks="$weeks $week" nw=$((nw + 1))
+  else
+    echo "removing the old backup $stamp"
+    rm -f -- "${f%.img.zst}.img.zst" "${f%.img.zst}.conf" "${f%.img.zst}.info"
+  fi
+done

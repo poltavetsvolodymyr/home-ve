@@ -1,5 +1,6 @@
 using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
+using HomeBackend.Features.Backups;
 using HomeBackend.Features.Host;
 using HomeBackend.Features.Isos;
 using HomeBackend.Features.Update;
@@ -48,6 +49,7 @@ public static class HomeBackendPipeline
             .MapHostEndpoints()
             .MapUpdateEndpoints()
             .MapVmsEndpoints()
+            .MapBackupsEndpoints()
             .MapIsoEndpoints();
 
         return app;

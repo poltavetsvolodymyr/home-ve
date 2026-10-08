@@ -1,0 +1,8 @@
+# Backs up every VM that doesn't say BACKUP=no (deploy/vm/vm-backup-all); vm-backup-all.timer starts it nightly.
+[Unit]
+Description=Back up the VMs
+RequiresMountsFor=/var/backups/vm
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-backup-all

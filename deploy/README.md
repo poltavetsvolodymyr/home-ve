@@ -13,10 +13,14 @@
 | `vm/vm-run` | запускает VM по `/etc/vm/<имя>.conf`; ставится в `/usr/local/sbin/` |
 | `vm/vm-disk-remove`, `vm/vm-disk-remove@.service` | удаляет диск остановленной VM (кнопка Delete VM с галкой «и диск») |
 | `vm/vm-stop` | выключение VM для `vm@.service`: кнопка питания, 120 с ожидания, потом выдернуть шнур |
+| `vm/vm-backup`, `vm/vm-backup@.service` | бэкап VM: снапшот → `zstd` в `/var/backups/vm/<имя>/`, чистка старых |
+| `vm/vm-backup-all`, `.service`, `.timer` | каждую ночь бэкапит все VM без `BACKUP=no` |
+| `vm/vm-restore`, `vm/vm-restore@.service` | записывает бэкап обратно на диск остановленной VM (старый диск остаётся снапшотом `<имя>-undo`) |
+| `vm/vm-backup-delete`, `vm/vm-backup-delete@.service` | удаляет один бэкап |
 | `vm/qmp` | одна команда в управляющий сокет VM: `qmp router system_powerdown` |
 | `vm/vm@.service` | шаблон службы: одна VM = `vm@<имя>` |
 | `vm/vm-autostart`, `vm/vm-autostart.service` | при загрузке запускает VM с `AUTOSTART=yes` |
-| `vm/50-home-backend.rules` | polkit: бэкенду можно start/stop/restart/kill только `vm@*.service` |
+| `vm/50-home-backend.rules` | polkit: что бэкенду можно делать с юнитами (VM, удаление диска, бэкапы, Update) |
 | `nginx/home.conf` | сайт nginx (HTTPS, WebSocket для консоли) |
 | `install.sh` | первая установка и применение любого обновления; можно запускать сколько угодно раз |
 | `update.sh` | `git pull` + `install.sh` |

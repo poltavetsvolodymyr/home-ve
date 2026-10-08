@@ -39,6 +39,7 @@ vm@<имя>.service (root)
 |---|---|---|
 | start / stop / restart / kill VM | polkit, `deploy/vm/50-home-backend.rules`: только `vm@<имя>.service` и только эти четыре действия | любые другие юниты, enable/disable, правка юнитов |
 | удалить VM вместе с диском | тот же polkit: только `start` для `vm-disk-remove@<имя>.service`. Скрипт от root удаляет том `<группа>/<имя>`, только тонкий в пуле `data` и только у остановленной VM | удалить любой другой том |
+| бэкапы | тот же polkit: `restart` для `vm-backup@<имя>.service`, `start` для `vm-restore@<имя>:<время>` и `vm-backup-delete@<имя>:<время>`. Скрипты от root сами проверяют имя, время и диск; восстановление только на остановленную VM | читать сами бэкапы: папки `/var/backups/vm/<имя>` дают группе `home-backend` только список файлов, сами файлы 0600 root |
 | кнопка Update | тот же polkit: только `restart` для `home-update.service`. Юнит от root запускает `update.sh` | выбрать, что запускать: команда зашита в юнит, бэкенд может только перезапустить юнит |
 | ISO-образы | папка `/var/lib/home-backend/iso` принадлежит бэкенду; он сам скачивает туда файлы по ссылке | подсунуть VM файл хоста: `vm-run` открывает ISO сам и проверяет открытый файл (см. ниже) |
 | настройки VM | `/etc/vm` принадлежит `root:home-backend` с правами 0775, в юните `ReadWritePaths=/etc/vm` | писать куда-то ещё: `ProtectSystem=strict` |
@@ -78,6 +79,7 @@ AUTOSTART=yes
 | `AUTOSTART` | `yes` / `no` | `vm-autostart.service` при загрузке запускает VM с `yes` |
 | `DISK_SIZE` | ГиБ, необязательно | если тома ещё нет, `vm-run` создаёт его такого размера (только том с именем VM) |
 | `CDROM` | имя файла `.iso`, необязательно | ISO из `/var/lib/home-backend/iso` в CD-приводе; грузится, если диск пустой |
+| `BACKUP` | `no`, необязательно | без строки VM бэкапится каждую ночь (`vm-backup-all`); с `no` пропускается |
 
 Пустые строки и строки с `#` пропускаются. Бэкенд переписывает файл целиком (временный файл + rename),
 так что свои комментарии в нём не живут.
@@ -120,6 +122,7 @@ Cli/                       home-backend hash-password / set-password
 | `SystemStatus` | (на Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp из /sys/class/hwmon) |
 | `Vms` | VMs, страница VM, New VM | `POST /api/vms` (создать), `DELETE /api/vms/{имя}[?disk=true]` (удалить), `GET /api/vms`, `GET /api/vms/{имя}`, `POST /api/vms/{имя}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{имя}/config`, `GET /api/vms/{имя}/logs`, `GET /api/vms/{имя}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
 | `Isos` | ISO images | `GET /api/isos`, `POST /api/isos` (скачать по ссылке), `DELETE /api/isos/{имя}` (удалить или отменить загрузку) | `IsoStore`: папка `IsoDir`, загрузки в фоне через `.<имя>.part` |
+| `Backups` | вкладка Backups у VM | `GET/POST /api/vms/{имя}/backups` (список / Back up now), `POST /api/vms/{имя}/backups/{время}/restore`, `DELETE /api/vms/{имя}/backups/{время}` | `LinuxBackupHost`: список файлов в `BackupDir`, `systemctl` для юнитов `vm-backup@`/`vm-restore@`/`vm-backup-delete@` и их журнал; `BackupRestores` держит идущее восстановление в памяти; `MockBackupHost` |
 | `Logs` | (вкладка Logs у VM) | — | `JournalctlSource`: `journalctl -o json -u vm@<имя>.service` |
 | `Update` | Settings (шестерёнка в шапке) | `GET /api/host/update`, `POST /api/host/update` | `SystemctlUpdateRunner`: `systemctl restart/show home-update.service` + его журнал; `MockUpdateRunner` |
 

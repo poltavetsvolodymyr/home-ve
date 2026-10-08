@@ -32,6 +32,9 @@ public sealed class HomeBackendOptions
     /// </summary>
     public string IsoDir { get; set; } = "/var/lib/home-backend/iso";
 
+    /// <summary>Where the VM backups are (deploy/vm/vm-backup): <c>&lt;dir&gt;/&lt;vm&gt;/&lt;vm&gt;-&lt;stamp&gt;.img.zst</c>.</summary>
+    public string BackupDir { get; set; } = "/var/backups/vm";
+
     /// <summary>LVM volume group of the thin pool "data": a new VM's disk is /dev/&lt;group&gt;/&lt;name&gt;.</summary>
     public string DiskGroup { get; set; } = "home";
 

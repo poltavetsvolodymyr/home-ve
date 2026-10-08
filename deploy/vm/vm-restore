@@ -1,0 +1,70 @@
+#!/bin/sh
+# vm-restore <name>:<YYYYmmdd-HHMMSS>: writes a backup back onto a stopped VM's disk.
+# vm-restore@<name>:<stamp>.service runs it as root (the web UI's "Restore").
+#
+# The disk as it was right before is kept as a thin snapshot <group>/<name>-undo (until the next restore):
+# lvconvert --merge or a dd from it brings it back. The backup file is opened here and checked like vm-run
+# checks an ISO: a plain file in /var/backups/vm/<name>, owned by root.
+# "check || die" on purpose: die exits, so it never runs after a passing check
+# shellcheck disable=SC2015
+set -eu
+
+POOL=data
+DIR=/var/backups/vm
+
+die() {
+  echo "vm-restore: $*" >&2
+  exit 1
+}
+
+arg=${1:-}
+name=${arg%%:*}
+stamp=${arg#*:}
+printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' || die "bad VM name '$name'"
+printf '%s\n' "$stamp" | grep -Eqx '[0-9]{8}-[0-9]{6}' || die "bad backup '$stamp'"
+
+state=$(systemctl show --property=ActiveState --value "vm@$name.service")
+case $state in
+  inactive | failed) ;;
+  *) die "vm@$name is $state: shut it down first" ;;
+esac
+
+# one at a time: a backup copying the disk meanwhile, or a second restore, would get a mix of both
+[ "$(systemctl show --property=ActiveState --value "vm-backup@$name.service")" != activating ] ||
+  die "a backup of $name is running"
+[ "$(systemctl list-units --no-legend --state=activating "vm-restore@$name:*" | grep -c .)" -le 1 ] ||
+  die "another restore of $name is running"
+
+conf=/etc/vm/$name.conf
+[ -f "$conf" ] || die "no $conf"
+disk=$(sed -n 's/^[[:space:]]*DISK=//p' "$conf" | tail -1)
+printf '%s\n' "$disk" | grep -Eqx '/dev/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*' || die "bad DISK '$disk' in $conf"
+lv=${disk#/dev/}
+[ "$(lvs --noheadings -o pool_lv -- "$lv" 2>/dev/null | tr -d ' ')" = "$POOL" ] || die "$lv is not a thin volume in the pool $POOL"
+lvchange -qq -ay -- "$lv"
+
+file=$DIR/$name/$name-$stamp.img.zst
+[ -f "$file" ] || die "no backup $file"
+exec 3<"$file"
+[ "$(readlink "/proc/$$/fd/3")" = "$file" ] && [ -f "/proc/$$/fd/3" ] &&
+  [ "$(stat -L -c %U "/proc/$$/fd/3")" = root ] || die "$file is not a plain file of root"
+
+want=$(sed -n 's/^SIZE=//p' "$DIR/$name/$name-$stamp.info" 2>/dev/null || true)
+have=$(blockdev --getsize64 "/dev/$lv")
+[ -z "$want" ] || [ "$want" -le "$have" ] || die "the backup ($want bytes) is bigger than the disk ($have bytes)"
+
+undo=${lv%%/*}/$name-undo
+lvremove -qy -- "$undo" >/dev/null 2>&1 || true
+lvcreate -qq --snapshot --name "${undo#*/}" -- "$lv"
+echo "the disk as it was is kept as $undo"
+
+# start from an empty disk (every block unmapped reads as zeros), then write only what isn't zeros:
+# the volume stays thin. Without discard support, write everything.
+sparse=sparse,
+if ! blkdiscard -- "/dev/$lv" 2>/dev/null; then
+  echo "no discard on /dev/$lv: writing the whole disk"
+  sparse=
+fi
+echo "restoring $file onto /dev/$lv"
+zstd -q -d -c <&3 | dd of="/dev/$lv" bs=4M iflag=fullblock conv="${sparse}fsync" status=none
+echo "done"

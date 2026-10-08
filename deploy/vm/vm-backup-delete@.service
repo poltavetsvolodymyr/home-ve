@@ -1,0 +1,8 @@
+# Deletes one backup (deploy/vm/vm-backup-delete); the instance is <vm>:<stamp>.
+[Unit]
+Description=Delete VM backup %i
+RequiresMountsFor=/var/backups/vm
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-backup-delete %i

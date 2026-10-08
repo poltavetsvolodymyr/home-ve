@@ -1,5 +1,6 @@
 using HomeBackend.Api;
 using HomeBackend.Configuration;
+using HomeBackend.Features.Backups;
 using HomeBackend.Features.Isos;
 using HomeBackend.Features.Logs;
 using HomeBackend.Infrastructure;
@@ -40,12 +41,15 @@ public static class VmsFeature
         return api;
     }
 
-    private static async Task<Results<Ok<VmInfo>, NotFound, BadRequest<ErrorResponse>, ProblemHttpResult>> RunAction(
-        string name, string action, IVmHost host, VmMonitor monitor, CancellationToken ct)
+    private static async Task<Results<Ok<VmInfo>, NotFound, BadRequest<ErrorResponse>, Conflict<ErrorResponse>, ProblemHttpResult>> RunAction(
+        string name, string action, IVmHost host, VmMonitor monitor, BackupRestores restores, CancellationToken ct)
     {
         if (!Enum.TryParse<VmAction>(action, ignoreCase: true, out var a) || !Enum.IsDefined(a))
             return TypedResults.BadRequest(new ErrorResponse($"unknown action '{action}'"));
         if (monitor.Find(name) is null) return TypedResults.NotFound();
+        // the disk is being overwritten: the VM would boot from half of it
+        if (a is VmAction.Start or VmAction.Reboot && restores.IsRunning(name))
+            return TypedResults.Conflict(new ErrorResponse($"a backup is being restored onto {name}: wait for it to finish"));
 
         try { await host.RunAsync(name, a, ct); }
         catch (Exception ex) when (HostCommandFailure.Is(ex)) { return HostCommandFailure.ToProblem(ex); }
@@ -70,6 +74,7 @@ public static class VmsFeature
             Nets = request.Nets.Select(n => new VmNet(n.Bridge, n.Mac.ToUpperInvariant())).ToList(),
             Autostart = request.Autostart,
             Cdrom = string.IsNullOrEmpty(request.Cdrom) ? null : request.Cdrom,
+            Backup = request.Backup,
         };
         if (Check(config, host, isos) is { } error) return TypedResults.BadRequest(new ErrorResponse(error));
 
@@ -105,7 +110,7 @@ public static class VmsFeature
 
         var config = new VmConfig(name, request.Cpus, request.MemoryMb, $"/dev/{options.Value.DiskGroup}/{name}",
             request.Nets.Select(n => new VmNet(n.Bridge, n.Mac.ToUpperInvariant())).ToList(), request.Autostart,
-            request.DiskSizeGb, string.IsNullOrEmpty(request.Cdrom) ? null : request.Cdrom);
+            request.DiskSizeGb, string.IsNullOrEmpty(request.Cdrom) ? null : request.Cdrom, request.Backup);
         if (config.DiskSizeGb is null) return TypedResults.BadRequest(new ErrorResponse("a new VM needs a disk size"));
         if (Check(config, host, isos) is { } error) return TypedResults.BadRequest(new ErrorResponse(error));
 
@@ -156,10 +161,11 @@ public static class VmsFeature
 
 /// <summary>Body of <c>PUT /api/vms/{name}/config</c>. The disk stays as it is.</summary>
 /// <param name="Cdrom">ISO file name for the CD drive; null or empty to eject.</param>
-public sealed record VmSettingsRequest(int Cpus, int MemoryMb, IReadOnlyList<VmNet> Nets, bool Autostart, string? Cdrom = null);
+/// <param name="Backup">In the nightly backups.</param>
+public sealed record VmSettingsRequest(int Cpus, int MemoryMb, IReadOnlyList<VmNet> Nets, bool Autostart, string? Cdrom = null, bool Backup = true);
 
 /// <summary>Body of <c>POST /api/vms</c>.</summary>
 /// <param name="DiskSizeGb">Size of the new disk, which vm-run creates at the first start.</param>
 /// <param name="Start">Start it right away (to install from the ISO in the console).</param>
 public sealed record VmCreateRequest(string Name, int Cpus, int MemoryMb, int? DiskSizeGb, IReadOnlyList<VmNet> Nets,
-    bool Autostart, string? Cdrom, bool Start);
+    bool Autostart, string? Cdrom, bool Start, bool Backup = true);

@@ -112,4 +112,14 @@ public class VmConfigFileTests
         var c = VmConfigFile.Parse("router", RouterConf) with { DiskSizeGb = size };
         Assert.NotNull(VmConfigFile.Validate(c));
     }
+
+    [Fact]
+    public void Backed_up_unless_the_file_says_no()
+    {
+        Assert.True(VmConfigFile.Parse("router", RouterConf).Backup);
+        var off = VmConfigFile.Parse("router", [.. RouterConf, "BACKUP=no"]);
+        Assert.False(off.Backup);
+        Assert.Contains("BACKUP=no\n", VmConfigFile.Format(off));
+        Assert.DoesNotContain("BACKUP", VmConfigFile.Format(off with { Backup = true }));
+    }
 }

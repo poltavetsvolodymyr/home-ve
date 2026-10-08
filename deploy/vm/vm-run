@@ -31,6 +31,10 @@ matches "$name" '[a-z][a-z0-9-]{0,11}' || die "bad VM name '$name'"
 conf=/etc/vm/$name.conf
 run=/run/vm-$name
 [ -f "$conf" ] || die "no $conf"
+# the disk is being overwritten (vm-restore): booting half of it could only make a mess
+if systemctl list-units --no-legend --state=activating "vm-restore@$name:*" | grep -q .; then
+  die "a backup is being restored onto $name"
+fi
 
 cpus='' memory='' disk='' nets='' disk_size='' cdrom=''
 # read trims the spaces around a line; the last line may lack its newline
@@ -47,6 +51,7 @@ while read -r line || [ -n "$line" ]; do
     DISK_SIZE) disk_size=$value ;;
     CDROM) cdrom=$value ;;
     AUTOSTART) ;; # read by vm-autostart
+    BACKUP) ;;    # read by vm-backup-all
     *) die "$conf: unknown key $key" ;;
   esac
 done <"$conf"

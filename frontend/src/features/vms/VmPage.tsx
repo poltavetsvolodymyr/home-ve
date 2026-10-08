@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
+import { VmBackups } from '@/features/backups/VmBackups'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { Badge, Card, ErrorNote, Segmented, Skeleton } from '@/shared/ui'
 import { fetchVm } from './api'
@@ -19,11 +20,12 @@ const tabs = [
   { value: 'summary', label: 'Summary' },
   { value: 'console', label: 'Console' },
   { value: 'settings', label: 'Settings' },
+  { value: 'backups', label: 'Backups' },
   { value: 'logs', label: 'Logs' },
 ] as const
 type Tab = (typeof tabs)[number]['value']
 
-/** `/vms/:name?tab=console`: one VM, with its buttons and four tabs. The tab is in the URL, so a reload keeps it. */
+/** `/vms/:name?tab=console`: one VM, with its buttons and five tabs. The tab is in the URL, so a reload keeps it. */
 export function VmPage() {
   const { name = '' } = useParams()
   const [params, setParams] = useSearchParams()
@@ -78,6 +80,7 @@ export function VmPage() {
           <VmDelete vm={vm} />
         </>
       )}
+      {tab === 'backups' && vm && <VmBackups vm={vm} />}
       {tab === 'logs' && <VmLogs name={name} />}
     </div>
   )

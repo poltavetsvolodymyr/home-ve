@@ -1,0 +1,15 @@
+# Backs up VM %i (deploy/vm/vm-backup): snapshot, compress into /var/backups/vm/%i, thin out old backups.
+# Started by the web UI's "Back up now" and by vm-backup-all (nightly); polkit lets home-backend restart it.
+[Unit]
+Description=Back up VM %i
+RequiresMountsFor=/var/backups/vm
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/vm-backup %i
+# stays "active (exited)" with its result and times for the web UI; a new run is a restart
+RemainAfterExit=yes
+# a backup shouldn't slow the VMs down
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h

@@ -1,0 +1,13 @@
+#!/bin/sh
+# vm-backup-all: backs up every VM whose .conf doesn't say BACKUP=no, one after another.
+# vm-backup-all.timer runs it every night. A failed VM doesn't stop the others.
+failed=0
+for conf in /etc/vm/*.conf; do
+  [ -f "$conf" ] || continue
+  name=$(basename "$conf" .conf)
+  printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' || continue
+  if grep -Eqx '[[:space:]]*BACKUP=no[[:space:]]*' "$conf"; then continue; fi
+  # restart, not start: the unit stays "active (exited)" after a run (RemainAfterExit)
+  systemctl restart "vm-backup@$name.service" || failed=1
+done
+exit $failed
