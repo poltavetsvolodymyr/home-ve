@@ -141,36 +141,48 @@ The card's name:
 ip -br link
 ```
 
-You need the one that is `UP` and is not `lo`, for example `enp1s0` or `eno1`. Below, replace `enp1s0` with its name.
+You need the one that is `UP` and is not `lo`, for example `enp1s0` or `eno1`. Put its name into `NIC` (this is
+the only thing you change; every command below takes the name from there) and check it:
+
+```bash
+NIC=enp1s0
+ip link show "$NIC"
+```
+
+The second line must print the card, not `Device "…" does not exist`. Then, in the same shell:
 
 ```bash
 printf '[NetDev]\nName=br0\nKind=bridge\n' > /etc/systemd/network/10-br0.netdev
 printf '[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nClientIdentifier=mac\n' > /etc/systemd/network/10-br0.network
-printf '[Match]\nName=enp1s0\n\n[Network]\nBridge=br0\n' > /etc/systemd/network/20-br0-port.network
+printf '[Match]\nName=%s\n\n[Network]\nBridge=br0\n' "$NIC" > /etc/systemd/network/20-br0-port.network
+cat /etc/systemd/network/20-br0-port.network
 ```
 
 - `10-br0.netdev` creates the bridge `br0`;
 - `10-br0.network`: the bridge gets the address via DHCP. `ClientIdentifier=mac` makes it identify itself to the router
   by MAC, so the address does not change;
-- `20-br0-port.network`: the card is added to the bridge and no longer gets an address of its own.
+- `20-br0-port.network`: the card is added to the bridge and no longer gets an address of its own. `%s` is replaced
+  with the name in `NIC`; `cat` shows the result: `Name=` must be your card.
 
 Now remove the card from the old network configuration (ifupdown) and enable networkd:
 
 ```bash
 cp /etc/network/interfaces /etc/network/interfaces.bak
-sed -i -E 's/^(allow-hotplug|auto) enp1s0$/# &/; s/^iface enp1s0 .*/# &/' /etc/network/interfaces
+sed -i -E "s/^(allow-hotplug|auto) $NIC\$/# &/; s/^iface $NIC .*/# &/" /etc/network/interfaces
+grep "$NIC" /etc/network/interfaces
 systemctl enable systemd-networkd
 reboot
 ```
 
-- `sed` comments out the lines about this card in `/etc/network/interfaces`; otherwise two services would manage it;
+- `sed` comments out the lines about this card in `/etc/network/interfaces`; otherwise two services would manage it.
+  `grep` shows them: every line must now start with `#`;
 - `/etc/resolv.conf` (DNS) stays as the old DHCP client left it: it is already correct. If the DNS server on your
   network changes later, edit this file or install `systemd-resolved`.
 
 After the reboot:
 
 ```bash
-networkctl                  # br0: routable configured, enp1s0: enslaved configured
+networkctl                  # br0: routable configured, your card: enslaved configured
 ip -br a                    # the address is now on br0
 getent hosts debian.org     # DNS works
 ```
