@@ -5,7 +5,7 @@ import { dateTime } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { Badge, Card, confirm, ErrorNote, Segmented, Skeleton } from '@/shared/ui'
 import { type Channel, fetchChannel, fetchUpdate, saveChannel, startUpdate } from './api'
-import { confirmDev, confirmUpdate, updateBadge } from './update'
+import { confirmDev, confirmUpdate, releaseOf, updateBadge } from './update'
 import '@/features/vms/logs.css'
 
 /**
@@ -52,36 +52,33 @@ export function UpdateCard() {
     }
   }
 
+  const channelSwitch = channel.data ? (
+    <Segmented
+      label="Update channel"
+      value={channel.data.channel}
+      options={[
+        { value: 'stable', label: 'Stable' },
+        { value: 'dev', label: 'Dev' },
+      ]}
+      onChange={changeChannel}
+    />
+  ) : (
+    <Skeleton width="9em" />
+  )
+
   return (
-    <Card
-      title="Update"
-      className="fit-screen head-inline"
-      actions={
-        <button className="primary" disabled={!data || running || starting} onClick={start}>
-          <Download size={15} aria-hidden /> {running || starting ? 'Updating…' : 'Update now'}
-        </button>
-      }
-    >
+    <Card title="Update" className="fit-screen head-inline" actions={channelSwitch}>
       {/* the backend restarts during an update: a failed poll then is expected, not news */}
       {!running && <ErrorNote error={error} />}
       <ErrorNote error={startError} />
       <ErrorNote error={channelError} />
 
-      <div className="update-channel">
-        {channel.data ? (
-          <Segmented
-            label="Update channel"
-            value={channel.data.channel}
-            options={[
-              { value: 'stable', label: 'Stable' },
-              { value: 'dev', label: 'Dev' },
-            ]}
-            onChange={changeChannel}
-          />
-        ) : (
-          <Skeleton width="9em" />
-        )}
-        <span className="muted mono">{channel.data?.version ?? ''}</span>
+      {/* the release running now on the left (none between releases), the button under the channel switch */}
+      <div className="update-run">
+        <span className="muted mono">{releaseOf(channel.data?.version)}</span>
+        <button className="primary" disabled={!data || running || starting} onClick={start}>
+          <Download size={15} aria-hidden /> {running || starting ? 'Updating…' : 'Update now'}
+        </button>
       </div>
 
       {/* state, started and finished one under another; Reload on the right */}

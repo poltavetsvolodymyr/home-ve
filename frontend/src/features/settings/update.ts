@@ -37,3 +37,8 @@ export const confirmOffsite: ConfirmOptions = {
     'Only what changed goes up, at most 5 GB per run (offsite.conf). It also runs every night after the backups.',
   confirmLabel: 'Upload',
 }
+
+/** A release's name (v0.1.0) as is; a build between releases (v0.1.0-3-gabc1234, or a bare commit) says nothing. */
+export function releaseOf(version: string | null | undefined): string {
+  return version && /^v\d+\.\d+\.\d+$/.test(version) ? version : ''
+}
