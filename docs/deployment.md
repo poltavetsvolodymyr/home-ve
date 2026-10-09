@@ -123,6 +123,10 @@ Check: `lvs` shows `data` with the attributes `twi-a-tz--` (thin pool, active).
 Why `90%FREE` and not everything: the rest of the group is a reserve, so you can grow the pool's metadata
 (`lvextend --poolmetadatasize`) or the pool itself if needed.
 
+> **Backups on the same disk?** The backup volume (see [Backups](#backups)) is a separate, regular volume, and a thin
+> pool cannot be shrunk later. So if the backups are to live in this volume group too, create the backup volume
+> **before** the pool, then the pool takes 90% of what is left.
+
 If you already ran `install.sh` before the pool existed, run it again: it will add the group to the settings.
 
 ### Bridge for VM networking
@@ -458,7 +462,16 @@ so the root filesystem does not fill up.
 
 Create the volume, for example a regular (not thin) LV in your volume group, or use a separate disk. Format it as ext4,
 mount it at `/var/backups/vm` with an `/etc/fstab` line that uses `nofail`, then run `install.sh` again to enable the
-nightly timer. Replace `<group>` with your volume group's name:
+nightly timer.
+
+How big: a backup is the VM disk's used space, compressed (a fresh Debian is well under 1 GB), and up to 11 are kept
+per VM (7 daily, 4 weekly; consecutive ones are mostly the same data, but each is stored in full). Check what is free
+first: `vgs` (`VFree`). If the pool already took the space, use a separate disk, or a smaller volume.
+
+A backup on the same disk protects against mistakes (a broken update, a deleted file), not against the disk dying:
+for that there is the [offsite copy](#offsite-copy-cloudflare-r2).
+
+Replace `<group>` with your volume group's name and `50G` with the size you chose:
 
 ```bash
 lvcreate -L 50G -n backups <group>
