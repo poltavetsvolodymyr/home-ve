@@ -4,6 +4,13 @@
 you run from the browser, on a computer or a phone: create and install VMs, watch and control them, back them up every night and keep an
 encrypted copy off-site. No Proxmox, no custom kernel or distribution, and the web UI never runs as root.
 
+<p align="center">
+  <img src="docs/screenshots/vms.jpg" width="24%" alt="The VM list: a router VM running with its CPU and memory, a stopped test VM">
+  <img src="docs/screenshots/console.jpg" width="24%" alt="A VM's console in the browser, with a key panel for phones">
+  <img src="docs/screenshots/new-vm.jpg" width="24%" alt="The New VM form: name, CPUs, memory, disk, CD drive, autostart, nightly backup">
+  <img src="docs/screenshots/host.jpg" width="24%" alt="Host status: CPU and load, CPU temperature, memory, system disk, uptime">
+</p>
+
 Made for a home server or a small office box: a router VM, Home Assistant, a NAS, a few Linux servers. One host runs
 as many VMs as its CPU, memory and disks allow, and it grows by adding disks to the LVM pool or more memory.
 (Managing several hosts together, as a cluster, is not a goal for now.)
