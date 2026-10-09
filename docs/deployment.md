@@ -215,39 +215,20 @@ write `LinkLocalAddressing=no` instead of `DHCP=`.
 
 The host is prepared (see the section above). Run everything on the host as root.
 
-### 1. Key for reading the repository
-
-Once the repository is public, skip this step: in step 2, clone over HTTPS instead
-(`https://github.com/poltavetsvolodymyr/home-ve.git` in place of `git@github.com:poltavetsvolodymyr/home-ve.git`).
-
-While the repository is private, the host needs its own read-only deploy key:
-
-```bash
-ssh-keygen -t ed25519 -f /root/.ssh/home_deploy -N "" -C "home deploy"
-cat /root/.ssh/home_deploy.pub
-```
-
-Add the public key: GitHub → home-ve → Settings → Deploy keys → Add (without "Allow write access"). Then:
-
-```bash
-printf 'Host github.com\n    IdentityFile /root/.ssh/home_deploy\n' >> /root/.ssh/config
-ssh -T git@github.com
-```
-
-- `printf` appends two lines to `/root/.ssh/config` (`\n` is a line break): use this key for github.com;
-- `ssh -T` tests the key: answer `yes` to the fingerprint question; after that you should see
-  `Hi poltavetsvolodymyr/home-ve! You've successfully authenticated`. `Permission denied` means the key on GitHub
-  is the wrong one or was not added.
-
-### 2. Clone only `deploy/`
+### 1. Clone only `deploy/`
 
 ```bash
 apt-get install -y git
-git clone --filter=blob:none --sparse git@github.com:poltavetsvolodymyr/home-ve.git /opt/home-ve
+git clone --filter=blob:none --sparse https://github.com/poltavetsvolodymyr/home-ve.git /opt/home-ve
 cd /opt/home-ve && git sparse-checkout set deploy
 ```
 
-### 3. Install
+- `--filter=blob:none --sparse` downloads the history without file contents, and `sparse-checkout set deploy` then
+  fetches only the `deploy/` folder: the ready-built backend and frontend and the scripts. The host needs no source
+  code and no build tools;
+- updates later come from the same place (`deploy/update.sh`, or Update now in the web UI).
+
+### 2. Install
 
 ```bash
 bash /opt/home-ve/deploy/install.sh
@@ -278,7 +259,7 @@ bash /opt/home-ve/deploy/install.sh
   30 days before it expires the script makes a new one). If the site was already configured by hand, `tls.conf` gets its certificate.
 
 Done: the web UI is at `https://<host address>/`. With the self-signed certificate the browser warns you once
-(the connection is still encrypted). To get rid of the warning, use your own domain and certificate, step 4.
+(the connection is still encrypted). To get rid of the warning, use your own domain and certificate, step 3.
 
 The script does not touch running VMs. A VM gets the new `vm-run` (and with it the browser console) on its next
 restart. If the VM is a router, this means ~30 seconds without internet, so pick a convenient moment:
@@ -288,7 +269,7 @@ systemctl restart vm@router
 ls -l /run/vm-router/      # vnc.sock: srw-rw---- root home-backend; other sockets root only
 ```
 
-### 4. Your own domain and certificate (optional)
+### 3. Your own domain and certificate (optional)
 
 This is how the author does it: the domain is on Cloudflare, the certificate is from Let's Encrypt via acme.sh with
 DNS validation, so the host does not need to be reachable from the internet. Below, replace `example.com`, `home.example.com` and `192.168.1.2` with your own values.
