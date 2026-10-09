@@ -88,6 +88,10 @@ On the host:
   bridge), installation, your own domain and certificate, updates, settings, backups, offsite upload
 - [deploy/README.md](deploy/README.md): cheat sheet for the host (the host only has `deploy/`)
 
+## Security
+
+Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 The text in [LICENSE](LICENSE) is what applies: [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)
