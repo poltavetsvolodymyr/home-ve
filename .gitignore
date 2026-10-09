@@ -154,3 +154,6 @@ obj/
 *.user
 .vs/
 backend/HomeBackend/.data/
+
+# local Claude Code settings (launch configs, permissions)
+.claude/
