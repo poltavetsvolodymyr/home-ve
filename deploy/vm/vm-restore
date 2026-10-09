@@ -57,8 +57,9 @@ have=$(blockdev --getsize64 "/dev/$lv")
 [ -z "$want" ] || [ "$want" -le "$have" ] || die "the backup ($want bytes) is bigger than the disk ($have bytes)"
 
 undo=${lv%%/*}/$name-undo
-lvremove -qy -- "$undo" >/dev/null 2>&1 || true
-lvcreate -qq --snapshot --name "${undo#*/}" -- "$lv"
+# 3<&-: LVM warns about any file descriptor it inherits, and the backup is open on 3
+lvremove -qy -- "$undo" >/dev/null 2>&1 3<&- || true
+lvcreate -qq --snapshot --name "${undo#*/}" -- "$lv" 3<&-
 echo "the disk as it was is kept as $undo"
 
 # start from an empty disk (every block unmapped reads as zeros), then write only what isn't zeros:
