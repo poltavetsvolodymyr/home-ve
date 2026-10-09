@@ -491,8 +491,10 @@ How (`deploy/vm/vm-backup`, unit `vm-backup@<name>`):
    `/var/backups/vm/<name>/<name>-<YYYYMMDD-HHMMSS>.img.zst` (next to it: `.conf`, the VM's settings at that moment, and `.info`, the disk size);
 4. the snapshot is deleted. Retention keeps the most recent backup for each of the last 7 days and for each of the 4 weeks before that.
 
-When: every night around 3:30 (`vm-backup-all.timer`, ±30 minutes) for all VMs without `BACKUP=no`, and with the
+When: every night around 3:30 in the host's time zone (`vm-backup-all.timer`, up to 30 minutes later; a night the host was off is caught up at the next boot) for all VMs without `BACKUP=no`, and with the
 VM → Backups → Back up now button. The "Back up every night" checkbox in the VM's settings turns the nightly backup on and off.
+Check the host's time zone with `timedatectl`; set yours with `timedatectl set-timezone Europe/Berlin` (the list:
+`timedatectl list-timezones`).
 
 Restore: VM → Backups → Restore, only for a stopped VM, and you must type its name. The disk is overwritten with
 the backup, and what was on it before is kept as the snapshot `<group>/<name>-undo` until the next restore.
