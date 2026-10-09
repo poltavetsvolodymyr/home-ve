@@ -1,7 +1,7 @@
 /* Settings page. */
 
-/* the release running now on the left, Update now on the right (under the channel switch in the head) */
-.update-run {
+/* the channel switch on the left, the release running now on the right */
+.update-channel {
   display: flex;
   align-items: center;
   justify-content: space-between;

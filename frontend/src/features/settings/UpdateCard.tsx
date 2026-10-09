@@ -67,18 +67,24 @@ export function UpdateCard() {
   )
 
   return (
-    <Card title="Update" className="fit-screen head-inline" actions={channelSwitch}>
+    <Card
+      title="Update"
+      className="fit-screen head-inline"
+      actions={
+        <button className="primary" disabled={!data || running || starting} onClick={start}>
+          <Download size={15} aria-hidden /> {running || starting ? 'Updating…' : 'Update now'}
+        </button>
+      }
+    >
       {/* the backend restarts during an update: a failed poll then is expected, not news */}
       {!running && <ErrorNote error={error} />}
       <ErrorNote error={startError} />
       <ErrorNote error={channelError} />
 
-      {/* the release running now on the left (none between releases), the button under the channel switch */}
-      <div className="update-run">
+      {/* the channel switch on the left, the release running now on the right (none between releases) */}
+      <div className="update-channel">
+        {channelSwitch}
         <span className="muted mono">{releaseOf(channel.data?.version)}</span>
-        <button className="primary" disabled={!data || running || starting} onClick={start}>
-          <Download size={15} aria-hidden /> {running || starting ? 'Updating…' : 'Update now'}
-        </button>
       </div>
 
       {/* state, started and finished one under another; Reload on the right */}
