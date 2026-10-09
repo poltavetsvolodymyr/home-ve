@@ -1,0 +1,69 @@
+# Checks every pull request and every push to main: the same checks a contributor runs locally
+# (docs/development.md), plus that the committed frontend build in deploy/www matches the sources.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# read-only token: CI never writes to the repository
+permissions:
+  contents: read
+
+# a newer push to the same branch or pull request cancels the run still going for the older one
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      # warnings are errors here: trim warnings in particular mean the host's trimmed binary may break
+      - name: Build
+        run: dotnet build backend/HomeBackend.slnx --nologo -warnaserror
+      - name: Test
+        run: dotnet test --solution backend/HomeBackend.slnx --no-build
+      # the build the host runs (self-contained, trimmed), into a scratch directory instead of deploy/app
+      - name: Publish as for the host
+        run: dotnet publish backend/HomeBackend -p:PublishProfile=Home -p:PublishDir="$RUNNER_TEMP/app/" --nologo -warnaserror
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-fund --no-audit
+      # types, ESLint, Prettier, tests
+      - run: npm run check
+      # the build writes deploy/www; the committed copy must be what these sources produce (run build.sh)
+      - name: deploy/www is up to date
+        run: |
+          npm run build
+          git diff --exit-code --stat -- ../deploy/www
+          test -z "$(git status --porcelain -- ../deploy/www)"
+
+  scripts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # every shell script in deploy/ and build.sh (picked by its #! line; unit files and the polkit rule are not shell)
+      - name: shellcheck
+        run: |
+          files=$(git ls-files deploy build.sh | while read -r f; do
+            if head -c 64 "$f" | head -n 1 | grep -q '^#!.*sh'; then echo "$f"; fi
+          done)
+          echo "$files"
+          shellcheck $files

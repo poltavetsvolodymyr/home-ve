@@ -36,6 +36,10 @@ npm run dev          # http://localhost:5173
 Run the first two rows before committing. The backend build must have no warnings,
 and that includes trimming warnings (see [architecture.md](architecture.md#trimming-what-not-to-do)).
 
+CI (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`: the backend build with
+warnings as errors, its tests and the trimmed publish for the host; `npm run check`; that `deploy/www` is what the
+frontend sources build to (if not, run `build.sh` and commit); and `shellcheck` on every shell script in `deploy/`.
+
 `dotnet test` runs through Microsoft.Testing.Platform (xunit v3 on the .NET 10 SDK requires this). This mode
 is enabled in `global.json` at the repository root.
 
@@ -51,7 +55,7 @@ is enabled in `global.json` at the repository root.
   through a real WebSocket in both directions; for a stopped VM it expects 404.
 - **Frontend** (`*.test.ts` next to the code): formatting, the temperature tile, VM states and actions,
   validation of the settings form and the random MAC, mapping characters to key presses for the console, log levels.
-- **`deploy/vm/vm-run`** has no automated tests; when you change it, run `shellcheck -s sh deploy/vm/*` and
+- **`deploy/vm/vm-run`** has no automated tests; when you change it, run `shellcheck deploy/vm/vm-run` (CI does it too) and
   check by hand on the host with `systemctl restart vm@<name>` + `journalctl -u vm@<name> -n 20`.
 
 ### Console locally
