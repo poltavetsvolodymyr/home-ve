@@ -1,17 +1,41 @@
 # home-ve
 
-A web UI for a virtual machine host (Debian + QEMU/KVM, no Proxmox). VMs are described by files `/etc/vm/<name>.conf`
-and run by the template service `vm@<name>.service`.
+**A small self-hosted virtualization platform for one Debian machine.** It turns a plain Debian 13 box into a VM host
+you run from your phone: create and install VMs, watch and control them, back them up every night and keep an
+encrypted copy off-site. No Proxmox, no custom kernel or distribution, and the web UI never runs as root.
 
-What it does:
+Made for a home server or a small office box: a router VM, Home Assistant, a NAS, a few Linux servers. One host runs
+as many VMs as its CPU, memory and disks allow, and it grows by adding disks to the LVM pool or more memory.
+(Managing several hosts together, as a cluster, is not a goal for now.)
+
+## Why
+
+- **Plain Debian underneath.** QEMU/KVM, LVM thin volumes, systemd and nginx: tools you already know. Each VM is one
+  readable text file (`/etc/vm/<name>.conf`) and one systemd unit (`vm@<name>`). Everything the web UI does, you can
+  also do from the shell, so it never locks you in.
+- **Least privilege.** The backend runs as an unprivileged user. It may only start and stop `vm@…` units (through
+  polkit) and write VM settings files. The root-side scripts parse those files, never execute them, and accept only
+  thin volumes named after the VM as disks.
+- **Phone first.** The whole UI works on a phone, including the VM console (noVNC, with a key panel for the keys a
+  phone keyboard lacks).
+- **Backups that don't stop the VM.** The guest's file systems are frozen for a moment (qemu-guest-agent), a thin
+  snapshot is taken and compressed with zstd. Nightly, with retention (7 daily, 4 weekly); restore in one tap, with an
+  undo snapshot. Optionally an encrypted offsite copy to Cloudflare R2, with limits so it can't run up a bill.
+- **Installs and updates itself.** One idempotent `install.sh`; after that, updates are one button in the web UI.
+- **Small.** A self-contained backend binary (no .NET on the host), a static frontend, no database: state lives in
+  plain files.
+
+## What it does
 
 - host status: CPU, temperature, memory, disk;
 - VMs: create (installation from an ISO through the console in the browser), start, shut down, reboot, power off,
   delete with or without the disk; cores, memory, network cards, CD drive, autostart; the VM's log;
 - ISO images downloaded by the host from a URL;
-- backups: nightly and on demand, without stopping the VM (thin snapshot + zstd), restore with an undo snapshot;
+- backups: nightly and on demand, restore, undo a restore;
 - optional encrypted offsite copy of the backups (rclone to Cloudflare R2);
 - self-update from the web UI.
+
+Getting started: [docs/deployment.md](docs/deployment.md), from preparing the host to the first VM.
 
 ## How it works
 
