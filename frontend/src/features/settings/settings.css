@@ -1,5 +1,13 @@
 /* Settings page. */
 
+/* channel switch on the left, the running version on the right */
+.update-channel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
 .update-state {
   display: flex;
   align-items: center;

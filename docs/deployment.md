@@ -11,7 +11,7 @@ deploy/
   vm/                     vm-run, qmp, vm@.service, vm-autostart(.service), polkit rule
   nginx/home.conf         nginx site (install.sh installs it itself)
   install.sh              install and every update (idempotent)
-  update.sh               git pull + install.sh
+  update.sh               latest version of the channel + install.sh
 ```
 
 ## Preparing the host
@@ -219,14 +219,15 @@ The host is prepared (see the section above). Run everything on the host as root
 
 ```bash
 apt-get install -y git
-git clone --filter=blob:none --sparse https://github.com/poltavetsvolodymyr/home-ve.git /opt/home-ve
+git clone --filter=blob:none --sparse --branch stable https://github.com/poltavetsvolodymyr/home-ve.git /opt/home-ve
 cd /opt/home-ve && git sparse-checkout set deploy
 ```
 
 - `--filter=blob:none --sparse` downloads the history without file contents, and `sparse-checkout set deploy` then
   fetches only the `deploy/` folder: the ready-built backend and frontend and the scripts. The host needs no source
   code and no build tools;
-- updates later come from the same place (`deploy/update.sh`, or Update now in the web UI).
+- `--branch stable`: the latest release. Updates later come from the same place (Update now in the web UI, or
+  `deploy/update.sh`), see [Updating](#updating) for the dev channel.
 
 ### 2. Install
 
@@ -357,34 +358,39 @@ Open `https://home.example.com`.
 
 ## Updating
 
-After running `build.ps1`, commit and push on your computer:
+The web UI: gear icon in the header → **Update now** → confirm. The button starts `home-update.service`, which runs
+`/opt/home-ve/deploy/update.sh` as root as a service of its own, so the update runs to the end even though
+`install.sh` restarts the backend along the way. The page shows the status and the script's output, and after a
+successful update offers to reload itself (a new frontend may have arrived). From the console: the same script,
+`/opt/home-ve/deploy/update.sh`, or `systemctl restart home-update` and `journalctl -u home-update -n 50`.
 
-```bash
-/opt/home-ve/deploy/update.sh
-```
+`update.sh` brings the host to the latest version of its **channel** and then runs that version's `install.sh`:
 
-`update.sh` runs `git pull --ff-only` and, if anything new arrived, runs the fresh `install.sh`.
+| Channel | Follows | For |
+|---|---|---|
+| **Stable** (default) | the branch `stable`: the latest release, a `vX.Y.Z` tag | every host that should just work |
+| **Dev** | the branch `main`: every commit, as soon as it is pushed | trying what comes next; now and then something is broken |
 
-You can do the same from the web UI: gear icon in the header → **Update now** → confirm. The button starts
-`home-update.service`: this is `update.sh` run as root as a separate service, so the update runs to the end
-even though `install.sh` restarts the backend along the way. The page shows the status and the script's output, and after
-a successful update offers to reload itself (a new frontend may have arrived). From the console:
-`systemctl restart home-update` and `journalctl -u home-update -n 50`.
+Switch in the same card (Stable / Dev); it takes effect at the next update. Next to it is the version running now:
+`v0.1.0` is a release, `v0.1.0-3-gabc1234` is 3 commits after it. The channel is kept in
+`/var/lib/home-backend/update-channel`; `update.sh` accepts only `stable` or `dev` from it, anything else counts as
+stable.
 
-The button appears after the first manual update: `install.sh` installs the `home-update.service` unit and its polkit
-rule.
+A host never goes back on its own: when it runs something newer than its channel (it was on dev, now it is on
+stable), `update.sh` says so and leaves it where it is until the channel catches up.
+
 If `vm-run` or `vm@.service` changed, VMs pick them up on their next restart.
 
 ## Rollback
 
+Back to an earlier release, say `v0.1.0` (`git -C /opt/home-ve tag` lists them):
+
 ```bash
-cd /opt/home-ve
-git log --oneline -5             # find the previous version
-git reset --hard <hash>          # go back to it
-bash deploy/install.sh           # apply it
+git -C /opt/home-ve checkout --detach v0.1.0
+bash /opt/home-ve/deploy/install.sh
 ```
 
-To return to the latest version: `/opt/home-ve/deploy/update.sh`.
+The next update brings the host forward again to the latest version of its channel.
 
 ## Security
 

@@ -3,14 +3,15 @@ import { useState } from 'react'
 import { levelClass } from '@/features/vms/logLevel'
 import { dateTime } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
-import { Badge, Card, confirm, ErrorNote, Skeleton } from '@/shared/ui'
-import { fetchUpdate, startUpdate } from './api'
-import { confirmUpdate, updateBadge } from './update'
+import { Badge, Card, confirm, ErrorNote, Segmented, Skeleton } from '@/shared/ui'
+import { type Channel, fetchChannel, fetchUpdate, saveChannel, startUpdate } from './api'
+import { confirmDev, confirmUpdate, updateBadge } from './update'
 import '@/features/vms/logs.css'
 
 /**
- * The Update button: /opt/home-ve/deploy/update.sh (git pull + install.sh) as root, through
- * home-update.service. Shows the last run and what it printed, oldest line first like a terminal.
+ * The Update button: /opt/home-ve/deploy/update.sh (the channel's latest version + install.sh) as root, through
+ * home-update.service. Shows the channel and the version, the last run and what it printed, oldest line first
+ * like a terminal.
  */
 export function UpdateCard() {
   const { data, error, refresh } = usePoll(fetchUpdate, 2000)
@@ -20,6 +21,20 @@ export function UpdateCard() {
   const [startedHere, setStartedHere] = useState(false)
 
   const running = data?.state === 'running'
+  const channel = usePoll(fetchChannel, 10000)
+  const [channelError, setChannelError] = useState<string>()
+
+  const changeChannel = async (next: Channel) => {
+    if (next === channel.data?.channel) return
+    if (next === 'dev' && !(await confirm(confirmDev))) return
+    setChannelError(undefined)
+    try {
+      await saveChannel(next)
+      await channel.refresh()
+    } catch (e) {
+      setChannelError(e instanceof Error ? e.message : String(e))
+    }
+  }
   const badge = data && updateBadge[data.state]
 
   const start = async () => {
@@ -50,6 +65,24 @@ export function UpdateCard() {
       {/* the backend restarts during an update: a failed poll then is expected, not news */}
       {!running && <ErrorNote error={error} />}
       <ErrorNote error={startError} />
+      <ErrorNote error={channelError} />
+
+      <div className="update-channel">
+        {channel.data ? (
+          <Segmented
+            label="Update channel"
+            value={channel.data.channel}
+            options={[
+              { value: 'stable', label: 'Stable' },
+              { value: 'dev', label: 'Dev' },
+            ]}
+            onChange={changeChannel}
+          />
+        ) : (
+          <Skeleton width="9em" />
+        )}
+        <span className="muted mono">{channel.data?.version ?? ''}</span>
+      </div>
 
       {/* state, started and finished one under another; Reload on the right */}
       <div className="update-state">

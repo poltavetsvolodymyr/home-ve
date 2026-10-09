@@ -96,9 +96,29 @@ qemu-system-x86_64 -m 128 -display vnc=unix:backend/HomeBackend/.data/run/vm-rou
 
 The script builds the frontend into `deploy/www`, publishes the backend with the profile
 `backend/HomeBackend/Properties/PublishProfiles/Home.pubxml` into `deploy/app` (a single file of about 16 MB,
-linux-x64, .NET included) and adds everything to git, including the executable bit of the binary. Then commit, push
-and `update.sh` on the host, see [deployment.md](deployment.md).
+linux-x64, .NET included) and adds everything to git, including the executable bit of the binary. Then commit and push to `main`: hosts
+on the dev channel get it at their next update, see [deployment.md](deployment.md#updating).
 
 Every build puts a new binary into git. This does not matter on the host: the partial clone
 (`--filter=blob:none`) fetches only the current version. But the history on GitHub grows over time. If it starts
 to get in the way, the binary can be moved to GitHub Releases or Git LFS.
+
+## Releasing
+
+Hosts on the stable channel (the default) follow the branch `stable`, which points at the latest release. A release
+is a commit on `main` whose CI is green, tagged `vX.Y.Z`:
+
+```bash
+git checkout main && git pull
+git tag -a v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+git push origin v0.2.0^{commit}:refs/heads/stable
+```
+
+- the version: the last number for fixes, the middle one for new features, the first one when an update needs the
+  user to do something by hand;
+- `stable` only ever moves forward to the new tag (the push fails if it would not be a fast-forward: then something
+  is off);
+- on GitHub, Releases → **Draft a new release** → choose the tag and write what changed: that page is what users
+  read before they update.
+

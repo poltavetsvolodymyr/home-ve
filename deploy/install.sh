@@ -18,6 +18,7 @@ main() {
   install_packages
   create_service_user
   create_config
+  record_version
   set_disk_group
   migrate_vm_configs
   install_rclone
@@ -81,6 +82,15 @@ create_config() {
     chown root:home-backend "$CONFIG"
     chmod 0640 "$CONFIG"
   fi
+}
+
+# What runs now, for the web UI (Settings → Update): v0.1.0, or v0.1.0-3-gabc1234 for 3 commits after it.
+record_version() {
+  local version
+  version=$(git -C "${DEPLOY_DIR%/deploy}" describe --tags --always 2>/dev/null) || return 0
+  printf '%s\n' "$version" >"$CONFIG_DIR/version"
+  chmod 0644 "$CONFIG_DIR/version"
+  echo "==> version $version"
 }
 
 # A new VM's disk is a thin volume in the pool "data": the backend needs to know its volume group. Found once,

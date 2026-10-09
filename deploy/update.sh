@@ -1,21 +1,65 @@
 #!/usr/bin/env bash
-# Pulls the latest build and applies it. Run as root on the host "home":
+# Brings this host to the latest build of its channel and applies it. Run as root (home-update.service does):
 #   /opt/home-ve/deploy/update.sh
+#
+# Channels (docs/deployment.md, "Updating"):
+#   stable  the branch "stable": the latest release (a vX.Y.Z tag). The default.
+#   dev     the branch "main": every commit, as soon as it is pushed.
+# The web UI writes the channel into /var/lib/home-backend/update-channel; that file belongs to the backend's
+# user, so only the words "stable" and "dev" are taken from it, anything else counts as stable.
+#
+# A host never goes back on its own: when it already runs something newer than its channel (it was on dev,
+# now it is on stable), it stays where it is until the channel catches up.
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
+CHANNEL_FILE=/var/lib/home-backend/update-channel
 cd "$DEPLOY_DIR"
 
-before=$(git rev-parse HEAD)
-git pull --ff-only
-after=$(git rev-parse HEAD)
+channel=stable
+if [[ -f $CHANNEL_FILE ]]; then
+  wanted=$(head -c 16 "$CHANNEL_FILE" | tr -d '[:space:]')
+  case $wanted in
+    stable | dev) channel=$wanted ;;
+    *) echo "note: $CHANNEL_FILE says '$wanted', which is no channel: using stable" >&2 ;;
+  esac
+fi
+case $channel in
+  stable) branch=stable ;;
+  dev) branch=main ;;
+esac
 
-if [[ "$before" == "$after" ]]; then
-  echo "already up to date ($after)"
+# --exit-code: 2 when the branch isn't there (before the first release), other errors (no network) stay errors
+rc=0
+git ls-remote --quiet --exit-code --heads origin "$branch" >/dev/null || rc=$?
+if [[ $rc == 2 ]]; then
+  echo "channel $channel: there is no branch '$branch' upstream yet (no release so far): nothing to update to"
+  exit 0
+fi
+[[ $rc == 0 ]] || exit "$rc"
+# only the channel's branch, plus the release tags (for the version shown in the web UI)
+git fetch --quiet --tags --force origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+target=$(git rev-parse "refs/remotes/origin/$branch")
+before=$(git rev-parse HEAD)
+version() { git describe --tags --always "$1"; }
+
+if [[ $before == "$target" ]]; then
+  echo "channel $channel: already up to date ($(version HEAD))"
+  exit 0
+fi
+if git merge-base --is-ancestor "$target" "$before"; then
+  echo "channel $channel is at $(version "$target"), this host runs the newer $(version HEAD): it stays on that until $channel catches up"
   exit 0
 fi
 
-git --no-pager log --oneline "$before..$after"
+echo "channel $channel: $(version "$before") -> $(version "$target")"
+# the branch is moved to the target, whatever it was: hosts don't commit, and history rewritten upstream
+# (or a switch of channel) must not stop updates
+git checkout --quiet -B "$branch" "$target"
+git branch --quiet --set-upstream-to="origin/$branch" "$branch"
+if git merge-base --is-ancestor "$before" "$target"; then
+  git --no-pager log --oneline "$before..$target"
+fi
 
 # unit file, config migrations, frontend, restart: install.sh is idempotent and does all of it.
 # exec: run the install.sh that just arrived, not this (already running, possibly older) script.

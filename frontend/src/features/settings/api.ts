@@ -1,4 +1,4 @@
-import { get, post } from '@/shared/api/http'
+import { get, post, put } from '@/shared/api/http'
 import type { LogEntry } from '@/features/vms/logLevel'
 
 // Mirrors backend/HomeBackend/Features/Update/UpdateStatus.cs
@@ -17,6 +17,20 @@ export interface UpdateStatus {
 
 export const fetchUpdate = () => get<UpdateStatus>('/api/host/update')
 export const startUpdate = () => post<UpdateStatus>('/api/host/update')
+
+// Mirrors backend/HomeBackend/Features/Update/UpdateChannel.cs
+
+/** stable = the latest release, dev = every commit on main */
+export type Channel = 'stable' | 'dev'
+
+export interface ChannelInfo {
+  channel: Channel
+  /** what runs now: v0.1.0, or v0.1.0-3-gabc1234 for 3 commits after it; null when unknown */
+  version: string | null
+}
+
+export const fetchChannel = () => get<ChannelInfo>('/api/host/update/channel')
+export const saveChannel = (channel: Channel) => put<ChannelInfo>('/api/host/update/channel', { channel })
 
 // Mirrors backend/HomeBackend/Features/Offsite/OffsiteStatus.cs
 

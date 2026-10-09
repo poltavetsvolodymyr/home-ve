@@ -2,7 +2,7 @@
 # The "Update" button on the Settings page (re)starts it; polkit lets home-backend restart this unit and nothing
 # more (vm/50-home-backend.rules). A unit of its own, so the update outlives the backend, which install.sh restarts.
 [Unit]
-Description=Update home-ve: git pull, then install.sh (backend, frontend, VM tools)
+Description=Update home-ve: the latest version of its channel, then install.sh (backend, frontend, VM tools)
 After=network-online.target
 Wants=network-online.target
 

@@ -30,6 +30,8 @@ namespace HomeBackend.Api;
 [JsonSerializable(typeof(IReadOnlyList<LogEntry>))]
 [JsonSerializable(typeof(string[]))]
 [JsonSerializable(typeof(UpdateStatus))]
+[JsonSerializable(typeof(UpdateChannelInfo))]
+[JsonSerializable(typeof(UpdateChannelRequest))]
 [JsonSerializable(typeof(OffsiteStatus))]
 [JsonSerializable(typeof(VmBackups))]
 [JsonSerializable(typeof(ProblemDetails))]

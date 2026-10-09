@@ -12,11 +12,22 @@ export const updateBadge: Record<UpdateState, { status: Status; label: string }>
 export const confirmUpdate: ConfirmOptions = {
   title: 'Update home-ve now?',
   message:
-    'Runs /opt/home-ve/deploy/update.sh as root: pulls the latest version from GitHub and installs the backend, ' +
+    'Runs /opt/home-ve/deploy/update.sh as root: fetches the latest version of the chosen channel from GitHub ' +
+    'and installs the backend, ' +
     'this web UI, vm-run and the units.\n\n' +
     'The page loses the server for a few seconds while the backend restarts. The VMs keep running; a VM picks up ' +
     'a new vm-run at its next restart.',
   confirmLabel: 'Update',
+}
+
+/** Before leaving the releases: dev is for trying what comes next. */
+export const confirmDev: ConfirmOptions = {
+  title: 'Switch to the dev channel?',
+  message:
+    'Update will then install every commit on main as soon as it is pushed, before it becomes a release: new ' +
+    'things early, and now and then something broken.\n\n' +
+    'Back on stable, this host stays on what it has until the next release is newer: it never goes back on its own.',
+  confirmLabel: 'Use dev',
 }
 
 export const confirmOffsite: ConfirmOptions = {

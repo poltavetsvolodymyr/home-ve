@@ -15,8 +15,8 @@ want it.
 
 ## What is supported
 
-Only the latest commit on `main`: hosts update from it (Settings → Update now, or `deploy/update.sh`), and fixes
-land there.
+The latest release (the `stable` branch, which hosts follow by default) and `main` (the dev channel). Fixes land
+on `main` first, then in a release as soon as possible.
 
 ## Scope
 

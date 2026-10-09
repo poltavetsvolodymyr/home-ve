@@ -23,6 +23,13 @@ public sealed class SystemctlUpdateRunner(IJournalSource journal) : IUpdateRunne
         return new UpdateStatus(state, started, finished, log);
     }
 
+    public string? ReadVersion()
+    {
+        try { return File.ReadAllText(UpdateChannel.VersionFile).Trim() is { Length: > 0 } v ? v : null; }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
     /// <summary>A restart while it runs would cut install.sh off halfway, so a running update is left alone.</summary>
     public async Task StartAsync(CancellationToken ct)
     {

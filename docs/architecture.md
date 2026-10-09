@@ -29,7 +29,7 @@ vm@<name>.service (root)
 - **VMs are started by systemd, not by the backend**: `vm@<name>.service` → `vm-run` → QEMU. The backend only asks
   systemd (start/stop/restart/kill) and edits the `.conf`. If the backend crashes or is stopped, the VMs do not notice.
 - **The build** runs on the developer's computer (`build.ps1`), and the result is committed to `deploy/`.
-  The host builds nothing: `update.sh` runs `git pull` and installs the files.
+  The host builds nothing: `update.sh` fetches the latest version of its channel (stable or dev) and installs the files.
 
 ## Permissions: who can do what
 

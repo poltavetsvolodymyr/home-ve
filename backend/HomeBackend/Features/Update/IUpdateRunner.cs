@@ -7,4 +7,7 @@ public interface IUpdateRunner
 
     /// <summary>Starts the update and returns at once; it goes on without the backend (which it restarts).</summary>
     Task StartAsync(CancellationToken ct);
+
+    /// <summary>The version running now, as install.sh recorded it; null when unknown.</summary>
+    string? ReadVersion();
 }

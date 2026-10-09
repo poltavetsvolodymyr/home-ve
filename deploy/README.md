@@ -1,6 +1,6 @@
 # deploy
 
-This is everything the host needs. It is built on a computer (`build.ps1`) and arrives here via `git pull`.
+This is everything the host needs. It is built on a computer (`build.ps1`) and arrives here through git (`update.sh`).
 Details: `docs/deployment.md` in the repository on GitHub (the host's sparse checkout does not include it).
 
 | | |
@@ -25,7 +25,7 @@ Details: `docs/deployment.md` in the repository on GitHub (the host's sparse che
 | `vm/50-home-backend.rules` | polkit: what the backend may do with units (VMs, disk removal, backups, Update) |
 | `nginx/home.conf` | nginx site (HTTPS, WebSocket for the console) |
 | `install.sh` | first installation and applying any update; can be run any number of times |
-| `update.sh` | `git pull` + `install.sh` |
+| `update.sh` | the latest version of the update channel (stable or dev) + `install.sh` |
 
 ```bash
 /opt/home-ve/deploy/update.sh                                  # update

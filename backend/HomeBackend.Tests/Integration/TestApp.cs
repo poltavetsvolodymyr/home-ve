@@ -23,6 +23,9 @@ public sealed class TestApp : IAsyncLifetime
     /// <summary>The ISO directory; tests drop files into it.</summary>
     public string IsoDir => Path.Combine(_dataDir, "iso");
 
+    /// <summary>HomeBackend:DataDir: the cookie keys, the update channel.</summary>
+    public string DataDir => _dataDir;
+
     public async ValueTask InitializeAsync()
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });

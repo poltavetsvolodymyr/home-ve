@@ -36,6 +36,8 @@ public sealed class MockUpdateRunner : IUpdateRunner
         return Task.FromResult(new UpdateStatus(done ? "succeeded" : "running", s, done ? s + Duration : null, log));
     }
 
+    public string? ReadVersion() => "v0.1.0-3-g4a74ac7";
+
     public Task StartAsync(CancellationToken ct)
     {
         lock (_lock)
