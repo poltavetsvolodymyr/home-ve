@@ -1,7 +1,7 @@
 # home-ve
 
 **A small self-hosted virtualization platform for one Debian machine.** It turns a plain Debian 13 box into a VM host
-you run from your phone: create and install VMs, watch and control them, back them up every night and keep an
+you run from the browser, on a computer or a phone: create and install VMs, watch and control them, back them up every night and keep an
 encrypted copy off-site. No Proxmox, no custom kernel or distribution, and the web UI never runs as root.
 
 Made for a home server or a small office box: a router VM, Home Assistant, a NAS, a few Linux servers. One host runs
@@ -16,8 +16,8 @@ as many VMs as its CPU, memory and disks allow, and it grows by adding disks to 
 - **Least privilege.** The backend runs as an unprivileged user. It may only start and stop `vm@…` units (through
   polkit) and write VM settings files. The root-side scripts parse those files, never execute them, and accept only
   thin volumes named after the VM as disks.
-- **Phone first.** The whole UI works on a phone, including the VM console (noVNC, with a key panel for the keys a
-  phone keyboard lacks).
+- **Any screen.** The whole UI works in a desktop browser and just as well on a phone, including the VM console
+  (noVNC; on a phone, with a key panel for the keys its keyboard lacks).
 - **Backups that don't stop the VM.** The guest's file systems are frozen for a moment (qemu-guest-agent), a thin
   snapshot is taken and compressed with zstd. Nightly, with retention (7 daily, 4 weekly); restore in one tap, with an
   undo snapshot. Optionally an encrypted offsite copy to Cloudflare R2, with limits so it can't run up a bill.
