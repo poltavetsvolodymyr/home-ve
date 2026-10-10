@@ -5,6 +5,8 @@
 #   2. the thin pool "data": 90% of what is left, the rest a reserve (docs/deployment.md "The data thin pool");
 #   3. install.sh; once it went through, the service disables itself. If it didn't (no network?), the next boot
 #      tries again, or run this by hand: /opt/home-ve/deploy/preseed/firstboot.sh
+#   4. on the host's screen, above the login prompt: the web UI's address and the setup code. Straight to the
+#      screen (/dev/console), not to the output: that also goes to the journal, where the code has no business.
 # Each step is skipped when its result is already there, so running it again is safe.
 set -euo pipefail
 
@@ -34,3 +36,13 @@ fi
 
 /opt/home-ve/deploy/install.sh
 systemctl disable home-ve-firstboot.service
+
+code=/var/lib/home-backend/setup-code
+if [[ -s $code ]]; then
+  {
+    echo
+    echo "  home-ve is installed. Open https://$(hostname -I | cut -d' ' -f1)/"
+    echo "  and set the web UI password with the setup code  $(cat "$code")"
+    echo
+  } >/dev/console
+fi

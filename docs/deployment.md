@@ -37,12 +37,12 @@ machine the way the rest of this page does by hand: LVM with room for the backup
    ```
 
    (`main` instead of `stable` installs the dev channel's version.)
-3. It asks only for: **the disk** (everything on it goes), a confirmation that names that disk, **the root password**,
-   and **your own user** (name and password), whom you log in as over SSH before `su -`.
+3. It asks only for: **the disk** (with a single disk it takes that one), a confirmation that names that disk
+   (everything on it goes), **the root password**, and **your own user** (name and password), whom you log in as
+   over SSH before `su -`.
 4. It installs, reboots, and on that first boot `home-ve-firstboot.service` finishes the job; its progress shows on
-   the screen. When the login prompt comes back, the screen shows the web UI's address
-   (`home-ve: the web UI is at https://…/`). Open it and set the password with the setup code
-   (`cat /var/lib/home-backend/setup-code` as root).
+   the screen. When it is done, the screen shows the web UI's address and the setup code, then the login prompt.
+   Open the address and set the password with that code (later, as root: `cat /var/lib/home-backend/setup-code`).
 
 What the answers set up:
 
