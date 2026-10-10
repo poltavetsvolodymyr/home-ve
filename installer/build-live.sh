@@ -42,7 +42,8 @@ if ! grep -rqx 'timeout 50' config/bootloaders || ! grep -rqx 'set timeout=5' co
   echo "build-live: the boot menus' timeout wasn't set: live-build's templates changed" >&2
   exit 1
 fi
-grep -rl 'Live system' config/bootloaders | xargs -r sed -i 's/Live system/home-ve installer/g'
+# the entries' names, where the templates have them (an optional nicety: never a reason to fail the build)
+grep -rl 'Live system' config/bootloaders | xargs -r sed -i 's/Live system/home-ve installer/g' || true
 
 # live-build's own package list brings live-config, which logs a "user" in on every console (one this image
 # doesn't have): out, ours lists live-boot itself

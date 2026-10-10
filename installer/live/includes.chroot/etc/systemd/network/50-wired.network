@@ -1,7 +1,11 @@
-# Every wired card asks for an address by DHCP, so the page can be reached from the network.
+# Every wired card asks for an address by DHCP, so the page can be reached from the network. By its MAC, as the
+# host's bridge will: whoever else asks from this card (the boot's own DHCP) gets the same address, not a second one.
 [Match]
 Type=ether
 Name=en* eth*
 
 [Network]
 DHCP=yes
+
+[DHCPv4]
+ClientIdentifier=mac
