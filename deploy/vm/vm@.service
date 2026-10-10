@@ -17,6 +17,9 @@ ExecStart=/usr/local/sbin/vm-run %i
 ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 600 ] && kill -0 "$$MAINPID" 2>/dev/null; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"'
 # press the power button, wait up to 120 s for the guest, then pull the plug (deploy/vm/vm-stop)
 ExecStop=/usr/local/sbin/vm-stop %i
+# then unplug its "cables": the taps <vm>-n0..n7 that vm-run made (only tap devices: they have tun_flags).
+# Otherwise they stay on the bridge, without a VM on the other end, until the next start or a reboot.
+ExecStopPost=-/bin/sh -c 'for d in /sys/class/net/%i-n[0-9]; do [ -e "$$d/tun_flags" ] && ip link del "$${d##*/}"; done; true'
 # only if even that hangs
 TimeoutStopSec=150
 Restart=on-failure

@@ -19,6 +19,7 @@ nginx (on the host)
 vm@<name>.service (root)
    └── /usr/local/sbin/vm-run <name>   reads /etc/vm/<name>.conf, validates it, creates the tap "cables"
           └── exec qemu-system-x86_64  sockets in /run/vm-<name>/: qmp, qga, serial, vnc
+   └── on stop: vm-stop (power button, then the plug), then the taps are removed
 ```
 
 - **Frontend**: a static React application. It gets data only from `/api/...` and re-fetches it every few
