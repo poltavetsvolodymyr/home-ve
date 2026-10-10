@@ -10,10 +10,12 @@ export interface ConfirmOptions {
   danger?: boolean
   /** The confirming button stays off until this (the VM's name) is typed: for what can't be undone. */
   typeToConfirm?: string
+  /** A text shown in a field the user can scroll and change before confirming (confirmEdit returns it). */
+  editText?: string
 }
 
 export interface ConfirmRequest extends ConfirmOptions {
-  resolve: (ok: boolean) => void
+  resolve: (ok: boolean, text?: string) => void
 }
 
 // one question at a time, shown by the single <ConfirmHost /> in the app
@@ -33,12 +35,24 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
   })
 }
 
-/** The open dialog's answer; ConfirmHost calls it. */
-export function answer(ok: boolean) {
+/**
+ * Like confirm(), with `editText` in a field the user can change: the text as it is when confirmed, null for
+ * Cancel, Esc or a tap outside.
+ */
+export function confirmEdit(options: ConfirmOptions & { editText: string }): Promise<string | null> {
+  current?.resolve(false)
+  return new Promise(resolve => {
+    current = { ...options, resolve: (ok, text) => resolve(ok ? (text ?? options.editText) : null) }
+    emit()
+  })
+}
+
+/** The open dialog's answer (and the edited text, if it has a field); ConfirmHost calls it. */
+export function answer(ok: boolean, text?: string) {
   const r = current
   current = null
   emit()
-  r?.resolve(ok)
+  r?.resolve(ok, text)
 }
 
 /** For ConfirmHost: the question being asked (null: none) and change notifications. */

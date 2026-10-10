@@ -4,13 +4,16 @@ import { answer, confirmStore, type ConfirmRequest } from './confirm'
 /** Rendered once (App.tsx); shows whatever confirm() asks, as a modal <dialog>. */
 export function ConfirmHost() {
   const request = useSyncExternalStore(confirmStore.subscribe, confirmStore.current)
-  return request ? <ConfirmDialog key={request.title + request.typeToConfirm} request={request} /> : null
+  return request ? (
+    <ConfirmDialog key={request.title + request.typeToConfirm + request.editText} request={request} />
+  ) : null
 }
 
 function ConfirmDialog({ request }: { request: ConfirmRequest }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [typed, setTyped] = useState('')
-  const { title, message, confirmLabel = 'OK', danger = false, typeToConfirm } = request
+  const { title, message, confirmLabel = 'OK', danger = false, typeToConfirm, editText } = request
+  const [edited, setEdited] = useState(editText ?? '')
   const ready = !typeToConfirm || typed.trim() === typeToConfirm
 
   // showModal: on top of everything, the page behind inert, Esc closes it (the "cancel" event). It focuses
@@ -40,11 +43,25 @@ function ConfirmDialog({ request }: { request: ConfirmRequest }) {
         method="dialog"
         onSubmit={e => {
           e.preventDefault()
-          if (ready) answer(true)
+          if (ready) answer(true, editText === undefined ? undefined : edited)
         }}
       >
         <h2 id="confirm-title">{title}</h2>
         {message && <div className="confirm-message">{message}</div>}
+        {editText !== undefined && (
+          <textarea
+            className="confirm-edit mono"
+            aria-label="Text"
+            value={edited}
+            onChange={e => setEdited(e.target.value)}
+            rows={Math.min(Math.max(edited.split('\n').length, 3), 12)}
+            wrap="off"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        )}
         {typeToConfirm && (
           <label className="confirm-type">
             <span>

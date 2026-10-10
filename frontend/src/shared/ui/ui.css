@@ -337,6 +337,20 @@ dialog.confirm h2 {
   margin-top: 14px;
   color: var(--ink-2);
 }
+/* text to look over and change (a paste): as wide as the dialog, scrolls both ways, at most ~40% of the screen */
+.confirm-edit {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 40vh;
+  margin-top: 12px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre;
+  overflow: auto;
+  resize: vertical;
+}
 .confirm-buttons {
   display: flex;
   justify-content: flex-end;

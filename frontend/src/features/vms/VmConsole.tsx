@@ -9,7 +9,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react'
-import { Badge, Card, confirm, type Status as BadgeStatus } from '@/shared/ui'
+import { Badge, Card, confirmEdit, type Status as BadgeStatus } from '@/shared/ui'
 import { consoleUrl } from './api'
 import {
   lineEdit,
@@ -147,26 +147,26 @@ export default function VmConsole({ name }: { name: string }) {
     }
   }
 
-  // Several lines pasted: each one typed and entered, as in a terminal, after a confirmation (in a root shell
-  // they run as commands). What follows the last line break stays in the box. One line is an ordinary edit.
+  // Several lines pasted: shown in a field to look over and change first (in a root shell they run as
+  // commands), then each line typed and entered, as in a terminal. What follows the last line break stays in
+  // the box, typed but not entered. One line is an ordinary edit.
   const paste = async (e: ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData.getData('text/plain')
     if (!/[\r\n]/.test(pasted)) return
     e.preventDefault()
-    const { lines, rest } = splitPaste(pasted)
-    const all = rest ? [...lines, rest] : lines
-    const ok = await confirm({
-      title: `Paste ${all.length} line${all.length === 1 ? '' : 's'}?`,
+    const edited = await confirmEdit({
+      title: 'Paste into the VM?',
       message:
-        'They are typed into the VM one by one, with Enter after each' +
-        (rest ? ' but the last (it stays typed, like the start of a command).' : '.') +
-        `\n\n${all.slice(0, 5).join('\n')}${all.length > 5 ? '\n…' : ''}`,
+        'Each line is typed and Enter pressed after it, as if you typed them one by one. Text after the last ' +
+        'line break stays typed, without Enter. You can change it here first.',
+      editText: pasted.replace(/\r\n?/g, '\n'),
       confirmLabel: 'Paste',
     })
-    if (!ok) return
+    if (edited === null) return
+    const { lines, rest } = splitPaste(edited)
     send(lines.flatMap(l => [...textEvents(l), ...panelKeyEvents(panelKeys.enter)]).concat(textEvents(rest)))
     // the box mirrors the VM's current line: after the last Enter, that is what follows it
-    setText(rest)
+    setText(lines.length ? rest : text + rest)
   }
 
   // the phone keyboard's Return and the Enter button: Enter in the VM, a fresh line in the box
