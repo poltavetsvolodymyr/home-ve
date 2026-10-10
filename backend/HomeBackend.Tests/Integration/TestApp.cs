@@ -11,6 +11,9 @@ namespace HomeBackend.Tests.Integration;
 /// </summary>
 public sealed class TestApp : IAsyncLifetime
 {
+    /// <summary>false: no mock data and no password, so the app waits for its first-run setup.</summary>
+    public bool Mock { get; init; } = true;
+
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "home-backend-tests-" + Guid.NewGuid().ToString("N"));
     private WebApplication? _app;
     private int _lastClientHost = 100;
@@ -31,7 +34,9 @@ public sealed class TestApp : IAsyncLifetime
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["HomeBackend:Mock"] = "true",
+            ["HomeBackend:Mock"] = Mock ? "true" : "false",
+            // nothing of the machine running the tests: no VM configs
+            ["HomeBackend:VmConfigDir"] = Path.Combine(_dataDir, "vm"),
             ["HomeBackend:Urls:0"] = "http://127.0.0.1:0",
             ["HomeBackend:DataDir"] = _dataDir,
             ["HomeBackend:VmRuntimeDir"] = RuntimeDir,
@@ -40,6 +45,7 @@ public sealed class TestApp : IAsyncLifetime
         builder.AddHomeBackend();
 
         _app = builder.Build();
+        _app.PrepareSetup();
         _app.UseHomeBackend();
         await _app.StartAsync();
         BaseAddress = new Uri(_app.Urls.Single());

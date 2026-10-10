@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Unauthorized } from '@/shared/api/http'
 import { clearPollCache } from '@/shared/hooks/usePoll'
-import { fetchMe, logout as logoutRequest } from './api'
+import { fetchMe, fetchSetup, logout as logoutRequest } from './api'
 
-export type AuthStatus = 'checking' | 'signed-in' | 'signed-out'
+/** `setup`: the host has no password yet, the first-run setup sets one. */
+export type AuthStatus = 'checking' | 'signed-in' | 'signed-out' | 'setup'
 
 /**
- * Whether to show the login page. Asks the server once at start. Only a 401 means signed out:
- * on any other error the app opens and its pages show what's wrong with the server.
+ * Whether to show the login page (or the first-run setup). Asks the server once at start. Only a 401 means
+ * signed out: on any other error the app opens and its pages show what's wrong with the server.
  */
 export function useAuthState() {
   const [status, setStatus] = useState<AuthStatus>('checking')
@@ -15,7 +16,13 @@ export function useAuthState() {
   useEffect(() => {
     fetchMe().then(
       () => setStatus('signed-in'),
-      e => setStatus(e instanceof Unauthorized ? 'signed-out' : 'signed-in'),
+      e => {
+        if (!(e instanceof Unauthorized)) return setStatus('signed-in')
+        fetchSetup().then(
+          s => setStatus(s.needed ? 'setup' : 'signed-out'),
+          () => setStatus('signed-out'),
+        )
+      },
     )
   }, [])
 

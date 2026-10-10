@@ -19,6 +19,8 @@ namespace HomeBackend.Api;
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(LoginRequest))]
 [JsonSerializable(typeof(MeResponse))]
+[JsonSerializable(typeof(SetupStatus))]
+[JsonSerializable(typeof(SetupRequest))]
 [JsonSerializable(typeof(ErrorResponse))]
 [JsonSerializable(typeof(HostResponse))]
 [JsonSerializable(typeof(IReadOnlyList<VmInfo>))]

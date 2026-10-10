@@ -7,3 +7,9 @@ export const fetchMe = () => get<{ name: string | null }>('/api/auth/me')
 export const login = (password: string) => post('/api/auth/login', { password })
 
 export const logout = () => post('/api/auth/logout')
+
+/** Whether the host has no password yet, so the first-run setup is shown instead of the login. */
+export const fetchSetup = () => get<{ needed: boolean }>('/api/auth/setup')
+
+/** The first password, with the setup code from the host; signs in. Throws with the server's reason. */
+export const setUp = (code: string, password: string) => post('/api/auth/setup', { code, password })

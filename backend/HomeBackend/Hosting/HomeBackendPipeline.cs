@@ -14,14 +14,17 @@ namespace HomeBackend.Hosting;
 
 public static class HomeBackendPipeline
 {
-    /// <summary>The UI never runs without a password, except with mock data during development.</summary>
-    public static bool HasPasswordOrMockData(this WebApplication app)
+    /// <summary>
+    /// Without a password the UI serves nothing but the first-run setup, which takes the setup code: made here,
+    /// into a file for root and this service only (the code itself never goes into the log).
+    /// </summary>
+    public static void PrepareSetup(this WebApplication app)
     {
-        var options = app.Services.GetRequiredService<IOptions<HomeBackendOptions>>().Value;
-        if (!string.IsNullOrEmpty(options.PasswordHash) || options.Mock) return true;
-
-        app.Logger.LogCritical("HomeBackend:PasswordHash is not set. Run: home-backend set-password /etc/home-backend/config.json");
-        return false;
+        var store = app.Services.GetRequiredService<PasswordStore>();
+        if (!store.NeedsSetup) return;
+        store.EnsureSetupCode();
+        app.Logger.LogWarning("No password yet: open the web UI and enter the setup code from {File} (sudo cat {File}). " +
+            "Or set it here: home-backend set-password /etc/home-backend/config.json", store.SetupCodeFile, store.SetupCodeFile);
     }
 
     /// <summary>Middleware, in the order a request passes through it, then every endpoint.</summary>

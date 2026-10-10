@@ -27,3 +27,11 @@
 .login-card button {
   min-height: 38px;
 }
+.login-hint {
+  font-size: 13px;
+  line-height: 1.45;
+}
+/* the file path may break anywhere on a narrow phone */
+.login-hint .mono {
+  overflow-wrap: anywhere;
+}

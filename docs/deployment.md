@@ -241,7 +241,7 @@ bash /opt/home-ve/deploy/install.sh
   `nginx`, `openssl`. `systemctl` run by a regular user talks to systemd over D-Bus, and a minimal Debian
   may not have it;
 - creates the system user `home-backend` (no shell, no home directory);
-- creates `/etc/home-backend/config.json` from the template (mode 0640) and asks for the web UI password;
+- creates `/etc/home-backend/config.json` from the template (mode 0640);
 - **finds where to put VM disks**: the LVM volume group that contains the `data` thin pool, and writes it to `DiskGroup`
   (only if that is still empty). If there is no pool, the script tells you how to create one, for example
   `lvcreate --type thin-pool -l 90%FREE -n data <group>`; until the pool exists and you run `install.sh` again,
@@ -259,7 +259,11 @@ bash /opt/home-ve/deploy/install.sh
   At first it points to a self-signed certificate for the host's name and addresses (`/etc/nginx/home-ve/selfsigned.*`, valid for 825 days;
   30 days before it expires the script makes a new one). If the site was already configured by hand, `tls.conf` gets its certificate.
 
-Done: the web UI is at `https://<host address>/`. With the self-signed certificate the browser warns you once
+Done: the web UI is at `https://<host address>/`. **The first visit sets the password**: the page asks for the setup
+code that `install.sh` printed at the end (8 characters, like `ABCD-EFGH`; again any time with
+`cat /var/lib/home-backend/setup-code`) and the password you choose, and signs you in. The code is there so that
+nobody else on your network can set the password before you; it is gone once the password is set, and until then
+the web UI shows nothing but this page. The password is kept as a hash in `/var/lib/home-backend/password`. With the self-signed certificate the browser warns you once
 (the connection is still encrypted). To get rid of the warning, use your own domain and certificate, step 3.
 
 The script does not touch running VMs. A VM gets the new `vm-run` (and with it the browser console) on its next
@@ -439,9 +443,9 @@ File `/etc/home-backend/config.json` (template: `deploy/config.example.json`). A
 | `VmConfigDir` | `/etc/vm` | where the `.conf` files are (vm-run always reads `/etc/vm`) |
 | `VmRuntimeDir` | `/run` | where the `vm-<name>` folders with sockets are |
 | `DataDir` | `/var/lib/home-backend` | cookie keys |
-| `PasswordHash` | — | set with the command below |
+| `PasswordHash` | — | set with the command below; when set, it takes the place of the password chosen in the web UI |
 
-To change the password:
+To change the password, or reset a forgotten one:
 
 ```bash
 /opt/home-ve/deploy/app/home-backend set-password /etc/home-backend/config.json && systemctl restart home-backend

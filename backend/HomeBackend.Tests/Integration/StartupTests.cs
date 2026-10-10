@@ -3,13 +3,15 @@ using HomeBackend.Features.Auth;
 using HomeBackend.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace HomeBackend.Tests.Integration;
 
 public class StartupTests
 {
     [Fact]
-    public async Task Refuses_to_run_without_a_password_on_real_data()
+    public async Task Without_a_password_on_real_data_it_starts_waiting_for_the_setup()
     {
         var dataDir = Path.Combine(Path.GetTempPath(), "home-backend-tests-" + Guid.NewGuid().ToString("N"));
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -17,19 +19,25 @@ public class StartupTests
         builder.AddHomeBackend();
         await using var app = builder.Build();
 
-        Assert.False(app.HasPasswordOrMockData());
+        app.PrepareSetup();
+
+        Assert.True(app.Services.GetRequiredService<PasswordStore>().NeedsSetup);
+        Assert.Matches("^[A-Z2-9]{4}-[A-Z2-9]{4}\n$", File.ReadAllText(Path.Combine(dataDir, "setup-code")));
         Directory.Delete(dataDir, recursive: true);
     }
 
     [Fact]
     public void Mock_data_without_a_hash_takes_admin()
     {
-        var options = new HomeBackendOptions { Mock = true };
+        var mock = Store(new HomeBackendOptions { Mock = true });
 
-        Assert.True(AuthFeature.IsPasswordCorrect("admin", options));
-        Assert.False(AuthFeature.IsPasswordCorrect("Admin", options));
-        Assert.False(AuthFeature.IsPasswordCorrect("admin", new HomeBackendOptions()));
+        Assert.True(mock.Verify("admin"));
+        Assert.False(mock.Verify("Admin"));
+        Assert.False(mock.NeedsSetup);
+        Assert.False(Store(new HomeBackendOptions()).Verify("admin"));
     }
+
+    private static PasswordStore Store(HomeBackendOptions options) => new(Options.Create(options));
 
     [Fact]
     public void Defaults_fill_only_what_the_config_leaves_empty()

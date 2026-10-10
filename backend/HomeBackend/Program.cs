@@ -9,12 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddHomeBackend();             // Hosting/HomeBackendServices.cs
 
 var app = builder.Build();
-if (!app.HasPasswordOrMockData())
-{
-    await app.DisposeAsync();      // flushes the console log, so the reason reaches the journal
-    return 1;
-}
-
+app.PrepareSetup();                   // no password yet: the setup code for the first-run setup
 app.UseHomeBackend();                 // Hosting/HomeBackendPipeline.cs
 app.Run();
 return 0;
