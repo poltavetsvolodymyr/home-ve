@@ -1,0 +1,16 @@
+# Once, on the first boot after an automated install (deploy/preseed): the backup volume, the pool and install.sh.
+# late.sh enables it, firstboot.sh disables it when done. Its output also goes to the screen.
+[Unit]
+Description=home-ve: first-boot setup (backup volume, VM pool, install.sh)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/home-ve/deploy/preseed/firstboot.sh
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

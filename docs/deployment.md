@@ -4,15 +4,64 @@ The host keeps a sparse checkout of the repository in `/opt/home-ve`. It contain
 
 ```
 deploy/
-  app/home-backend        backend: a single self-contained linux-x64 binary
-  www/                    built frontend; install.sh copies it to /var/www/home
+  app/home-backend        backend: a single self-contained linux-x64 binary (downloaded, not in git)
+  www/                    built frontend; install.sh copies it to /var/www/home (downloaded, not in git)
+  fetch-build.sh          downloads the build of the checked-out commit from the GitHub releases
   home-backend.service    systemd unit for the backend
   config.example.json     template for /etc/home-backend/config.json
   vm/                     vm-run, qmp, vm@.service, vm-autostart(.service), polkit rule
   nginx/home.conf         nginx site (install.sh installs it itself)
   install.sh              install and every update (idempotent)
   update.sh               latest version of the channel + install.sh
+  preseed/                answers for the Debian installer: the automated installation below
 ```
+
+There are two ways to get there: the **automated installation**, which installs Debian and home-ve in one go on an
+empty machine, or **by hand** on a Debian that is already installed ([Preparing the host](#preparing-the-host) and
+the sections after it).
+
+## Automated installation
+
+The Debian installer can take its answers from a file (a "preseed"). `deploy/preseed/preseed.cfg` sets up the
+machine the way the rest of this page does by hand: LVM with room for the backups and the VMs, the bridge, home-ve.
+
+**What you need:** a machine (or a VM) with a wired network card and DHCP on the network, a disk of at least
+**64 GB that will be erased whole**, and the Debian 13 netinst image
+([debian.org/distrib](https://www.debian.org/distrib/)) on a USB stick or as a virtual CD.
+
+1. Boot the image. In the menu: **Advanced options → Automated install**.
+2. The installer sets up the network and asks for the location of the preconfiguration file. Enter:
+
+   ```
+   https://raw.githubusercontent.com/poltavetsvolodymyr/home-ve/stable/deploy/preseed/preseed.cfg
+   ```
+
+   (`main` instead of `stable` installs the dev channel's version.)
+3. It asks only for: **the disk** (everything on it goes), a confirmation that names that disk, **the root password**,
+   and **your own user** (name and password), whom you log in as over SSH before `su -`.
+4. It installs, reboots, and on that first boot `home-ve-firstboot.service` finishes the job; its progress shows on
+   the screen. When the login prompt comes back, the screen shows the web UI's address
+   (`home-ve: the web UI is at https://…/`). Open it and set the password with the setup code
+   (`cat /var/lib/home-backend/setup-code` as root).
+
+What the answers set up:
+
+| | |
+|---|---|
+| language, keyboard, time zone | English, US, Europe/Berlin (`dpkg-reconfigure locales`, `keyboard-configuration`, `tzdata` to change them) |
+| host name | `home` |
+| disk | `/boot`, then the LVM volume group `home`: `root` 30 GB, `swap` 2 GB; on the first boot `backups` (a quarter of the group, at most half of what is free), mounted at `/var/backups/vm`, and the thin pool `data` (90% of the rest; the remainder is a reserve, see [the pool](#the-data-thin-pool)) |
+| software | the base system, SSH server, git, curl, thin-provisioning-tools; `install.sh` adds the rest |
+| network | the bridge `br0` on the card the installer used, by DHCP: [Bridge for VM networking](#bridge-for-vm-networking), done for you. The router sees a new client, so the address after the reboot is usually not the installer's: read it on the screen |
+| home-ve | the stable channel in `/opt/home-ve` (or the dev channel, from `main`), installed by `install.sh` on the first boot |
+
+The installer's own log of the home-ve part is `/var/log/home-ve-install.log`; the first boot's is
+`journalctl -u home-ve-firstboot`. If the first boot could not finish (no network, for example), it tries again at the
+next boot; or run `/opt/home-ve/deploy/preseed/firstboot.sh` by hand, it skips whatever is done already.
+
+Limits: one bridge on one card, by DHCP (with a static address the installer's network setup stays, without a bridge:
+then follow [Bridge for VM networking](#bridge-for-vm-networking)); with several disks, GRUB goes onto the first
+one, so pick that one for the system.
 
 ## Preparing the host
 
@@ -224,8 +273,8 @@ cd /opt/home-ve && git sparse-checkout set deploy
 ```
 
 - `--filter=blob:none --sparse` downloads the history without file contents, and `sparse-checkout set deploy` then
-  fetches only the `deploy/` folder: the ready-built backend and frontend and the scripts. The host needs no source
-  code and no build tools;
+  fetches only the `deploy/` folder: the scripts. `install.sh` downloads the backend and frontend built for this
+  version by CI. The host needs no source code and no build tools;
 - `--branch stable`: the latest release. Updates later come from the same place (Update now in the web UI, or
   `deploy/update.sh`), see [Updating](#updating) for the dev channel.
 

@@ -28,6 +28,7 @@ main() {
   install_service
   install_frontend
   install_nginx
+  install_console_hint
   show_status
 }
 
@@ -277,6 +278,12 @@ make_self_signed() {
       -addext "subjectAltName=$san" -keyout "$NGINX_DIR/selfsigned.key" -out "$NGINX_DIR/selfsigned.crt" 2>/dev/null
   )
   chmod 0644 "$NGINX_DIR/selfsigned.crt"
+}
+
+# On the host's own screen, above the login prompt: where the web UI is (agetty fills in \4, the address)
+install_console_hint() {
+  install -d -m 0755 /etc/issue.d
+  install -m 0644 "$DEPLOY_DIR/home-ve.issue" /etc/issue.d/home-ve.issue
 }
 
 show_status() {

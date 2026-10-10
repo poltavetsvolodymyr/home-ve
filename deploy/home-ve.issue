@@ -1,0 +1,3 @@
+home-ve: the web UI is at https://\4/
+The first visit asks for the setup code: as root, cat /var/lib/home-backend/setup-code
+

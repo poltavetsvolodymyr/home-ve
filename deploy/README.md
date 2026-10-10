@@ -8,6 +8,9 @@ Details: `docs/deployment.md` in the repository on GitHub (the host's sparse che
 |---|---|
 | `app/home-backend` | the backend, a single binary, .NET included. Listens on `127.0.0.1:5000`. `app/COMMIT`: the commit it was built from |
 | `fetch-build.sh` | downloads the build of a commit (`app/`, `www/`) from the repository's GitHub releases and checks it; `install.sh` runs it |
+| `home-ve.issue` | on the host's screen above the login prompt: the web UI's address; `install.sh` puts it into `/etc/issue.d` |
+| `preseed/preseed.cfg`, `recipe.sh`, `late.sh` | the automated installation: answers for the Debian installer (docs/deployment.md) |
+| `preseed/firstboot.sh`, `home-ve-firstboot.service` | the first boot after it: the backup volume, the pool, `install.sh` |
 | `www/` | the frontend; `install.sh` copies it to `/var/www/home`, nginx serves it from there |
 | `home-backend.service` | systemd unit of the backend, installed into `/etc/systemd/system/` |
 | `home-update.service` | `update.sh` as root; started by the Update button in the web UI |
