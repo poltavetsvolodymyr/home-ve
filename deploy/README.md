@@ -35,6 +35,6 @@ Details: `docs/deployment.md` in the repository on GitHub (the host's sparse che
 journalctl -u home-backend -n 50                               # backend log
 journalctl -u vm@router -n 50                                  # VM log (same as the Logs tab)
 systemctl restart vm@router                                    # restart a VM (new settings, new vm-run)
-/opt/home-ve/deploy/app/home-backend set-password /etc/home-backend/config.json && systemctl restart home-backend
+rm /var/lib/home-backend/password && systemctl restart home-backend   # new password: the setup again (cat /var/lib/home-backend/setup-code)
 cd /opt/home-ve && git reset --hard <hash> && bash deploy/install.sh   # roll back to version <hash>
 ```

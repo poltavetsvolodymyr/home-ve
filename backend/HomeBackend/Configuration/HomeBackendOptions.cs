@@ -17,9 +17,6 @@ public sealed class HomeBackendOptions
     /// <summary>Only clients from these networks get any response at all.</summary>
     public string[] AllowedNetworks { get; set; } = [];
 
-    /// <summary>PBKDF2 hash, produced by <c>home-backend set-password</c>.</summary>
-    public string PasswordHash { get; set; } = "";
-
     /// <summary>One <c>&lt;name&gt;.conf</c> per VM; vm@&lt;name&gt;.service runs it (deploy/vm/vm-run).</summary>
     public string VmConfigDir { get; set; } = "/etc/vm";
 
@@ -41,7 +38,7 @@ public sealed class HomeBackendOptions
     /// </summary>
     public string DiskGroup { get; set; } = "";
 
-    /// <summary>Writable directory for the cookie key ring.</summary>
+    /// <summary>Writable directory for the cookie key ring and the password's hash (<c>password</c>).</summary>
     public string DataDir { get; set; } = "/var/lib/home-backend";
 
     /// <summary>Serve fake data (for development without the host).</summary>

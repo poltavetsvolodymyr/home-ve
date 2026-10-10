@@ -7,13 +7,13 @@ using Microsoft.Extensions.Options;
 namespace HomeBackend.Features.Auth;
 
 /// <summary>
-/// The login password's hash. It is HomeBackend:PasswordHash from config.json when that is set (written by
-/// <c>home-backend set-password</c>, which therefore also resets a forgotten password), else
-/// <c>&lt;DataDir&gt;/password</c>, written by the first-run setup in the web UI.
+/// The login password's hash, in <c>&lt;DataDir&gt;/password</c> (PBKDF2, see <see cref="PasswordHash"/>), written by the
+/// first-run setup in the web UI.
 ///
-/// Without either, the host waits for that setup: whoever sets the password first owns the host, so it takes the
-/// setup code from <c>&lt;DataDir&gt;/setup-code</c>, which only root and this service can read (install.sh prints it).
-/// With mock data and no hash, the password is "admin", so the UI can be developed without any setup.
+/// Without it, the host waits for that setup: whoever sets the password first owns the host, so it takes the setup
+/// code from <c>&lt;DataDir&gt;/setup-code</c>, which only root and this service can read (install.sh prints it).
+/// A forgotten password: delete the file and restart the service, and the setup comes back.
+/// With mock data and no file, the password is "admin", so the UI can be developed without any setup.
 /// </summary>
 public sealed class PasswordStore(IOptions<HomeBackendOptions> options)
 {
@@ -35,7 +35,6 @@ public sealed class PasswordStore(IOptions<HomeBackendOptions> options)
     {
         get
         {
-            if (!string.IsNullOrEmpty(_options.PasswordHash)) return _options.PasswordHash;
             lock (_lock)
             {
                 if (_savedHash is null && File.Exists(HashFile))

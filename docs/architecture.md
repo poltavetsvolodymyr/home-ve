@@ -93,7 +93,7 @@ as long as the MAC is the same, the guest sees "the same" card (the router's `.l
 ## Backend: `backend/HomeBackend`
 
 ```
-Program.cs                 CLI command (set-password) or web server
+Program.cs                 the web server
 Hosting/
   HomeBackendServices.cs   AddHomeBackend(): config + registration of all features
   HomeBackendPipeline.cs   UseHomeBackend(): middleware in order + all endpoints
@@ -113,14 +113,13 @@ Infrastructure/
   LinuxFiles.cs            reads single-line files in /proc and /sys
   DataSources.cs           AddDataSource<>(): Linux implementation or mock
   MockClock.cs             shared fake boot time for the mocks
-Cli/                       home-backend hash-password / set-password
 ```
 
 ### Features
 
 | Feature | Page | Endpoints | Data source (Linux / mock) |
 |---|---|---|---|
-| `Auth` | login | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | hash from the config |
+| `Auth` | login, first-run setup | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `GET`/`POST /api/auth/setup` | `PasswordStore`: the hash in `/var/lib/home-backend/password`; without it, the setup with the code from `setup-code` |
 | `Host` | Host | `GET /api/host` | assembled from SystemStatus |
 | `SystemStatus` | (on Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp from /sys/class/hwmon) |
 | `Vms` | VMs, VM page, New VM | `POST /api/vms` (create), `DELETE /api/vms/{name}[?disk=true]` (delete), `GET /api/vms`, `GET /api/vms/{name}`, `POST /api/vms/{name}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{name}/config`, `GET /api/vms/{name}/logs`, `GET /api/vms/{name}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |

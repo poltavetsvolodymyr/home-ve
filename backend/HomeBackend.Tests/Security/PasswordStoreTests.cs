@@ -1,6 +1,5 @@
 using HomeBackend.Configuration;
 using HomeBackend.Features.Auth;
-using HomeBackend.Security;
 using Microsoft.Extensions.Options;
 
 namespace HomeBackend.Tests.Security;
@@ -9,8 +8,7 @@ public sealed class PasswordStoreTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "home-backend-tests-" + Guid.NewGuid().ToString("N"));
 
-    private PasswordStore Store(string configHash = "") =>
-        new(Options.Create(new HomeBackendOptions { DataDir = _dir, PasswordHash = configHash }));
+    private PasswordStore Store() => new(Options.Create(new HomeBackendOptions { DataDir = _dir }));
 
     [Fact]
     public void The_setup_code_stays_the_same_until_the_setup_is_done()
@@ -51,14 +49,15 @@ public sealed class PasswordStoreTests : IDisposable
     }
 
     [Fact]
-    public void The_config_hash_wins_so_set_password_resets_a_forgotten_one()
+    public void Without_the_password_file_the_setup_comes_back()
     {
         var store = Store();
         store.TrySetUp(store.EnsureSetupCode(), "forgotten-password");
 
-        var reset = Store(PasswordHash.Create("new-password"));
+        File.Delete(Path.Combine(_dir, "password")); // and a restart: a new store
+        var reset = Store();
 
-        Assert.True(reset.Verify("new-password"));
+        Assert.True(reset.NeedsSetup);
         Assert.False(reset.Verify("forgotten-password"));
     }
 

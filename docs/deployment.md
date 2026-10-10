@@ -263,7 +263,8 @@ Done: the web UI is at `https://<host address>/`. **The first visit sets the pas
 code that `install.sh` printed at the end (8 characters, like `ABCD-EFGH`; again any time with
 `cat /var/lib/home-backend/setup-code`) and the password you choose, and signs you in. The code is there so that
 nobody else on your network can set the password before you; it is gone once the password is set, and until then
-the web UI shows nothing but this page. The password is kept as a hash in `/var/lib/home-backend/password`. With the self-signed certificate the browser warns you once
+the web UI shows nothing but this page. The password is kept as a hash in `/var/lib/home-backend/password` (see
+Settings below for changing it). With the self-signed certificate the browser warns you once
 (the connection is still encrypted). To get rid of the warning, use your own domain and certificate, step 3.
 
 The script does not touch running VMs. A VM gets the new `vm-run` (and with it the browser console) on its next
@@ -443,12 +444,13 @@ File `/etc/home-backend/config.json` (template: `deploy/config.example.json`). A
 | `VmConfigDir` | `/etc/vm` | where the `.conf` files are (vm-run always reads `/etc/vm`) |
 | `VmRuntimeDir` | `/run` | where the `vm-<name>` folders with sockets are |
 | `DataDir` | `/var/lib/home-backend` | cookie keys |
-| `PasswordHash` | — | set with the command below; when set, it takes the place of the password chosen in the web UI |
-
-To change the password, or reset a forgotten one:
+The web UI password is not in this file: the first-run setup keeps its hash (PBKDF2) in
+`/var/lib/home-backend/password`, readable by the backend and root only. To change it, or reset a forgotten one,
+delete that file and restart the backend: the web UI shows the setup again, with a new setup code.
 
 ```bash
-/opt/home-ve/deploy/app/home-backend set-password /etc/home-backend/config.json && systemctl restart home-backend
+rm /var/lib/home-backend/password && systemctl restart home-backend
+cat /var/lib/home-backend/setup-code
 ```
 
 ## New VM

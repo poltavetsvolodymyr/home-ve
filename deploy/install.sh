@@ -84,6 +84,13 @@ create_config() {
     echo "==> creating $CONFIG"
     install -m 0640 -o root -g home-backend "$DEPLOY_DIR/config.example.json" "$CONFIG"
   fi
+  # The password used to be a "PasswordHash" here (until October 2026); now only the web UI's first-run setup sets
+  # it, into /var/lib/home-backend/password. The line goes, and with it a comma it may leave before a "}".
+  if grep -q '"PasswordHash"' "$CONFIG"; then
+    echo "==> the web UI password is no longer kept in $CONFIG: set it again on the next visit (with the setup code)"
+    sed -i '/"PasswordHash"/d' "$CONFIG"
+    sed -i -z -E 's/,(\s*\n\s*\})/\1/g' "$CONFIG"
+  fi
 }
 
 # What runs now, for the web UI (Settings → Update): v0.1.0, or v0.1.0-3-gabc1234 for 3 commits after it.
@@ -286,16 +293,17 @@ show_status() {
   local url code_file=/var/lib/home-backend/setup-code n=0
   url="https://$(hostname -I | cut -d' ' -f1)/"
   echo "Done. The web UI: $url (docs/deployment.md)."
-  # no password yet (neither in config.json nor set in the web UI): the backend makes the setup code as it starts
-  if ! grep -q '"PasswordHash": *"pbkdf2' "$CONFIG" && [[ ! -s /var/lib/home-backend/password ]]; then
+  # no password yet: the backend makes the setup code as it starts. Shown only on a terminal: an update from the web
+  # UI runs this too, and its output goes to the journal, where the code has no business.
+  if [[ ! -s /var/lib/home-backend/password ]]; then
     while [[ ! -s $code_file ]] && ((n++ < 30)); do sleep 0.5; done
     echo
-    if [[ -s $code_file ]]; then
+    if [[ -t 1 && -s $code_file ]]; then
       echo "First visit: open $url, enter the setup code $(cat "$code_file") and choose the password."
+      echo "(The code stays in $code_file until then: cat it again any time.)"
     else
-      echo "First visit: open $url; the setup code is in $code_file once the backend runs (journalctl -u home-backend)."
+      echo "No web UI password yet: open $url and enter the setup code from $code_file (as root: cat $code_file)."
     fi
-    echo "(The code is in $code_file until then: cat it again any time.)"
   fi
   echo "A running VM gets the new vm-run (and its console) at its next restart: systemctl restart vm@<name>"
 }

@@ -23,8 +23,8 @@ public static class HomeBackendPipeline
         var store = app.Services.GetRequiredService<PasswordStore>();
         if (!store.NeedsSetup) return;
         store.EnsureSetupCode();
-        app.Logger.LogWarning("No password yet: open the web UI and enter the setup code from {File} (sudo cat {File}). " +
-            "Or set it here: home-backend set-password /etc/home-backend/config.json", store.SetupCodeFile, store.SetupCodeFile);
+        app.Logger.LogWarning("No password yet: open the web UI and enter the setup code from {File} (sudo cat {File})",
+            store.SetupCodeFile, store.SetupCodeFile);
     }
 
     /// <summary>Middleware, in the order a request passes through it, then every endpoint.</summary>
