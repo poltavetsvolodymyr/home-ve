@@ -14,7 +14,7 @@ export default defineConfig({
     proxy: { '/api': { target: 'http://localhost:5080', ws: true } }, // ws: the VM console
   },
   build: {
-    // deploy/www goes to the host as is; install.sh copies it to /var/www/home, where nginx serves it
+    // deploy/www: the frontend of the build hosts get (build.sh, CI); install.sh copies it to /var/www/home for nginx
     outDir: '../deploy/www',
     // noVNC uses top-level await (Safari 15+, Chrome 89+)
     target: 'es2022',

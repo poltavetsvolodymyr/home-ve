@@ -1,8 +1,9 @@
-# Builds everything the host "home" runs into deploy/ and stages it in git:
+# Builds what a host runs from these sources into deploy/ (both directories are not in git):
 #   frontend -> deploy/www  (npm run build)
 #   backend  -> deploy/app  (one self-contained linux-x64 executable, the .NET runtime inside;
 #                            settings in backend/HomeBackend/Properties/PublishProfiles/Home.pubxml)
-# Then commit, push, and run deploy/update.sh on the host.
+# deploy/app/COMMIT names the commit built. Hosts normally download the same build, made by CI for every
+# commit on main and every release (deploy/fetch-build.sh); see build.sh.
 #   .\build.ps1
 # Same steps as build.sh. Exit codes are checked explicitly: with 'Stop', Windows PowerShell 5.1
 # turns npm's stderr warnings into failures.
@@ -24,10 +25,10 @@ if (Test-Path $app) { Remove-Item -Recurse -Force $app -ErrorAction Stop }
 dotnet publish (Join-Path $root 'backend/HomeBackend') -p:PublishProfile=Home --nologo
 if ($LASTEXITCODE) { throw 'dotnet publish failed' }
 
-# Windows has no exec bit; record it in git so the host can run the file straight after `git pull`
-git -C $root add deploy/app deploy/www
-git -C $root update-index --chmod=+x deploy/app/home-backend
-if ($LASTEXITCODE) { throw 'git update-index failed' }
+$commit = git -C $root rev-parse HEAD
+if ($LASTEXITCODE) { throw 'git rev-parse failed' }
+# no BOM, a plain line: fetch-build.sh compares it with the commit as text
+[IO.File]::WriteAllText((Join-Path $app 'COMMIT'), "$commit`n")
 
 $size = [math]::Round((Get-Item (Join-Path $app 'home-backend')).Length / 1MB, 1)
-Write-Host "`nBuilt deploy/app/home-backend ($size MB) and deploy/www, staged in git. Commit and push, then run deploy/update.sh on the host."
+Write-Host "`nBuilt deploy/app/home-backend ($size MB) and deploy/www for $($commit.Substring(0, 7))."

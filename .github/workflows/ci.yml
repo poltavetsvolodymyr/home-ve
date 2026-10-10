@@ -1,5 +1,5 @@
 # Checks every pull request and every push to main: the same checks a contributor runs locally
-# (docs/development.md), plus that the committed frontend build in deploy/www matches the sources.
+# (docs/development.md). A push to main that passes them is built for the hosts on the dev channel (dev-build).
 name: CI
 
 on:
@@ -48,22 +48,59 @@ jobs:
       - run: npm ci --no-fund --no-audit
       # types, ESLint, Prettier, tests
       - run: npm run check
-      # the build writes deploy/www; the committed copy must be what these sources produce (run build.sh)
-      - name: deploy/www is up to date
-        run: |
-          npm run build
-          git diff --exit-code --stat -- ../deploy/www
-          test -z "$(git status --porcelain -- ../deploy/www)"
 
   scripts:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      # every shell script in deploy/ and build.sh (picked by its #! line; unit files and the polkit rule are not shell)
+      # every shell script in deploy/ and .github/, and build.sh (picked by its #! line; unit files and the polkit
+      # rule are not shell)
       - name: shellcheck
         run: |
-          files=$(git ls-files deploy build.sh | while read -r f; do
+          files=$(git ls-files deploy .github build.sh | while read -r f; do
             if head -c 64 "$f" | head -n 1 | grep -q '^#!.*sh'; then echo "$f"; fi
           done)
           echo "$files"
           shellcheck $files
+
+  # What the hosts on the dev channel run: the build of this commit (build.sh), as
+  # home-ve-<commit>-linux-x64.tar.gz on the pre-release "dev", where deploy/fetch-build.sh downloads it.
+  # Only for pushes to main, and only once every check above has passed.
+  dev-build:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend, frontend, scripts]
+    runs-on: ubuntu-24.04
+    # this job alone may write: it uploads to the releases
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build
+        run: ./build.sh
+      - name: Package
+        run: .github/package.sh "home-ve-$GITHUB_SHA-linux-x64.tar.gz"
+      - name: Upload to the pre-release "dev"
+        run: |
+          if ! gh release view dev >/dev/null 2>&1; then
+            gh release create dev --prerelease --target "$GITHUB_SHA" --title "dev builds" \
+              --notes "Builds of every commit on main, for hosts on the dev channel: not a release. The newest 30 are kept."
+          fi
+          # the .sha256 last: hosts take a build once its .sha256 is there (deploy/fetch-build.sh)
+          gh release upload dev "home-ve-$GITHUB_SHA-linux-x64.tar.gz" --clobber
+          gh release upload dev "home-ve-$GITHUB_SHA-linux-x64.tar.gz.sha256" --clobber
+      - name: Keep the newest 30 builds
+        run: |
+          gh release view dev --json assets \
+            --jq '.assets | sort_by(.createdAt) | reverse | .[60:] | .[].name' |
+            while read -r name; do gh release delete-asset dev "$name" --yes; done

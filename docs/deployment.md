@@ -378,7 +378,11 @@ The web UI: gear icon in the header → **Update now** → confirm. The button s
 successful update offers to reload itself (a new frontend may have arrived). From the console: the same script,
 `/opt/home-ve/deploy/update.sh`, or `systemctl restart home-update` and `journalctl -u home-update -n 50`.
 
-`update.sh` brings the host to the latest version of its **channel** and then runs that version's `install.sh`:
+`update.sh` brings the host to the latest version of its **channel** and then runs that version's `install.sh`,
+which downloads that version's build (backend and frontend, made by CI from the sources) from the repository's
+GitHub releases and checks its SHA-256: the host needs no .NET or Node. CI makes the build a few minutes after a
+commit is pushed or a release is published; an update before that changes nothing and says so: try again a little
+later.
 
 | Channel | Follows | For |
 |---|---|---|
@@ -403,6 +407,8 @@ Back to an earlier release, say `v0.1.0` (`git -C /opt/home-ve tag` lists them):
 git -C /opt/home-ve checkout --detach v0.1.0
 bash /opt/home-ve/deploy/install.sh
 ```
+
+`install.sh` downloads the build of that release (up to v0.4.0, the build came in git with the release itself).
 
 The next update brings the host forward again to the latest version of its channel.
 

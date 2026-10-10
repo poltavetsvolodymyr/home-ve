@@ -1,11 +1,13 @@
 # deploy
 
-This is everything the host needs. It is built on a computer (`build.ps1`) and arrives here through git (`update.sh`).
+This is everything the host needs. The scripts arrive through git (`update.sh`); `app/` and `www/` are the build of
+the checked-out commit, made by CI and downloaded by `fetch-build.sh` (they are not in git).
 Details: `docs/deployment.md` in the repository on GitHub (the host's sparse checkout does not include it).
 
 | | |
 |---|---|
-| `app/home-backend` | the backend, a single binary, .NET included. Listens on `127.0.0.1:5000` |
+| `app/home-backend` | the backend, a single binary, .NET included. Listens on `127.0.0.1:5000`. `app/COMMIT`: the commit it was built from |
+| `fetch-build.sh` | downloads the build of a commit (`app/`, `www/`) from the repository's GitHub releases and checks it; `install.sh` runs it |
 | `www/` | the frontend; `install.sh` copies it to `/var/www/home`, nginx serves it from there |
 | `home-backend.service` | systemd unit of the backend, installed into `/etc/systemd/system/` |
 | `home-update.service` | `update.sh` as root; started by the Update button in the web UI |

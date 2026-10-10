@@ -37,8 +37,9 @@ Run the first two rows before committing. The backend build must have no warning
 and that includes trimming warnings (see [architecture.md](architecture.md#trimming-what-not-to-do)).
 
 CI (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`: the backend build with
-warnings as errors, its tests and the trimmed publish for the host; `npm run check`; that `deploy/www` is what the
-frontend sources build to (if not, run `build.sh` and commit); and `shellcheck` on every shell script in `deploy/`.
+warnings as errors, its tests and the trimmed publish for the host; `npm run check`; and `shellcheck` on every shell
+script in `deploy/` and `.github/`. A push to `main` that passes all of them is then built for the hosts (next
+section).
 
 `dotnet test` runs through Microsoft.Testing.Platform (xunit v3 on the .NET 10 SDK requires this). This mode
 is enabled in `global.json` at the repository root.
@@ -95,30 +96,45 @@ qemu-system-x86_64 -m 128 -display vnc=unix:backend/HomeBackend/.data/run/vm-rou
 ```
 
 The script builds the frontend into `deploy/www`, publishes the backend with the profile
-`backend/HomeBackend/Properties/PublishProfiles/Home.pubxml` into `deploy/app` (a single file of about 16 MB,
-linux-x64, .NET included) and adds everything to git, including the executable bit of the binary. Then commit and push to `main`: hosts
-on the dev channel get it at their next update, see [deployment.md](deployment.md#updating).
+`backend/HomeBackend/Properties/PublishProfiles/Home.pubxml` into `deploy/app` (a single file of about 17 MB,
+linux-x64, .NET included) and writes the commit it was built from into `deploy/app/COMMIT`. Neither directory is in
+git.
 
-Every build puts a new binary into git. This does not matter on the host: the partial clone
-(`--filter=blob:none`) fetches only the current version. But the history on GitHub grows over time. If it starts
-to get in the way, the binary can be moved to GitHub Releases or Git LFS.
+Hosts don't need you to build anything: CI builds every commit for them.
+
+- **A push to `main`** whose checks pass: the `dev-build` job in `ci.yml` runs `build.sh` and attaches
+  `home-ve-<commit>-linux-x64.tar.gz` (and its `.sha256`) to the pre-release **dev** on GitHub, which keeps the newest
+  30. Hosts on the dev channel take it at their next update.
+- **A published release** `vX.Y.Z`: `.github/workflows/release.yml` runs the checks again, then `build.sh`, and
+  attaches `home-ve-vX.Y.Z-linux-x64.tar.gz` to the release. A release's commit was on `main` before, so its dev build
+  is there too: hosts take whichever they find first.
+
+On the host, `deploy/fetch-build.sh` downloads the build of the checked-out commit, checks its SHA-256 and that it
+is the build of that commit, and puts it into `deploy/app` and `deploy/www`; `install.sh` runs it first. `update.sh`
+moves a host to a new commit only once its build can be downloaded, so a host never waits for one half-updated.
+The repository it downloads from is the one the checkout came from (`git remote get-url origin`): a fork gets its
+own builds once its Actions run.
+
+A build of your own on a test host: copy `deploy/app` and `deploy/www` over (with `deploy/app/COMMIT` naming the
+commit the host has checked out), then run `install.sh`: it keeps a build that names its commit and downloads none.
+
+Up to v0.4.0 the binary was committed to git; those releases still bring theirs along.
 
 ## Releasing
 
 Hosts on the stable channel (the default) follow the branch `stable`, which points at the latest release. A release
-is a commit on `main` whose CI is green, tagged `vX.Y.Z`:
+is a commit on `main` whose CI is green (its dev build is on the pre-release **dev**):
 
 ```bash
-git checkout main && git pull
-git tag -a v0.2.0 -m "v0.2.0"
-git push origin v0.2.0
-git push origin v0.2.0^{commit}:refs/heads/stable
+git fetch origin main
+git push origin <commit>:refs/heads/stable
 ```
+
+then on GitHub, Releases → **Draft a new release**: a new tag `vX.Y.Z` with the target `stable`, and what changed:
+that page is what users read before they update. Publishing it starts `release.yml`, which attaches the build.
 
 - the version: the last number for fixes, the middle one for new features, the first one when an update needs the
   user to do something by hand;
-- `stable` only ever moves forward to the new tag (the push fails if it would not be a fast-forward: then something
-  is off);
-- on GitHub, Releases → **Draft a new release** → choose the tag and write what changed: that page is what users
-  read before they update.
+- `stable` only ever moves forward (the push fails if it would not be a fast-forward: then something is off);
+- only maintainers move `stable` and make releases: pull requests go to `main`.
 

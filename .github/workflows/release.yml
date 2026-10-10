@@ -1,0 +1,47 @@
+# A published release vX.Y.Z gets its build: home-ve-vX.Y.Z-linux-x64.tar.gz (and .sha256), made from the
+# release's tag with build.sh, after the same checks as CI. Hosts on the stable channel download it
+# (deploy/fetch-build.sh); until it is there they take the dev build of the same commit.
+name: Release build
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # only versions: not the pre-release "dev" (its builds come from ci.yml)
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Test
+        run: |
+          dotnet build backend/HomeBackend.slnx --nologo -warnaserror
+          dotnet test --solution backend/HomeBackend.slnx --no-build
+          (cd frontend && npm ci --no-fund --no-audit && npm run check)
+      - name: Build
+        run: ./build.sh
+      - name: Package
+        run: .github/package.sh "home-ve-$TAG-linux-x64.tar.gz"
+      # the .sha256 last: hosts take a build once its .sha256 is there
+      - name: Upload to the release
+        run: |
+          gh release upload "$TAG" "home-ve-$TAG-linux-x64.tar.gz" --clobber
+          gh release upload "$TAG" "home-ve-$TAG-linux-x64.tar.gz.sha256" --clobber

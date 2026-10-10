@@ -102,8 +102,7 @@ cd frontend; npm run check                        # frontend: types, ESLint, Pre
 ## Deployment
 
 ```powershell
-.\build.ps1                                      # frontend -> deploy/www, backend -> deploy/app/home-backend, all into git
-git commit -m "..."; git push
+git commit -m "..."; git push                    # CI builds it; hosts download the build (docs/development.md)
 ```
 
 On the host:

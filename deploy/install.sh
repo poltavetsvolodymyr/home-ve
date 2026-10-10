@@ -2,7 +2,8 @@
 # Sets up the VM web UI on a Debian host, or brings an existing setup up to date. Run as root from the checkout:
 #   /opt/home-ve/deploy/install.sh
 # Safe to re-run: every step checks what is already there. deploy/update.sh runs it after each pull.
-# Needs no .NET on the host: deploy/app/home-backend is self-contained.
+# Needs no .NET or Node on the host: the build of the checked-out commit (deploy/app, deploy/www) is downloaded
+# from the repository's GitHub releases, where CI puts it (deploy/fetch-build.sh).
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,6 +17,7 @@ main() {
   require_root
   note_unusual_location
   install_packages
+  fetch_build
   create_service_user
   create_config
   record_version
@@ -61,6 +63,11 @@ install_packages() {
   systemctl start dbus.service polkit.service
 }
 
+# the backend and the frontend of this very commit, unless they are here already
+fetch_build() {
+  "$DEPLOY_DIR/fetch-build.sh" get HEAD
+}
+
 # service user: no shell, no home; reads the journal through the unit's SupplementaryGroups
 create_service_user() {
   if ! id home-backend &>/dev/null; then
@@ -87,7 +94,8 @@ create_config() {
 # What runs now, for the web UI (Settings → Update): v0.1.0, or v0.1.0-3-gabc1234 for 3 commits after it.
 record_version() {
   local version
-  version=$(git -C "${DEPLOY_DIR%/deploy}" describe --tags --always 2>/dev/null) || return 0
+  # only release tags: "dev" is the pre-release CI keeps the builds of main on, not a version
+  version=$(git -C "${DEPLOY_DIR%/deploy}" describe --tags --match 'v[0-9]*' --always 2>/dev/null) || return 0
   printf '%s\n' "$version" >"$CONFIG_DIR/version"
   chmod 0644 "$CONFIG_DIR/version"
   echo "==> version $version"

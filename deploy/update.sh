@@ -41,15 +41,27 @@ fi
 git fetch --quiet --tags --force origin "+refs/heads/$branch:refs/remotes/origin/$branch"
 target=$(git rev-parse "refs/remotes/origin/$branch")
 before=$(git rev-parse HEAD)
-version() { git describe --tags --always "$1"; }
+version() { git describe --tags --match 'v[0-9]*' --always "$1"; }
 
 if [[ $before == "$target" ]]; then
+  # an update that stopped at downloading its build (deploy/fetch-build.sh) is finished now
+  if [[ "$(cat app/COMMIT 2>/dev/null)" != "$before" ]]; then
+    echo "channel $channel: up to date ($(version HEAD)), but its build isn't installed yet: installing it"
+    exec "$DEPLOY_DIR/install.sh"
+  fi
   echo "channel $channel: already up to date ($(version HEAD))"
   exit 0
 fi
 if git merge-base --is-ancestor "$target" "$before"; then
   echo "channel $channel is at $(version "$target"), this host runs the newer $(version HEAD): it stays on that until $channel catches up"
   exit 0
+fi
+
+# CI builds a commit a few minutes after it is pushed (or released): until then, nothing changes here
+if ! "$DEPLOY_DIR/fetch-build.sh" check "$target"; then
+  echo "channel $channel: $(version "$target") is out, but its build isn't ready to download yet (CI makes it" >&2
+  echo "a few minutes after a push or a release). Nothing changed here: try again in a few minutes." >&2
+  exit 1
 fi
 
 echo "channel $channel: $(version "$before") -> $(version "$target")"

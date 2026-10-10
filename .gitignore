@@ -157,3 +157,7 @@ backend/HomeBackend/.data/
 
 # local Claude Code settings (launch configs, permissions)
 .claude/
+
+# the build a host runs: made by build.sh, or by CI and downloaded by deploy/fetch-build.sh
+/deploy/app/
+/deploy/www/
