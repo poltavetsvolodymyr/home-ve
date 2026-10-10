@@ -1,9 +1,26 @@
 import RFB from '@novnc/novnc'
 import { CornerDownLeft, Keyboard, Maximize, RotateCcw, X } from 'lucide-react'
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from 'react'
-import { Badge, Card, type Status as BadgeStatus } from '@/shared/ui'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react'
+import { Badge, Card, confirm, type Status as BadgeStatus } from '@/shared/ui'
 import { consoleUrl } from './api'
-import { lineEdit, panelKeyEvents, panelKeys, textEvents, type KeyEvent, type Modifier, type PanelKey } from './keysyms'
+import {
+  lineEdit,
+  panelKeyEvents,
+  panelKeys,
+  splitPaste,
+  textEvents,
+  type KeyEvent,
+  type Modifier,
+  type PanelKey,
+} from './keysyms'
 import { VmKeys } from './VmKeys'
 
 type Status = 'connecting' | 'connected' | 'closed'
@@ -13,6 +30,9 @@ const statusBadge: Record<Status, BadgeStatus> = { connecting: 'warning', connec
 /** After a lost connection (a reboot: QEMU goes and a new one comes), try again every 2 s for a minute. */
 const retryMs = 2000
 const maxRetries = 30
+// keys go out 16 events (4 to 8 characters) at a time, 15 ms apart: about 400 characters a second
+const KEYS_PER_BATCH = 16
+const BATCH_PAUSE_MS = 15
 
 /**
  * The VM's screen (noVNC over /api/vms/{name}/console). Scaled to fit; click it to type with a real keyboard.
@@ -70,11 +90,29 @@ export default function VmConsole({ name }: { name: string }) {
     return () => cancelAnimationFrame(frame)
   }, [])
 
-  const send = (events: KeyEvent[]) => {
+  // Keys go out in small batches with a pause between them: QEMU's keyboard holds only so many keys until the
+  // guest reads them, and a long paste sent at once would lose characters. Anything sent meanwhile queues up.
+  const queue = useRef<KeyEvent[]>([])
+  const pumping = useRef(false)
+  const pump = () => {
     const r = rfb.current
-    if (!r) return
-    for (const [keysym, code, down] of events) r.sendKey(keysym, code, down)
+    if (!r) {
+      queue.current = []
+      pumping.current = false
+      return
+    }
+    for (const [keysym, code, down] of queue.current.splice(0, KEYS_PER_BATCH)) r.sendKey(keysym, code, down)
+    if (queue.current.length) setTimeout(pump, BATCH_PAUSE_MS)
+    else pumping.current = false
+  }
+  const send = (events: KeyEvent[]) => {
+    if (!rfb.current) return
+    queue.current.push(...events)
     setMods([])
+    if (!pumping.current) {
+      pumping.current = true
+      pump()
+    }
   }
 
   const toggle = (m: Modifier) => setMods(ms => (ms.includes(m) ? ms.filter(x => x !== m) : [...ms, m]))
@@ -107,6 +145,28 @@ export default function VmConsole({ name }: { name: string }) {
       e.preventDefault()
       send(panelKeyEvents(panelKeys.backspace, mods))
     }
+  }
+
+  // Several lines pasted: each one typed and entered, as in a terminal, after a confirmation (in a root shell
+  // they run as commands). What follows the last line break stays in the box. One line is an ordinary edit.
+  const paste = async (e: ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text/plain')
+    if (!/[\r\n]/.test(pasted)) return
+    e.preventDefault()
+    const { lines, rest } = splitPaste(pasted)
+    const all = rest ? [...lines, rest] : lines
+    const ok = await confirm({
+      title: `Paste ${all.length} line${all.length === 1 ? '' : 's'}?`,
+      message:
+        'They are typed into the VM one by one, with Enter after each' +
+        (rest ? ' but the last (it stays typed, like the start of a command).' : '.') +
+        `\n\n${all.slice(0, 5).join('\n')}${all.length > 5 ? '\n…' : ''}`,
+      confirmLabel: 'Paste',
+    })
+    if (!ok) return
+    send(lines.flatMap(l => [...textEvents(l), ...panelKeyEvents(panelKeys.enter)]).concat(textEvents(rest)))
+    // the box mirrors the VM's current line: after the last Enter, that is what follows it
+    setText(rest)
   }
 
   // the phone keyboard's Return and the Enter button: Enter in the VM, a fresh line in the box
@@ -161,6 +221,7 @@ export default function VmConsole({ name }: { name: string }) {
           value={text}
           onChange={edit}
           onKeyDown={keyDown}
+          onPaste={paste}
           autoCapitalize="off"
           autoCorrect="off"
           autoComplete="off"

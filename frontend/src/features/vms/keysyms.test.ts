@@ -7,6 +7,7 @@ import {
   needsShift,
   panelKeyEvents,
   panelKeys,
+  splitPaste,
   textEvents,
 } from './keysyms'
 
@@ -74,4 +75,16 @@ describe('lineEdit', () => {
     expect(lineEdit('cat fiel.txt', 'cat file.txt')).toEqual({ backspaces: 6, typed: 'le.txt' }))
 
   it('counts characters, not UTF-16 units', () => expect(lineEdit('a😀', 'a')).toEqual({ backspaces: 1, typed: '' }))
+})
+
+describe('splitPaste', () => {
+  it('enters every line that ends with a break and keeps the rest typed', () => {
+    expect(splitPaste('apt update\napt upgrade\n')).toEqual({ lines: ['apt update', 'apt upgrade'], rest: '' })
+    expect(splitPaste('cd /etc\nls')).toEqual({ lines: ['cd /etc'], rest: 'ls' })
+  })
+  it('takes Windows and old Mac line breaks too', () =>
+    expect(splitPaste('a\r\nb\rc')).toEqual({ lines: ['a', 'b'], rest: 'c' }))
+  it('keeps empty lines: an Enter each', () =>
+    expect(splitPaste('a\n\nb\n')).toEqual({ lines: ['a', '', 'b'], rest: '' }))
+  it('has no lines without a break', () => expect(splitPaste('just text')).toEqual({ lines: [], rest: 'just text' }))
 })

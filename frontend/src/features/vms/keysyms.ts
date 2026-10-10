@@ -107,3 +107,13 @@ export function lineEdit(before: string, after: string): { backspaces: number; t
   while (same < a.length && same < b.length && a[same] === b[same]) same++
   return { backspaces: a.length - same, typed: b.slice(same).join('') }
 }
+
+/**
+ * Pasted text as lines for the VM, like a terminal takes it: every line that ends with a line break is
+ * typed and entered; what follows the last break (none: the whole text) stays typed, not entered.
+ */
+export function splitPaste(text: string): { lines: string[]; rest: string } {
+  const parts = text.split(/\r\n|\r|\n/)
+  const rest = parts.pop() ?? ''
+  return { lines: parts, rest }
+}
