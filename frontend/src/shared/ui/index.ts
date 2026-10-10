@@ -1,5 +1,6 @@
 // The UI kit: small building blocks every page uses. Styles: ./ui.css (loaded globally by styles/index.css).
 export { Badge, type Status } from './Badge'
+export { BrandMark } from './BrandMark'
 export { Card } from './Card'
 export { confirm, confirmEdit, type ConfirmOptions } from './confirm'
 export { ConfirmHost } from './ConfirmHost'

@@ -374,3 +374,21 @@ button.danger-solid:hover:not(:disabled) {
   filter: brightness(1.08);
   background: var(--critical);
 }
+
+/* BrandMark: drawn like the header's buttons, an outline icon, the accent only on its strokes */
+.brand-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent);
+}
+.brand-mark.large {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+}

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { BrandMark } from '@/shared/ui'
 import { setUp } from './api'
 import { setupProblem } from './setup'
 import './login.css'
@@ -33,7 +34,7 @@ export function SetupPage({ onDone }: { onDone: () => void }) {
   return (
     <div className="login">
       <form className="card login-card" onSubmit={submit}>
-        <img src="/favicon.svg" alt="" width={40} height={40} />
+        <BrandMark large />
         <h1>Welcome</h1>
         <p className="muted login-hint">
           This host has no password yet. Choose one; you'll sign in with it from now on. The setup code is on the host:{' '}

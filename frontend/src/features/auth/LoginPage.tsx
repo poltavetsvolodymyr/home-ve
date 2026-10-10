@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Unauthorized } from '@/shared/api/http'
+import { BrandMark } from '@/shared/ui'
 import { login } from './api'
 import './login.css'
 
@@ -25,7 +26,7 @@ export function LoginPage({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="login">
       <form className="card login-card" onSubmit={submit}>
-        <img src="/favicon.svg" alt="" width={40} height={40} />
+        <BrandMark large />
         <h1>Home</h1>
         <label>
           Password
