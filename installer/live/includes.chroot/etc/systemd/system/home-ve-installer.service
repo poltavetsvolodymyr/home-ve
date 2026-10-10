@@ -1,0 +1,17 @@
+# The installer's page (home-backend installer, backend/HomeBackend/Installer) on https://<address>/.
+# Before the login prompt on the screen, which shows the address and the code (home-ve-installer-code).
+[Unit]
+Description=home-ve installer page
+After=network.target
+Before=getty@tty1.service
+
+[Service]
+Type=exec
+ExecStartPre=/usr/local/sbin/home-ve-installer-code
+ExecStart=/opt/home-ve/app/home-backend installer
+Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/run/home-ve-installer
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

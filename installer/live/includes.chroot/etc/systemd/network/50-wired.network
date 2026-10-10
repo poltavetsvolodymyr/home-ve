@@ -1,0 +1,7 @@
+# Every wired card asks for an address by DHCP, so the page can be reached from the network.
+[Match]
+Type=ether
+Name=en* eth*
+
+[Network]
+DHCP=yes

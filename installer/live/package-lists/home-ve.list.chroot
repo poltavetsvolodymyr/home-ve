@@ -1,0 +1,32 @@
+# The installer image's system (installer/build-live.sh): booting from the stick, the network, the page's
+# backend (it needs OpenSSL for HTTPS), and what installing a host takes: partitioning, LVM, a Debian
+# bootstrap, boot loaders for BIOS and UEFI (with Secure Boot).
+live-boot
+systemd-sysv
+systemd-resolved
+systemd-timesyncd
+iproute2
+iputils-ping
+ca-certificates
+curl
+libssl3t64
+gdisk
+parted
+dosfstools
+e2fsprogs
+lvm2
+thin-provisioning-tools
+mmdebstrap
+debian-archive-keyring
+grub-pc-bin
+grub-efi-amd64-bin
+grub-efi-amd64-signed
+shim-signed
+efibootmgr
+zstd
+pciutils
+less
+nano
+# network cards that need firmware (Realtek, Broadcom NetXtreme II)
+firmware-realtek
+firmware-bnx2x

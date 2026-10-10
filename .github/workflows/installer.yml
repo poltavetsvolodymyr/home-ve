@@ -1,0 +1,47 @@
+# The installer image (installer/): a small Debian that boots into the installer's page. Built for every push to
+# main that touches it, and by hand (Run workflow); the image goes to the pre-release "dev" as
+# home-ve-installer-live-dev.iso. Separate from ci.yml: live-build takes a while.
+name: Installer image
+
+on:
+  push:
+    branches: [main]
+    paths: [installer/**, backend/**, frontend/**, .github/workflows/installer.yml, .github/package.sh, build.sh]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: installer-image
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build home-ve
+        run: |
+          ./build.sh
+          .github/package.sh home-ve-build.tar.gz
+      # live-build needs Debian itself and mounts inside the build: a privileged Debian 13 container
+      - name: Build the image
+        run: |
+          docker run --rm --privileged -v "$PWD:/src" -w /src debian:trixie \
+            installer/build-live.sh home-ve-build.tar.gz home-ve-installer-live-dev.iso
+      - name: Upload to the pre-release "dev"
+        run: |
+          sudo chown "$(id -u)" home-ve-installer-live-dev.iso home-ve-installer-live-dev.iso.sha256
+          gh release upload dev home-ve-installer-live-dev.iso home-ve-installer-live-dev.iso.sha256 --clobber

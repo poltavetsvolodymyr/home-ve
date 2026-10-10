@@ -53,11 +53,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      # every shell script in deploy/ and .github/, and build.sh (picked by its #! line; unit files and the polkit
-      # rule are not shell)
+      # every shell script in deploy/, .github/ and installer/, and build.sh (picked by its #! line; unit files and
+      # the polkit rule are not shell)
       - name: shellcheck
         run: |
-          files=$(git ls-files deploy .github build.sh | while read -r f; do
+          files=$(git ls-files deploy .github installer build.sh | while read -r f; do
             if head -c 64 "$f" | head -n 1 | grep -q '^#!.*sh'; then echo "$f"; fi
           done)
           echo "$files"

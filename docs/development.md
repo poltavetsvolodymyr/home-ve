@@ -70,6 +70,19 @@ mkdir -p backend/HomeBackend/.data/run/vm-router
 qemu-system-x86_64 -m 128 -display vnc=unix:backend/HomeBackend/.data/run/vm-router/vnc.sock
 ```
 
+### Installer page locally
+
+The installer image runs the same binary as `home-backend installer` (`backend/HomeBackend/Installer`), with its own
+page, `frontend/installer.html` (`src/installer`). With a made-up machine, and the code `TEST-CODE`:
+
+```bash
+dotnet run --project backend/HomeBackend --no-launch-profile -- installer --Installer:Mock=true --Installer:Urls:0=http://localhost:5081
+cd frontend && npm run dev     # then http://localhost:5173/installer.html
+```
+
+The image itself (`installer/build-live.sh`, live-build) is built by `.github/workflows/installer.yml` and lands on
+the pre-release **dev** as `home-ve-installer-live-dev.iso`.
+
 ## Conventions
 
 **General:** code, comments and documentation are in English. Indentation and the like are set by
