@@ -43,8 +43,9 @@ disk of at least **64 GB that will be erased whole**.
    (everything on it goes), **the root password**, and **your own user** (name and password), whom you log in as
    over SSH before `su -`.
 4. It installs, reboots, and on that first boot `home-ve-firstboot.service` finishes the job; its progress shows on
-   the screen. When it is done, the screen shows the web UI's address and the setup code, then the login prompt.
-   Open the address and set the password with that code (later, as root: `cat /var/lib/home-backend/setup-code`).
+   the screen. When it is done, the login prompt shows the web UI's address and the setup code. Open the address and
+   set the password with that code (or, as root: `cat /var/lib/home-backend/setup-code`). The code leaves the screen
+   with the next update after that.
 
 What the answers set up:
 

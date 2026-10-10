@@ -280,10 +280,12 @@ make_self_signed() {
   chmod 0644 "$NGINX_DIR/selfsigned.crt"
 }
 
-# On the host's own screen, above the login prompt: where the web UI is (agetty fills in \4, the address)
+# On the host's own screen, above the login prompt: where the web UI is (agetty fills in \4, the address). The
+# setup code an automated install put next to it (deploy/preseed/firstboot.sh) goes once the password is set.
 install_console_hint() {
   install -d -m 0755 /etc/issue.d
   install -m 0644 "$DEPLOY_DIR/home-ve.issue" /etc/issue.d/home-ve.issue
+  if [[ -s /var/lib/home-backend/password ]]; then rm -f /etc/issue.d/home-ve.setup.issue; fi
 }
 
 show_status() {
