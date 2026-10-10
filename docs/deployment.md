@@ -25,18 +25,20 @@ the sections after it).
 The Debian installer can take its answers from a file (a "preseed"). `deploy/preseed/preseed.cfg` sets up the
 machine the way the rest of this page does by hand: LVM with room for the backups and the VMs, the bridge, home-ve.
 
-**What you need:** a machine (or a VM) with a wired network card and DHCP on the network, a disk of at least
-**64 GB that will be erased whole**, and the Debian 13 netinst image
-([debian.org/distrib](https://www.debian.org/distrib/)) on a USB stick or as a virtual CD.
+**What you need:** a machine (or a VM) with a wired network card and DHCP on the network, internet access, and a
+disk of at least **64 GB that will be erased whole**.
 
-1. Boot the image. In the menu: **Advanced options → Automated install**.
-2. The installer sets up the network and asks for the location of the preconfiguration file. Enter:
+1. **The installer image**: `home-ve-vX.Y.Z-installer.iso` from the latest
+   [release](https://github.com/poltavetsvolodymyr/home-ve/releases/latest) (about 70 MB; the dev channel's is
+   `home-ve-installer-dev.iso` on the pre-release **dev**). It is Debian's own netboot installer, kernel and boot
+   loader untouched, with the answers below inside; it downloads Debian while it installs. Write it to a USB stick
+   (`dd`, balenaEtcher, Rufus in DD mode), or put it into a VM's CD drive.
+2. **Boot it and choose Install** (or Graphical install). That's all the image needs.
 
-   ```
-   https://raw.githubusercontent.com/poltavetsvolodymyr/home-ve/stable/deploy/preseed/preseed.cfg
-   ```
-
-   (`main` instead of `stable` installs the dev channel's version.)
+   Or, with any Debian 13 image instead (netinst from [debian.org](https://www.debian.org/distrib/)): **Advanced
+   options → Automated install**, then, when it asks for the preconfiguration file, enter
+   `https://raw.githubusercontent.com/poltavetsvolodymyr/home-ve/stable/deploy/preseed/preseed.cfg`
+   (`main` instead of `stable` for the dev channel).
 3. It asks only for: **the disk** (with a single disk it takes that one), a confirmation that names that disk
    (everything on it goes), **the root password**, and **your own user** (name and password), whom you log in as
    over SSH before `su -`.

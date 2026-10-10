@@ -44,8 +44,8 @@ as many VMs as its CPU, memory and disks allow, and it grows by adding disks to 
 - self-update from the web UI, stable or dev channel;
 - first-run setup: the password is chosen in the browser, with a code only the host knows.
 
-Getting started: [docs/deployment.md](docs/deployment.md): an automated installation of Debian and home-ve on an empty
-machine, or step by step on a Debian you already have.
+Getting started: [docs/deployment.md](docs/deployment.md): the installer image from a release (about 70 MB: boot it,
+set the passwords, done), or step by step on a Debian you already have.
 
 ## Screenshots
 

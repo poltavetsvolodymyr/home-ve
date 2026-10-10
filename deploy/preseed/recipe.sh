@@ -1,6 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC2016  # the $words below are partman's, for the recipe, not the shell's
-# Run by the Debian installer (preseed/run in preseed.cfg) before it partitions the disk: the layout for this
+# Run by the Debian installer (preseed/early_command in preseed.cfg) before it partitions the disk: the layout for this
 # machine's firmware. A partition table (GPT) with, on UEFI, the EFI system partition, on BIOS, the small partition
 # GRUB needs there; then /boot, then LVM with root (30 GB) and swap (2 GB). guided_size in preseed.cfg keeps the
 # rest of the group free.

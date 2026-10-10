@@ -45,3 +45,9 @@ jobs:
         run: |
           gh release upload "$TAG" "home-ve-$TAG-linux-x64.tar.gz" --clobber
           gh release upload "$TAG" "home-ve-$TAG-linux-x64.tar.gz.sha256" --clobber
+      # the installer: Debian's netboot image with deploy/preseed inside, installing the stable channel
+      - name: Installer ISO
+        run: |
+          sudo apt-get install -y -q xorriso cpio
+          .github/build-iso.sh stable "home-ve-$TAG-installer.iso"
+          gh release upload "$TAG" "home-ve-$TAG-installer.iso" "home-ve-$TAG-installer.iso.sha256" --clobber

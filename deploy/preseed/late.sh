@@ -1,6 +1,7 @@
 #!/bin/bash
 # late.sh <preseed URL>: the end of an automated Debian install (preseed.cfg), run inside the new system before
-# its first boot. Nothing here starts a service (the installer's chroot has no systemd running):
+# its first boot. The URL is where preseed.cfg came from, or (the ISO) where it would have: its branch is the one
+# installed. Nothing here starts a service (the installer's chroot has no systemd running):
 #   1. the checkout in /opt/home-ve, from the branch the preseed came from (stable, or main), as in
 #      docs/deployment.md "First installation";
 #   2. the bridge br0 on the card the installer used, by DHCP (docs/deployment.md "Bridge for VM networking");

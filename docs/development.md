@@ -106,7 +106,11 @@ Hosts don't need you to build anything: CI builds every commit for them.
   `home-ve-<commit>-linux-x64.tar.gz` (and its `.sha256`) to the pre-release **dev** on GitHub, which keeps the newest
   30. Hosts on the dev channel take it at their next update.
 - **A published release** `vX.Y.Z`: `.github/workflows/release.yml` runs the checks again, then `build.sh`, and
-  attaches `home-ve-vX.Y.Z-linux-x64.tar.gz` to the release. A release's commit was on `main` before, so its dev build
+  attaches `home-ve-vX.Y.Z-linux-x64.tar.gz` to the release.
+- **The installer ISO**: `.github/build-iso.sh` takes Debian's netboot `mini.iso` (checked against Debian's
+  SHA256SUMS), adds `deploy/preseed` to its initrd and writes the image anew with the original boot records.
+  Releases get `home-ve-vX.Y.Z-installer.iso` (stable channel), every push to `main` replaces
+  `home-ve-installer-dev.iso` on **dev**. A release's commit was on `main` before, so its dev build
   is there too: hosts take whichever they find first.
 
 On the host, `deploy/fetch-build.sh` downloads the build of the checked-out commit, checks its SHA-256 and that it
