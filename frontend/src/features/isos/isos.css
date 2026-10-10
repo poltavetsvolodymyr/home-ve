@@ -49,4 +49,6 @@
 .card.iso-download .card-actions {
   width: auto;
   flex: none;
+  /* the 36px button centred on the title's first line (15px × 1.45), not hanging below it */
+  margin-block: calc((15px * 1.45 - 36px) / 2);
 }
