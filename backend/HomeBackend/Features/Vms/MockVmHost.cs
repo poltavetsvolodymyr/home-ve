@@ -98,7 +98,7 @@ public sealed class MockVmHost : IVmHost
             ? ("""
                {"return": [
                  {"name": "lo", "ip-addresses": [{"ip-address-type": "ipv4", "ip-address": "127.0.0.1", "prefix": 8}]},
-                 {"name": "ppp0", "ip-addresses": [{"ip-address-type": "ipv4", "ip-address": "84.150.12.7", "prefix": 32}]},
+                 {"name": "ppp0", "ip-addresses": [{"ip-address-type": "ipv4", "ip-address": "203.0.113.7", "prefix": 32}]},
                  {"name": "br-lan", "hardware-address": "bc:24:11:14:4d:cd", "ip-addresses": [
                    {"ip-address-type": "ipv4", "ip-address": "192.168.178.1", "prefix": 24},
                    {"ip-address-type": "ipv6", "ip-address": "fd00::1", "prefix": 64},

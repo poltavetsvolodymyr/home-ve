@@ -5,9 +5,9 @@ you run from the browser, on a computer or a phone: create and install VMs, watc
 encrypted copy off-site. No Proxmox, no custom kernel or distribution, and the web UI never runs as root.
 
 <p align="center">
-  <img src="docs/screenshots/vms.jpg" width="24%" alt="The VM list: a router VM running with its CPU and memory, a stopped test VM">
-  <img src="docs/screenshots/console.jpg" width="24%" alt="A VM's console in the browser, with a key panel for phones">
-  <img src="docs/screenshots/new-vm.jpg" width="24%" alt="The New VM form: name, CPUs, memory, disk, CD drive, autostart, nightly backup">
+  <img src="docs/screenshots/vms.jpg" width="24%" alt="The VM list: a router VM running, with its CPU, memory and address, and a stopped test VM">
+  <img src="docs/screenshots/vm-summary.jpg" width="24%" alt="A VM's page: its buttons, load, uptime, the guest's IP addresses and its hardware">
+  <img src="docs/screenshots/vm-console.jpg" width="24%" alt="A VM's console in the browser, with a key panel and a text field for phones">
   <img src="docs/screenshots/host.jpg" width="24%" alt="Host status: CPU and load, CPU temperature, memory, system disk, uptime">
 </p>
 
@@ -41,9 +41,34 @@ as many VMs as its CPU, memory and disks allow, and it grows by adding disks to 
 - ISO images downloaded by the host from a URL;
 - backups: nightly and on demand, restore, undo a restore;
 - optional encrypted offsite copy of the backups (rclone to Cloudflare R2);
-- self-update from the web UI.
+- self-update from the web UI, stable or dev channel;
+- first-run setup: the password is chosen in the browser, with a code only the host knows.
 
 Getting started: [docs/deployment.md](docs/deployment.md), from preparing the host to the first VM.
+
+## Screenshots
+
+On a phone (390 px wide), with the mock data the backend serves in development.
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/screenshots/vms.jpg" alt="The VM list"><br><sub>VMs</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/vm-summary.jpg" alt="A VM's summary: load, IP addresses, hardware"><br><sub>A VM</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/vm-console.jpg" alt="A VM's console with the key panel"><br><sub>Console</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/vm-settings.jpg" alt="A VM's settings: CPUs, memory, autostart, backup, CD drive, network cards"><br><sub>VM settings</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="docs/screenshots/vm-backups.jpg" alt="A VM's backups: back up now, restore, delete"><br><sub>Backups</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/vm-logs.jpg" alt="A VM's log from the journal"><br><sub>The VM's log</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/new-vm.jpg" alt="The New VM form"><br><sub>New VM</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/isos.jpg" alt="ISO images: download by URL, the list with sizes"><br><sub>ISO images</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="25%"><img src="docs/screenshots/host.jpg" alt="Host status"><br><sub>Host</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/settings.jpg" alt="Settings: update channel and the last update's output, offsite backup"><br><sub>Update and offsite copy</sub></td>
+    <td align="center" width="25%"><img src="docs/screenshots/login.jpg" alt="The sign-in page"><br><sub>Sign in</sub></td>
+  </tr>
+</table>
 
 ## How it works
 

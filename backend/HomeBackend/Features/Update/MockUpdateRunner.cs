@@ -8,13 +8,14 @@ public sealed class MockUpdateRunner : IUpdateRunner
     private static readonly TimeSpan Duration = TimeSpan.FromSeconds(6);
     private static readonly string[] Lines =
     [
-        "From github.com:poltavetsvolodymyr/home-ve",
-        "   b53fc33..4a74ac7  main       -> origin/main",
-        "Updating b53fc33..4a74ac7",
-        "4a74ac7 No underline on links; card hover only with a real pointer",
+        "channel stable: v0.4.0 -> v0.5.0",
+        "2a90a19 install.sh: no more taking PasswordHash out of config.json",
+        "==> downloading https://github.com/poltavetsvolodymyr/home-ve/releases/download/v0.5.0/home-ve-v0.5.0-linux-x64.tar.gz",
+        "==> build of 2a90a19 in place (v0.5.0/home-ve-v0.5.0-linux-x64.tar.gz)",
+        "==> version v0.5.0",
         "==> VM tools",
         "==> frontend -> /var/www/home",
-        "Done. The backend listens on 127.0.0.1:5000; nginx serves the UI (docs/deployment.md).",
+        "Done. The web UI: https://192.168.178.2/ (docs/deployment.md).",
     ];
 
     private readonly Lock _lock = new();
@@ -36,7 +37,7 @@ public sealed class MockUpdateRunner : IUpdateRunner
         return Task.FromResult(new UpdateStatus(done ? "succeeded" : "running", s, done ? s + Duration : null, log));
     }
 
-    public string? ReadVersion() => "v0.1.0-3-g4a74ac7";
+    public string? ReadVersion() => "v0.5.0";
 
     public Task StartAsync(CancellationToken ct)
     {
