@@ -125,6 +125,7 @@ function DownloadRow({ download: d, onCancel }: { download: IsoDownload; onCance
   const percent = downloadPercent(d)
   return (
     <Card
+      className="iso-download"
       title={<span className="mono">{d.name}</span>}
       actions={
         <button

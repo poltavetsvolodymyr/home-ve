@@ -35,3 +35,18 @@
 .iso-url {
   margin: 6px 0 0;
 }
+
+/* a download: the long file name wraps, the cancel/dismiss ✕ stays in the top right corner (also on a phone,
+   where other cards put their buttons on a line of their own) */
+.card.iso-download .card-head {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.card.iso-download .card-head h2 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.card.iso-download .card-actions {
+  width: auto;
+  flex: none;
+}
