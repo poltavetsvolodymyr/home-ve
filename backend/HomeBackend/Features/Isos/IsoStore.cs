@@ -8,11 +8,15 @@ namespace HomeBackend.Features.Isos;
 /// <summary>
 /// The ISO directory: list, delete, and downloads by URL that run in the background (a phone can't upload
 /// a 700 MB file comfortably, but it can paste a link). A download goes to <c>.&lt;name&gt;.part</c> and is
-/// renamed when complete, so a half file never shows up as an image.
+/// renamed when complete, so a half file never shows up as an image. A server that goes quiet (no answer, or
+/// no data in the middle of the file) fails the download after <paramref name="stallTimeout"/> instead of
+/// leaving it hanging forever.
 /// </summary>
-public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoStore> log) : IDisposable
+public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoStore> log, TimeSpan? stallTimeout = null) : IDisposable
 {
     public const long MaxBytes = 32L << 30;
+    public static readonly TimeSpan DefaultStallTimeout = TimeSpan.FromSeconds(60);
+    private readonly TimeSpan _stallTimeout = stallTimeout ?? DefaultStallTimeout;
 
     private static readonly HttpClient Http = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.None })
     {
@@ -98,7 +102,9 @@ public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoSt
         try
         {
             Directory.CreateDirectory(_dir);
-            using var ct = CancellationTokenSource.CreateLinkedTokenSource(d.Cancel.Token, _stopping.Token);
+            // restarted before every wait for the server: fires only when it sends nothing for that long
+            using var stall = new CancellationTokenSource(_stallTimeout);
+            using var ct = CancellationTokenSource.CreateLinkedTokenSource(d.Cancel.Token, _stopping.Token, stall.Token);
             using var response = await Http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct.Token);
             response.EnsureSuccessStatusCode();
 
@@ -111,8 +117,10 @@ public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoSt
             {
                 var buffer = new byte[1 << 16];
                 int n;
-                while ((n = await source.ReadAsync(buffer, ct.Token)) > 0)
+                while (true)
                 {
+                    stall.CancelAfter(_stallTimeout);
+                    if ((n = await source.ReadAsync(buffer, ct.Token)) == 0) break;
                     await file.WriteAsync(buffer.AsMemory(0, n), ct.Token);
                     if (Interlocked.Add(ref d.Received, n) > MaxBytes) throw new InvalidOperationException($"bigger than {MaxBytes >> 30} GiB");
                 }
@@ -127,7 +135,12 @@ public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoSt
         {
             TryDelete(part);
             if (d.Cancel.IsCancellationRequested || _stopping.IsCancellationRequested) return;
-            d.Error = ex is HttpRequestException { StatusCode: { } code } ? $"the server answered {(int)code} {code}" : ex.Message;
+            d.Error = ex switch
+            {
+                HttpRequestException { StatusCode: { } code } => $"the server answered {(int)code} {code}",
+                OperationCanceledException => $"the server sent nothing for {_stallTimeout.TotalSeconds:0} s",
+                _ => ex.Message,
+            };
             log.LogWarning("Downloading {Name} from {Url} failed: {Error}", d.Name, d.Url, d.Error);
         }
     }
