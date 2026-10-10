@@ -18,7 +18,11 @@ public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoSt
     public static readonly TimeSpan DefaultStallTimeout = TimeSpan.FromSeconds(60);
     private readonly TimeSpan _stallTimeout = stallTimeout ?? DefaultStallTimeout;
 
-    private static readonly HttpClient Http = new(new SocketsHttpHandler { AutomaticDecompression = DecompressionMethods.None })
+    private static readonly HttpClient Http = new(new SocketsHttpHandler
+    {
+        AutomaticDecompression = DecompressionMethods.None,
+        ConnectCallback = HappyEyeballs.ConnectAsync,
+    })
     {
         Timeout = Timeout.InfiniteTimeSpan,
         DefaultRequestHeaders = { { "User-Agent", "home-ve" } },
@@ -139,6 +143,8 @@ public sealed class IsoStore(IOptions<HomeBackendOptions> options, ILogger<IsoSt
             {
                 HttpRequestException { StatusCode: { } code } => $"the server answered {(int)code} {code}",
                 OperationCanceledException => $"the server sent nothing for {_stallTimeout.TotalSeconds:0} s",
+                // connecting failed: HappyEyeballs says what each address did
+                HttpRequestException { InnerException: IOException inner } => inner.Message,
                 _ => ex.Message,
             };
             log.LogWarning("Downloading {Name} from {Url} failed: {Error}", d.Name, d.Url, d.Error);

@@ -52,6 +52,31 @@ public sealed class IsoDownloadTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_dir, ".test.iso.part"))); // the half file is gone
     }
 
+    [Fact]
+    public async Task A_missing_file_says_404_at_once()
+    {
+        using var accepted = Accept(async stream =>
+        {
+            await stream.WriteAsync("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"u8.ToArray(), Ct);
+            await Task.Delay(Timeout.Infinite, Ct);
+        });
+
+        Assert.Null(_store.StartDownload(Url, null));
+
+        Assert.Equal("the server answered 404 NotFound", await ErrorAsync());
+    }
+
+    [Fact]
+    public async Task A_refused_connection_says_so()
+    {
+        var port = ((IPEndPoint)_server.LocalEndpoint).Port;
+        _server.Stop();
+
+        Assert.Null(_store.StartDownload($"http://127.0.0.1:{port}/test.iso", null));
+
+        Assert.Equal("could not connect to 127.0.0.1: IPv4 127.0.0.1: ConnectionRefused", await ErrorAsync());
+    }
+
     /// <summary>Answers one connection with <paramref name="serve"/>; disposing closes it.</summary>
     private IDisposable Accept(Func<NetworkStream, Task> serve)
     {
