@@ -10,7 +10,7 @@ public class InstallerTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public void Disks_from_lsblk_skip_cd_drives_and_mark_the_installer_stick()
+    public void Disks_from_lsblk_skip_cd_drives_and_floppies_and_mark_the_installer_stick()
     {
         var disks = LinuxMachineSource.ParseDisks("""
             {"blockdevices": [
@@ -19,7 +19,8 @@ public class InstallerTests
               {"name": "sdb", "type": "disk", "size": "15376000000", "model": "Ultra", "tran": "usb", "ro": "0", "rm": "1", "rota": "0", "mountpoints": [null],
                "children": [{"name": "sdb1", "type": "part", "size": 15376000000, "mountpoints": ["/run/live/medium"]}]},
               {"name": "sr0", "type": "rom", "size": 409600000, "ro": false, "rm": true, "rota": false, "mountpoints": [null]},
-              {"name": "nvme0n1", "type": "disk", "size": 0, "ro": false, "rm": false, "rota": false, "mountpoints": [null]}
+              {"name": "nvme0n1", "type": "disk", "size": 0, "ro": false, "rm": false, "rota": false, "mountpoints": [null]},
+              {"name": "fd0", "type": "disk", "size": 4096, "ro": false, "rm": true, "rota": true, "mountpoints": [null]}
             ]}
             """);
 

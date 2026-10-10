@@ -42,8 +42,9 @@ public sealed class LinuxMachineSource : IMachineSource
     }
 
     /// <summary>
-    /// The whole disks in <c>lsblk --json --bytes</c> output: no loop devices, CD drives, read-only or empty ones.
-    /// A disk with anything mounted below it (the installer's own stick) is marked in use.
+    /// The whole disks in <c>lsblk --json --bytes</c> output: no loop devices, CD drives, read-only ones, nor any
+    /// under 1 GiB (floppy drives, card readers without a card). A disk with anything mounted below it (the
+    /// installer's own stick) is marked in use.
     /// </summary>
     public static IReadOnlyList<Disk> ParseDisks(string json)
     {
@@ -53,7 +54,7 @@ public sealed class LinuxMachineSource : IMachineSource
         {
             if (Text(d, "type") != "disk" || Flag(d, "ro")) continue;
             var size = Number(d, "size");
-            if (size <= 0) continue;
+            if (size < 1L << 30) continue;
             result.Add(new Disk(Text(d, "name") ?? "?", size, Text(d, "model")?.Trim(), Text(d, "serial")?.Trim(),
                 Text(d, "tran"), Flag(d, "rm"), Flag(d, "rota"), HasMount(d)));
         }

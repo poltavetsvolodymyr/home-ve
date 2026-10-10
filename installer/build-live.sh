@@ -33,6 +33,20 @@ lb config \
   --iso-application "home-ve installer" \
   --bootappend-live "boot=live quiet"
 
+# the boot menus: live-build's own, started after 5 s by themselves (theirs wait for a key forever) and named after
+# what they boot. Without the timeout an unattended machine never gets past the menu.
+cp -r /usr/share/live/build/bootloaders config/
+find config/bootloaders -name isolinux.cfg -exec sed -i 's/^timeout 0$/timeout 50/' {} +
+find config/bootloaders -name config.cfg -path '*grub*' -exec sed -i 's/^set default=0$/set default=0\nset timeout=5/' {} +
+if ! grep -rqx 'timeout 50' config/bootloaders || ! grep -rqx 'set timeout=5' config/bootloaders; then
+  echo "build-live: the boot menus' timeout wasn't set: live-build's templates changed" >&2
+  exit 1
+fi
+grep -rl 'Live system' config/bootloaders | xargs -r sed -i 's/Live system/home-ve installer/g'
+
+# live-build's own package list brings live-config, which logs a "user" in on every console (one this image
+# doesn't have): out, ours lists live-boot itself
+rm -f config/package-lists/live.list.chroot
 cp -r "$here/live/package-lists/." config/package-lists/
 cp -r "$here/live/hooks/." config/hooks/
 cp -r "$here/live/includes.chroot/." config/includes.chroot/
