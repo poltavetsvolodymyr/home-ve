@@ -45,6 +45,7 @@ public sealed class VmMonitor(IVmHost host, ILogger<VmMonitor> log) : Background
             var configs = host.ReadConfigs();
             var units = await host.ReadUnitsAsync(configs.Select(c => c.Name).ToList(), ct);
             var now = DateTimeOffset.UtcNow;
+            IReadOnlyDictionary<string, IReadOnlyList<HostNetwork>>? hostNetworks = null;
             var seen = new HashSet<int>();
 
             _current = configs.Zip(units, (config, unit) =>
@@ -52,7 +53,13 @@ public sealed class VmMonitor(IVmHost host, ILogger<VmMonitor> log) : Background
                 double? cpu = null;
                 long? memory = null;
                 IReadOnlyList<GuestAddress>? addresses = null;
-                if (unit.ActiveState == "active") addresses = Addresses(config.Name, now);
+                if (unit.ActiveState == "active" && Addresses(config.Name, now) is { } found)
+                {
+                    // read once per round, and only when some VM has addresses to sort
+                    hostNetworks ??= host.ReadHostNetworks();
+                    var networks = config.Nets.SelectMany(n => hostNetworks.GetValueOrDefault(n.Bridge) ?? []).ToList();
+                    addresses = GuestNetwork.Prefer(found, networks);
+                }
                 if (unit.ActiveState == "active" && unit.MainPid is { } pid && host.ReadProcess(pid) is { } p)
                 {
                     seen.Add(pid);

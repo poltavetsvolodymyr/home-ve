@@ -31,6 +31,9 @@ public interface IVmHost
     /// </summary>
     (string Json, DateTimeOffset Written)? ReadGuestNetwork(string name);
 
+    /// <summary>The host's own addresses with their prefix, by interface name (br0: 192.168.178.2/24).</summary>
+    IReadOnlyDictionary<string, IReadOnlyList<HostNetwork>> ReadHostNetworks();
+
     /// <summary>Bridges a VM's network card can be plugged into.</summary>
     IReadOnlyList<string> ReadBridges();
 }

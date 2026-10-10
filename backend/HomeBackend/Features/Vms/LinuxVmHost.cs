@@ -1,3 +1,4 @@
+using System.Net.NetworkInformation;
 using HomeBackend.Configuration;
 using HomeBackend.Infrastructure;
 using Microsoft.Extensions.Options;
@@ -97,6 +98,21 @@ public sealed class LinuxVmHost(IOptions<HomeBackendOptions> options, ILogger<Li
             return (File.ReadAllText(file.FullName), file.LastWriteTimeUtc);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    public IReadOnlyDictionary<string, IReadOnlyList<HostNetwork>> ReadHostNetworks()
+    {
+        var result = new Dictionary<string, IReadOnlyList<HostNetwork>>();
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+                result.TryAdd(nic.Name, nic.GetIPProperties().UnicastAddresses
+                    .Where(u => !u.Address.IsIPv6LinkLocal)
+                    .Select(u => new HostNetwork(u.Address, u.PrefixLength))
+                    .ToList());
+        }
+        catch (NetworkInformationException ex) { log.LogDebug(ex, "Reading the host's addresses failed"); }
+        return result;
     }
 
     public IReadOnlyList<string> ReadBridges() =>

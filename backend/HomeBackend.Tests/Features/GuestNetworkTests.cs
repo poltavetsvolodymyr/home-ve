@@ -1,3 +1,4 @@
+using System.Net;
 using HomeBackend.Features.Vms;
 
 namespace HomeBackend.Tests.Features;
@@ -66,4 +67,37 @@ public class GuestNetworkTests
         Assert.Equal(32, addresses!.Count);
         Assert.Equal("10.1.0.1", addresses[0].Address);
     }
+
+    [Fact]
+    public void Addresses_in_the_hosts_network_come_first()
+    {
+        GuestAddress[] addresses =
+        [
+            new("docker0", "172.17.0.1", 16),
+            new("br0", "192.168.178.119", 24),
+            new("br0", "2a02:8109:1234::5", 64),
+        ];
+        HostNetwork[] host = [new(IPAddress.Parse("192.168.178.2"), 24), new(IPAddress.Parse("2a02:8109:1234::2"), 64)];
+
+        Assert.Equal(
+            ["192.168.178.119", "2a02:8109:1234::5", "172.17.0.1"],
+            GuestNetwork.Prefer(addresses, host).Select(a => a.Address));
+    }
+
+    [Fact]
+    public void Without_a_host_address_on_the_bridge_the_order_stays() =>
+        Assert.Equal(["172.17.0.1", "10.0.0.5"],
+            GuestNetwork.Prefer([new("docker0", "172.17.0.1", 16), new("eth0", "10.0.0.5", 8)], []).Select(a => a.Address));
+
+    [Theory]
+    [InlineData("192.168.178.2", 24, "192.168.178.250", true)]
+    [InlineData("192.168.178.2", 24, "192.168.179.1", false)]
+    [InlineData("10.20.0.1", 13, "10.23.255.255", true)]
+    [InlineData("10.20.0.1", 13, "10.24.0.0", false)]
+    [InlineData("10.0.0.1", 0, "8.8.8.8", true)]
+    [InlineData("192.168.178.2", 24, "fd00::1", false)]
+    [InlineData("fd00:1:2:3::1", 64, "fd00:1:2:3:abcd::9", true)]
+    [InlineData("fd00:1:2:3::1", 64, "fd00:1:2:4::9", false)]
+    public void Host_network_contains(string host, int prefix, string address, bool expected) =>
+        Assert.Equal(expected, new HostNetwork(IPAddress.Parse(host), prefix).Contains(IPAddress.Parse(address)));
 }

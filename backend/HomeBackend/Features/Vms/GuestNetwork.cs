@@ -7,6 +7,25 @@ namespace HomeBackend.Features.Vms;
 /// <summary>An address the guest has on one of its network interfaces, e.g. 192.168.178.119/24 on br0.</summary>
 public sealed record GuestAddress(string Interface, string Address, int Prefix);
 
+/// <summary>A network the host itself is on, e.g. 192.168.178.2/24 on br0.</summary>
+public readonly record struct HostNetwork(IPAddress Address, int Prefix)
+{
+    public bool Contains(IPAddress address)
+    {
+        if (address.AddressFamily != Address.AddressFamily) return false;
+        var a = address.GetAddressBytes();
+        var n = Address.GetAddressBytes();
+        // whole bytes of the prefix, then the bits left in the next one
+        var bytes = Prefix / 8;
+        for (var i = 0; i < bytes; i++)
+            if (a[i] != n[i]) return false;
+        var bits = Prefix % 8;
+        if (bits == 0) return true;
+        var mask = (byte)(0xFF << (8 - bits));
+        return (a[bytes] & mask) == (n[bytes] & mask);
+    }
+}
+
 /// <summary>
 /// The guest agent's answer to guest-network-get-interfaces, which deploy/vm/vm-guest-net leaves in
 /// /run/vm-guest-net/&lt;name&gt;.json. It comes from inside the guest, so nothing in it is trusted: every
@@ -69,6 +88,16 @@ public static class GuestNetwork
             return found.OrderBy(f => f.V4 ? 0 : 1).Select(f => f.Address).Take(MaxAddresses).ToList();
         }
     }
+
+    /// <summary>
+    /// The addresses in a network the host has on a bridge the VM is plugged into first: those it is reached at
+    /// from the host and the network behind it (the guest's docker0 or VPN aren't). Otherwise as they were:
+    /// IPv4 first, then in the guest's own order.
+    /// </summary>
+    public static IReadOnlyList<GuestAddress> Prefer(IReadOnlyList<GuestAddress> addresses, IReadOnlyList<HostNetwork> networks) =>
+        networks.Count == 0
+            ? addresses
+            : addresses.OrderBy(a => IPAddress.TryParse(a.Address, out var ip) && networks.Any(n => n.Contains(ip)) ? 0 : 1).ToList();
 
     private static bool IsWorthShowing(IPAddress address)
     {

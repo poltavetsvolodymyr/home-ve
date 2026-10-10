@@ -439,7 +439,9 @@ To change the password:
 
 **The VM's addresses** show on its card and on its Summary tab once `qemu-guest-agent` runs in the guest (Debian,
 Ubuntu: `apt install qemu-guest-agent`, it starts by itself; Windows: the guest agent from the virtio-win ISO). The
-host asks it every 15 seconds, so a new address shows up within that. The same agent lets backups freeze the guest's
+host asks it every 15 seconds, so a new address shows up within that. The card shows one: an address in a network the host itself has on
+a bridge the VM is plugged into (the one you reach it at from the host and your LAN, not the guest's docker0 or VPN);
+without such a network, the guest's first IPv4. The Summary tab lists all of them. The same agent lets backups freeze the guest's
 file systems (see Backups), so it is worth installing in every VM.
 
 VMs boot via BIOS (SeaBIOS). Installers support this, but you must install the system in BIOS/MBR mode.

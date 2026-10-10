@@ -84,17 +84,25 @@ public sealed class MockVmHost : IVmHost
         }
     }
 
+    // the host is on br-lan (so the router's address there comes first); br-wan is only a cable for the router
+    public IReadOnlyDictionary<string, IReadOnlyList<HostNetwork>> ReadHostNetworks() =>
+        new Dictionary<string, IReadOnlyList<HostNetwork>>
+        {
+            ["br-lan"] = [new(System.Net.IPAddress.Parse("192.168.178.2"), 24)],
+            ["br-wan"] = [],
+        };
+
     // the router says where it is; the test VM has no guest agent
     public (string Json, DateTimeOffset Written)? ReadGuestNetwork(string name) =>
         name == "router"
             ? ("""
                {"return": [
                  {"name": "lo", "ip-addresses": [{"ip-address-type": "ipv4", "ip-address": "127.0.0.1", "prefix": 8}]},
+                 {"name": "ppp0", "ip-addresses": [{"ip-address-type": "ipv4", "ip-address": "84.150.12.7", "prefix": 32}]},
                  {"name": "br-lan", "hardware-address": "bc:24:11:14:4d:cd", "ip-addresses": [
                    {"ip-address-type": "ipv4", "ip-address": "192.168.178.1", "prefix": 24},
                    {"ip-address-type": "ipv6", "ip-address": "fd00::1", "prefix": 64},
-                   {"ip-address-type": "ipv6", "ip-address": "fe80::be24:11ff:fe14:4dcd", "prefix": 64}]},
-                 {"name": "ppp0", "ip-addresses": [{"ip-address-type": "ipv4", "ip-address": "84.150.12.7", "prefix": 32}]}
+                   {"ip-address-type": "ipv6", "ip-address": "fe80::be24:11ff:fe14:4dcd", "prefix": 64}]}
                ], "id": 1}
                """, DateTimeOffset.UtcNow)
             : null;
