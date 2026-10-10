@@ -84,13 +84,6 @@ create_config() {
     echo "==> creating $CONFIG"
     install -m 0640 -o root -g home-backend "$DEPLOY_DIR/config.example.json" "$CONFIG"
   fi
-  # The password used to be a "PasswordHash" here (until October 2026); now only the web UI's first-run setup sets
-  # it, into /var/lib/home-backend/password. The line goes, and with it a comma it may leave before a "}".
-  if grep -q '"PasswordHash"' "$CONFIG"; then
-    echo "==> the web UI password is no longer kept in $CONFIG: set it again on the next visit (with the setup code)"
-    sed -i '/"PasswordHash"/d' "$CONFIG"
-    sed -i -z -E 's/,(\s*\n\s*\})/\1/g' "$CONFIG"
-  fi
 }
 
 # What runs now, for the web UI (Settings → Update): v0.1.0, or v0.1.0-3-gabc1234 for 3 commits after it.
