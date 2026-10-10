@@ -52,21 +52,21 @@ On a phone (390 px wide), with the mock data the backend serves in development.
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="docs/screenshots/vms.jpg" alt="The VM list"><br><sub>VMs</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/vm-summary.jpg" alt="A VM's summary: load, IP addresses, hardware"><br><sub>A VM</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/vm-console.jpg" alt="A VM's console with the key panel"><br><sub>Console</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/vm-settings.jpg" alt="A VM's settings: CPUs, memory, autostart, backup, CD drive, network cards"><br><sub>VM settings</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/vms.jpg" alt="The VM list"><br><sub>VMs</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/vm-summary.jpg" alt="A VM's summary: load, IP addresses, hardware"><br><sub>VM</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/vm-console.jpg" alt="A VM's console with the key panel"><br><sub>Console</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/vm-settings.jpg" alt="A VM's settings: CPUs, memory, autostart, backup, CD drive, network cards"><br><sub>Settings</sub></td>
   </tr>
   <tr>
-    <td align="center" width="25%"><img src="docs/screenshots/vm-backups.jpg" alt="A VM's backups: back up now, restore, delete"><br><sub>Backups</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/vm-logs.jpg" alt="A VM's log from the journal"><br><sub>The VM's log</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/new-vm.jpg" alt="The New VM form"><br><sub>New VM</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/isos.jpg" alt="ISO images: download by URL, the list with sizes"><br><sub>ISO images</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/vm-backups.jpg" alt="A VM's backups: back up now, restore, delete"><br><sub>Backups</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/vm-logs.jpg" alt="A VM's log from the journal"><br><sub>Log</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/new-vm.jpg" alt="The New VM form"><br><sub>New VM</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/isos.jpg" alt="ISO images: download by URL, the list with sizes"><br><sub>ISOs</sub></td>
   </tr>
   <tr>
-    <td align="center" width="25%"><img src="docs/screenshots/host.jpg" alt="Host status"><br><sub>Host</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/settings.jpg" alt="Settings: update channel and the last update's output, offsite backup"><br><sub>Update and offsite copy</sub></td>
-    <td align="center" width="25%"><img src="docs/screenshots/login.jpg" alt="The sign-in page"><br><sub>Sign in</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/host.jpg" alt="Host status"><br><sub>Host</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/settings.jpg" alt="Settings: update channel and the last update's output, offsite backup"><br><sub>Update</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/login.jpg" alt="The sign-in page"><br><sub>Sign in</sub></td>
   </tr>
 </table>
 
