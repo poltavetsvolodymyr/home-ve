@@ -354,6 +354,20 @@ Open `https://home.example.com`.
   headers; here it passes them through, so the connection is "upgraded" to WebSocket.
 - `proxy_read_timeout 1h`: without it nginx closes the console after 60 seconds of no activity on the screen.
 - A regex `location ~` takes priority over the plain `/api/` prefix, so the console requests go to it.
+- `location /` with `try_files $uri $uri/ /index.html`: a file if there is one, otherwise the app's page, so an address
+  like `/vms/router` opens the app (it is a single-page app: the browser, not nginx, knows its addresses).
+- `location = /index.html` with `Cache-Control: no-cache`: every address of the app ends up here (through the
+  `try_files` above). `no-cache` doesn't mean "don't store it": the browser asks every time whether the page changed
+  (a cheap `304 Not Modified` when it didn't). So after an update it gets the new page, which names the new build's
+  files, and not a stored old one that names files that are gone.
+- `location /assets/` with `try_files $uri =404` and `Cache-Control: public, max-age=31536000, immutable`: the build's
+  JS and CSS have a hash of their content in the name (`index-yng_cktJ.js`), so a name never gets other content and
+  the browser may keep them for a year without asking. A file that is gone (a page opened before an update asks for
+  the old build's) is a 404, not the page: the app then reloads once and gets the new build (`main.tsx`). Without
+  this location the browser got the page's HTML as a script, and "'text/html' is not a valid JavaScript MIME type".
+- An `add_header` in a `location` hides every `add_header` of the `server` block, `tls.conf` included. There are none
+  now; if you add one to `tls.conf` (HSTS, for example), repeat it in the two locations above, or the page and its
+  files go without it. Since `install.sh` rewrites `home.conf`, that is a change to make in the repository.
 - `install.sh` overwrites your own edits to the site on the next update; put certificate settings only in `tls.conf`.
 
 ## Updating
