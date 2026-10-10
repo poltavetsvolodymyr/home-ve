@@ -79,7 +79,10 @@ lvchange -ay -- "$lv"
 set -- -name "$name" -machine q35,accel=kvm -cpu host -smp "$cpus" -m "$memory" \
   -nodefaults -vga std -display "vnc=unix:$run/vnc.sock" \
   -drive "if=none,id=disk0,file=$disk,format=raw,cache=none,aio=native,discard=unmap" \
-  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=disk0,bus=scsi0.0,rotation_rate=1,bootindex=1
+  -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=disk0,bus=scsi0.0,rotation_rate=1,bootindex=1 \
+  -device virtio-balloon-pci,id=balloon0,free-page-reporting=on
+# the balloon only for free page reporting: the guest tells QEMU which pages it freed, and QEMU gives them back
+# to the host. Without it a VM keeps all memory it ever touched (an installer fills it) until it is restarted.
 
 # the CD drive. The ISO directory belongs to home-backend, so the file is opened here (fd 3, which QEMU
 # inherits and reads through /proc/self/fd/3) and what was really opened is checked: a regular file in
