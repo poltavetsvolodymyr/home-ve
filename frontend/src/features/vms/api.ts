@@ -28,6 +28,14 @@ export interface VmConfig {
   backup: boolean
 }
 
+/** An address the guest has, e.g. 192.168.178.119/24 on br0. */
+export interface GuestAddress {
+  /** the guest's name for the interface */
+  interface: string
+  address: string
+  prefix: number
+}
+
 export type VmState = 'running' | 'starting' | 'stopping' | 'stopped' | 'failed'
 
 export interface Vm {
@@ -40,6 +48,8 @@ export interface Vm {
   /** RAM the VM occupies on the host, bytes */
   memoryBytes: number | null
   config: VmConfig
+  /** the guest's addresses, IPv4 first, as its guest agent tells them; null without an agent or when not running */
+  addresses: GuestAddress[] | null
 }
 
 /** shutdown and reboot ask the guest; poweroff pulls the plug */

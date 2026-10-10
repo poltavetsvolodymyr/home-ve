@@ -87,6 +87,18 @@ public sealed class LinuxVmHost(IOptions<HomeBackendOptions> options, ILogger<Li
         return (ProcPid.ParseCpuTicks(stat) / TicksPerSecond, ProcPid.ParseResidentPages(statm) * Environment.SystemPageSize);
     }
 
+    public (string Json, DateTimeOffset Written)? ReadGuestNetwork(string name)
+    {
+        var file = new FileInfo(Path.Combine(GuestNetwork.Dir, name + ".json"));
+        try
+        {
+            // vm-guest-net reads at most 256 KiB of an answer
+            if (!file.Exists || file.Length > 512 * 1024) return null;
+            return (File.ReadAllText(file.FullName), file.LastWriteTimeUtc);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return null; }
+    }
+
     public IReadOnlyList<string> ReadBridges() =>
         Directory.Exists("/sys/class/net")
             ? Directory.EnumerateDirectories("/sys/class/net")

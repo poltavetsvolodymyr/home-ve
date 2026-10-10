@@ -3,6 +3,25 @@ import { Card, Skeleton } from '@/shared/ui'
 import type { Vm } from './api'
 import { VmMeters } from './VmMeters'
 
+/** The guest's addresses, one per line with its interface; they come from the guest agent. */
+function VmAddresses({ vm }: { vm: Vm }) {
+  if (vm.state !== 'running') return '—'
+  if (!vm.addresses) return <span className="muted">unknown: needs qemu-guest-agent in the VM</span>
+  if (vm.addresses.length === 0) return 'none'
+  return (
+    <ul className="vm-addresses">
+      {vm.addresses.map(a => (
+        <li key={`${a.interface} ${a.address}`}>
+          <span className="mono">{a.address}</span>
+          <span className="muted">
+            /{a.prefix} · {a.interface}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** Load and the hardware the VM was given. */
 export function VmSummary({ vm }: { vm?: Vm }) {
   const c = vm?.config
@@ -13,6 +32,8 @@ export function VmSummary({ vm }: { vm?: Vm }) {
         <dl className="kv vm-uptime">
           <dt>Up</dt>
           <dd>{vm ? vm.state === 'running' ? since(vm.since) : '—' : <Skeleton width="4em" />}</dd>
+          <dt>Addresses</dt>
+          <dd>{vm ? <VmAddresses vm={vm} /> : <Skeleton width="8em" />}</dd>
         </dl>
       </Card>
       <Card title="Hardware">

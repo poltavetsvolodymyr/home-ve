@@ -1,0 +1,108 @@
+#!/bin/bash
+# vm-guest-net: every 15 s asks the guest agent (qemu-guest-agent) of each running VM for its network
+# interfaces and leaves the answer in /run/vm-guest-net/<name>.json, where the web UI reads the VM's
+# addresses from. vm-guest-net.service runs it as root.
+#
+# Why not the web UI itself: whoever holds a VM's agent socket can run any command in the guest as root
+# (guest-exec). The web UI only gets this one answer, as a file it may read. The answer is the guest's word,
+# so the web UI checks every address in it before showing it.
+#
+# A VM without an agent (or whose agent isn't up yet) gets no file: nothing is shown for it.
+set -u
+
+OUT=/run/vm-guest-net
+INTERVAL=15
+WAIT=10     # seconds an agent has to answer
+LATE=60     # then up to this long more for a late answer, before the connection is closed
+QUIET=300   # and its VM isn't asked again for this long
+MAX=262144  # bytes of an answer read at most: a guest could send endless data
+
+install -d -m 0750 -g home-backend -- "$OUT"
+declare -A quiet_until # VM -> $SECONDS before which it isn't asked
+seq=$EPOCHSECONDS      # numbers the questions (the agent puts the number into its answer)
+
+# ask <name>: puts the agent's answer into $reply, or leaves it empty (no agent, no answer in time)
+ask() {
+  local name=$1 sock=/run/vm-$1/qga.sock line re deadline left
+  reply=''
+  [ -S "$sock" ] || return 0
+  # whether the guest has opened its end of the channel (QMP query-chardev: "frontend-open"), i.e. an agent
+  # is listening; without one nothing is sent, so nothing waits for an answer that never comes
+  qmp "$name" query-chardev 2>/dev/null | grep -o '{[^{}]*"label": "qga"[^{}]*}' | grep -q '"frontend-open": true' ||
+    return 0
+
+  # socat in the background (coproc): QGA[1] writes to the agent, QGA[0] reads its answers
+  coproc QGA { exec socat - "UNIX-CONNECT:$sock" 2>/dev/null; }
+  seq=$((seq + 1))
+  re="\"id\": *${seq}[^0-9]" # "id": 12 is not "id": 1
+  # a socat that just died must not kill the script with SIGPIPE
+  trap '' PIPE
+  printf '{"execute":"guest-network-get-interfaces","id":%d}\n' "$seq" 1>&"${QGA[1]}" 2>/dev/null
+  trap - PIPE
+
+  # Lines that don't carry this number are skipped: left over from an earlier connection. A line longer
+  # than MAX comes in pieces, none of which matches.
+  local late=no rc
+  deadline=$((SECONDS + WAIT))
+  while [ -n "${QGA[0]:-}" ]; do
+    left=$((deadline - SECONDS))
+    if [ "$left" -le 0 ]; then
+      [ "$late" = no ] || break
+      # Closing now would leave the answer on its way with nowhere to go, and qemu-ga then spins on a
+      # CPU of the guest until restarted: wait for it a while longer, and leave this VM alone for a bit.
+      echo "$name: the guest agent didn't answer within $WAIT s"
+      quiet_until[$name]=$((SECONDS + QUIET))
+      late=yes
+      deadline=$((SECONDS + LATE))
+      continue
+    fi
+    rc=0
+    IFS= read -r -n "$MAX" -t "$left" line <&"${QGA[0]}" || rc=$?
+    [ "$rc" -gt 128 ] && continue # timed out: the check above decides
+    [ "$rc" -eq 0 ] || break      # socat gone
+    if [[ $line =~ $re ]]; then
+      reply=$line
+      break
+    fi
+  done
+
+  # closing its input ends socat (and the connection)
+  if [ -n "${QGA[1]:-}" ]; then eval "exec ${QGA[1]}>&-"; fi
+  wait "$QGA_PID" 2>/dev/null || true
+}
+
+while :; do
+  running=()
+  # vm@<name>.service units that run; the names are checked as everywhere (deploy/vm/vm-run)
+  while read -r unit _; do
+    name=${unit#vm@}
+    name=${name%.service}
+    printf '%s\n' "$name" | grep -Eqx '[a-z][a-z0-9-]{0,11}' && running+=("$name")
+  done < <(systemctl list-units --no-legend --plain --state=running 'vm@*.service')
+
+  for name in "${running[@]}"; do
+    file=$OUT/$name.json
+    [ "${quiet_until[$name]:-0}" -le "$SECONDS" ] || continue
+    # during a backup the agent is busy with it (and refuses most commands while the guest is frozen):
+    # keep what was read before
+    [ "$(systemctl show -P ActiveState "vm-backup@$name.service")" = activating ] && continue
+    ask "$name"
+    # only real answers ({"return": ...}); an error (the command blocked in the guest) counts as none
+    if [[ $reply == *'"return"'* ]]; then
+      printf '%s\n' "$reply" >"$file.tmp" && chgrp home-backend "$file.tmp" && chmod 0640 "$file.tmp" &&
+        mv -f -- "$file.tmp" "$file"
+    else
+      rm -f -- "$file"
+    fi
+  done
+
+  # files of VMs that don't run (any more)
+  for file in "$OUT"/*.json; do
+    [ -e "$file" ] || continue
+    name=${file##*/}
+    name=${name%.json}
+    [[ " ${running[*]} " == *" $name "* ]] || rm -f -- "$file"
+  done
+
+  sleep "$INTERVAL"
+done

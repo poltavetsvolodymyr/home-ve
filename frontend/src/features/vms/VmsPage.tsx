@@ -57,7 +57,15 @@ function VmCard({ vm }: { vm?: Vm }) {
       <div className="vm-card-foot muted">
         {vm ? (
           <>
-            <span>{vm.config.nets.map(n => n.bridge).join(', ') || 'no network'}</span>
+            {/* where to reach it, once its guest agent tells; until then the bridges it is plugged into */}
+            {vm.state === 'running' && vm.addresses?.length ? (
+              <span className="mono">
+                {vm.addresses[0].address}
+                {vm.addresses.length > 1 && <span className="muted"> +{vm.addresses.length - 1}</span>}
+              </span>
+            ) : (
+              <span>{vm.config.nets.map(n => n.bridge).join(', ') || 'no network'}</span>
+            )}
             <span>{vm.state === 'running' ? `up ${since(vm.since)}` : vm.config.disk}</span>
           </>
         ) : (

@@ -25,6 +25,12 @@ public interface IVmHost
     /// <summary>CPU time used so far (seconds) and resident memory (bytes) of a process; null when it's gone.</summary>
     (double CpuSeconds, long RssBytes)? ReadProcess(int pid);
 
+    /// <summary>
+    /// What the VM's guest agent last said about its network (<see cref="GuestNetwork"/>) and when; null when
+    /// there is nothing (no agent, VM not running).
+    /// </summary>
+    (string Json, DateTimeOffset Written)? ReadGuestNetwork(string name);
+
     /// <summary>Bridges a VM's network card can be plugged into.</summary>
     IReadOnlyList<string> ReadBridges();
 }

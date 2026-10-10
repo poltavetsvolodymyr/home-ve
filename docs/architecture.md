@@ -46,6 +46,7 @@ The backend has to manage VMs without being root. So permissions are granted nar
 | ISO images | the folder `/var/lib/home-backend/iso` belongs to the backend; it downloads files there from a URL itself | slipping a host file to a VM: `vm-run` opens the ISO itself and checks the opened file (see below) |
 | VM settings | `/etc/vm` is owned by `root:home-backend` with mode 0775, the unit has `ReadWritePaths=/etc/vm` | writing anywhere else: `ProtectSystem=strict` |
 | console | after the VM starts, `vnc.sock` gets the group `home-backend` and mode 0660 (`ExecStartPost` in `vm@.service`) | `qmp.sock`, `qga.sock`, `console.sock`: 0600, root only. QMP can do almost anything, up to reading host files |
+| VM addresses | `vm-guest-net.service` (root) asks each running VM's guest agent `guest-network-get-interfaces` every 15 s and leaves the answer in `/run/vm-guest-net/<name>.json` (root:home-backend, 0640). The backend checks every address in it before showing it (`GuestNetwork.cs`): it is the guest's word | `qga.sock` itself: whoever holds it can run commands in the guest as root (`guest-exec`) |
 | VM log | the group `systemd-journal` | — |
 
 **The `.conf` is written by the unprivileged backend and read by root.** So `vm-run` does not execute the file

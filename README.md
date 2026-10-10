@@ -36,7 +36,8 @@ as many VMs as its CPU, memory and disks allow, and it grows by adding disks to 
 
 - host status: CPU, temperature, memory, disk;
 - VMs: create (installation from an ISO through the console in the browser), start, shut down, reboot, power off,
-  delete with or without the disk; cores, memory, network cards, CD drive, autostart; the VM's log;
+  delete with or without the disk; cores, memory, network cards, CD drive, autostart; the VM's log; its IP addresses
+  (from qemu-guest-agent in the guest);
 - ISO images downloaded by the host from a URL;
 - backups: nightly and on demand, restore, undo a restore;
 - optional encrypted offsite copy of the backups (rclone to Cloudflare R2);

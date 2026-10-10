@@ -170,16 +170,19 @@ install_vm_tools() {
   install -m 0755 "$DEPLOY_DIR/vm/vm-run" "$DEPLOY_DIR/vm/qmp" "$DEPLOY_DIR/vm/vm-autostart" \
     "$DEPLOY_DIR/vm/vm-disk-remove" "$DEPLOY_DIR/vm/vm-stop" \
     "$DEPLOY_DIR/vm/vm-backup" "$DEPLOY_DIR/vm/vm-restore" "$DEPLOY_DIR/vm/vm-backup-delete" "$DEPLOY_DIR/vm/vm-backup-all" \
-    /usr/local/sbin/
+    "$DEPLOY_DIR/vm/vm-guest-net" /usr/local/sbin/
   install -m 0644 "$DEPLOY_DIR/vm/vm@.service" "$DEPLOY_DIR/vm/vm-autostart.service" \
     "$DEPLOY_DIR/vm/vm-disk-remove@.service" "$DEPLOY_DIR/vm/vm-backup@.service" "$DEPLOY_DIR/vm/vm-restore@.service" \
     "$DEPLOY_DIR/vm/vm-backup-delete@.service" "$DEPLOY_DIR/vm/vm-backup-all.service" "$DEPLOY_DIR/vm/vm-backup-all.timer" \
-    /etc/systemd/system/
+    "$DEPLOY_DIR/vm/vm-guest-net.service" /etc/systemd/system/
   install -m 0644 "$DEPLOY_DIR/vm/50-home-backend.rules" /etc/polkit-1/rules.d/
   # the backend writes the VM settings (temp file + rename, so it needs the directory)
   install -d -m 0775 -o root -g home-backend "$VM_DIR"
   systemctl daemon-reload
   systemctl enable vm-autostart.service
+  # the VMs' addresses for the web UI; restarted so an update's new script takes over
+  systemctl enable vm-guest-net.service
+  systemctl restart vm-guest-net.service
   # nightly backups, only once the backup volume is there (docs/deployment.md: "Backups")
   if mountpoint -q /var/backups/vm; then
     install -d -m 0750 -g home-backend /var/backups/vm

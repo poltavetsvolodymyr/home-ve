@@ -10,7 +10,10 @@ public sealed record VmUnitState(string ActiveState, string SubState, DateTimeOf
 /// <param name="State">running, starting, stopping, stopped or failed.</param>
 /// <param name="CpuPercent">Share of the VM's own CPUs in use, 0–100; null when not running or not measured yet.</param>
 /// <param name="MemoryBytes">RAM the VM really occupies on the host (QEMU's resident memory).</param>
-public sealed record VmInfo(string Name, string State, DateTimeOffset? Since, double? CpuPercent, long? MemoryBytes, VmConfig Config);
+/// <param name="Addresses">The guest's own network addresses, as its guest agent tells them; null when running
+/// without an agent (or not running).</param>
+public sealed record VmInfo(string Name, string State, DateTimeOffset? Since, double? CpuPercent, long? MemoryBytes, VmConfig Config,
+    IReadOnlyList<GuestAddress>? Addresses = null);
 
 /// <summary>Buttons on a VM's page. Shutdown and reboot ask the guest; poweroff pulls the plug.</summary>
 public enum VmAction { Start, Shutdown, Reboot, Poweroff }

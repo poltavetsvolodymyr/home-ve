@@ -39,6 +39,15 @@
 .vm-uptime {
   margin-top: 14px;
 }
+.vm-addresses {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* a long IPv6 address may break anywhere rather than widen the card */
+.vm-addresses .mono {
+  overflow-wrap: anywhere;
+}
 
 .back-link {
   display: inline-flex;

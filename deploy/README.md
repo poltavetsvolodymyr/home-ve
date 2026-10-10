@@ -17,6 +17,7 @@ Details: `docs/deployment.md` in the repository on GitHub (the host's sparse che
 | `vm/vm-backup-all`, `.service`, `.timer` | every night backs up all VMs without `BACKUP=no` |
 | `vm/vm-restore`, `vm/vm-restore@.service` | writes a backup back to the disk of a stopped VM (the old disk is kept as the snapshot `<name>-undo`) |
 | `vm/vm-backup-delete`, `vm/vm-backup-delete@.service` | deletes one backup |
+| `vm/vm-guest-net`, `vm/vm-guest-net.service` | every 15 s reads the running VMs' addresses from their guest agents into `/run/vm-guest-net/` for the web UI |
 | `offsite/vm-offsite`, `offsite/vm-offsite.service` | encrypted upload of backups and host settings to R2 (setup: docs/deployment.md) |
 | `offsite/offsite.conf.example` | upload limits; installed into `/etc/vm-offsite/` |
 | `vm/qmp` | sends one command to a VM's control socket: `qmp router system_powerdown` |

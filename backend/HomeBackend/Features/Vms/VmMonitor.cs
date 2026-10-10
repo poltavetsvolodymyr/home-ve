@@ -10,6 +10,8 @@ public sealed class VmMonitor(IVmHost host, ILogger<VmMonitor> log) : Background
 
     private readonly SemaphoreSlim _refreshing = new(1, 1);
     private readonly Dictionary<int, (double CpuSeconds, DateTimeOffset At)> _lastCpu = [];
+    // the guest agent's answer is rewritten every 15 s: parsed again only when it changed
+    private readonly Dictionary<string, (DateTimeOffset Written, IReadOnlyList<GuestAddress>? Addresses)> _addresses = [];
     private volatile IReadOnlyList<VmInfo> _current = [];
 
     public IReadOnlyList<VmInfo> Current => _current;
@@ -49,6 +51,8 @@ public sealed class VmMonitor(IVmHost host, ILogger<VmMonitor> log) : Background
             {
                 double? cpu = null;
                 long? memory = null;
+                IReadOnlyList<GuestAddress>? addresses = null;
+                if (unit.ActiveState == "active") addresses = Addresses(config.Name, now);
                 if (unit.ActiveState == "active" && unit.MainPid is { } pid && host.ReadProcess(pid) is { } p)
                 {
                     seen.Add(pid);
@@ -57,15 +61,25 @@ public sealed class VmMonitor(IVmHost host, ILogger<VmMonitor> log) : Background
                         cpu = Math.Clamp((p.CpuSeconds - last.CpuSeconds) / (now - last.At).TotalSeconds / config.Cpus * 100, 0, 100);
                     _lastCpu[pid] = (p.CpuSeconds, now);
                 }
-                return new VmInfo(config.Name, SystemctlVmUnits.StateOf(unit), unit.Since, cpu, memory, config);
+                return new VmInfo(config.Name, SystemctlVmUnits.StateOf(unit), unit.Since, cpu, memory, config, addresses);
             }).ToList();
 
             // forget processes that are gone, so a reused PID doesn't inherit an old sample
             foreach (var pid in _lastCpu.Keys.Where(k => !seen.Contains(k)).ToList()) _lastCpu.Remove(pid);
+            foreach (var name in _addresses.Keys.Where(n => !configs.Any(c => c.Name == n)).ToList()) _addresses.Remove(name);
         }
         finally
         {
             _refreshing.Release();
         }
+    }
+
+    private IReadOnlyList<GuestAddress>? Addresses(string name, DateTimeOffset now)
+    {
+        if (host.ReadGuestNetwork(name) is not { } answer || now - answer.Written > GuestNetwork.MaxAge) return null;
+        if (_addresses.TryGetValue(name, out var known) && known.Written == answer.Written) return known.Addresses;
+        var addresses = GuestNetwork.Parse(answer.Json);
+        _addresses[name] = (answer.Written, addresses);
+        return addresses;
     }
 }

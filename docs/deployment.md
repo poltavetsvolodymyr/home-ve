@@ -437,6 +437,11 @@ To change the password:
    as data is written. An empty disk is not bootable, so the BIOS boots from the CD. After installation the disk boots, so you
    can leave the ISO in place or remove it in Settings → CD drive.
 
+**The VM's addresses** show on its card and on its Summary tab once `qemu-guest-agent` runs in the guest (Debian,
+Ubuntu: `apt install qemu-guest-agent`, it starts by itself; Windows: the guest agent from the virtio-win ISO). The
+host asks it every 15 seconds, so a new address shows up within that. The same agent lets backups freeze the guest's
+file systems (see Backups), so it is worth installing in every VM.
+
 VMs boot via BIOS (SeaBIOS). Installers support this, but you must install the system in BIOS/MBR mode.
 
 **Deleting**: VM → Settings → Delete VM, only when the VM is stopped. Without the checkbox only the `.conf` is deleted; the disk stays,

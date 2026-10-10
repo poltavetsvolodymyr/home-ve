@@ -1,0 +1,14 @@
+# Reads the running VMs' network addresses from their guest agents for the web UI (deploy/vm/vm-guest-net).
+[Unit]
+Description=Read the VMs' network addresses from their guest agents
+
+[Service]
+Type=exec
+ExecStart=/usr/local/sbin/vm-guest-net
+# just try again if it dies
+Restart=always
+RestartSec=10
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
