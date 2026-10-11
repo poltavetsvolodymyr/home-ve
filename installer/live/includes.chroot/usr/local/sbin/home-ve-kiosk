@@ -2,7 +2,7 @@
 # home-ve-kiosk.service on tty1, as the user "kiosk": the installer's page full screen on the machine's own
 # screen (cage: a compositor for a single window; cog: a WebKit browser). The page knows it is on the machine
 # (http://127.0.0.1) and needs no code. -s keeps Ctrl+Alt+F2 (the root shell) working.
-# Without graphics, or should cage stop: the address and the code as text, redrawn as the network changes.
+# Without graphics, or should cage stop for good: the address and the code as text, redrawn as the network changes.
 
 # the page's service starts at the same time: give it a few seconds
 i=0
@@ -11,9 +11,13 @@ while [ $i -lt 30 ] && ! curl -fs -o /dev/null http://127.0.0.1/; do
   i=$((i + 1))
 done
 
-if ls /dev/dri/card* >/dev/null 2>&1; then
+# a few tries: one that fails (the graphics not quite ready yet) must not leave the screen in text for good
+tries=0
+while [ $tries -lt 3 ] && ls /dev/dri/card* >/dev/null 2>&1; do
   cage -s -- cog http://127.0.0.1/
-fi
+  tries=$((tries + 1))
+  sleep 2
+done
 
 while :; do
   clear

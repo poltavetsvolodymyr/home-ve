@@ -19,6 +19,10 @@ StandardError=journal
 UtmpIdentifier=tty1
 UtmpMode=user
 Environment=TERM=linux
+# most servers and every VM have no 3D graphics: cage draws with the CPU (mesa) only when told it may
+Environment=WLR_RENDERER_ALLOW_SOFTWARE=1
+# WebKit's sandbox (bubblewrap) doesn't start in a service; the browser only ever shows our own page from 127.0.0.1
+Environment=WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1
 ExecStart=/usr/local/sbin/home-ve-kiosk
 Restart=always
 RestartSec=2
