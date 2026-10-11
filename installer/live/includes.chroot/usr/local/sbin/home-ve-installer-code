@@ -22,3 +22,9 @@ cat >/etc/issue.d/home-ve-installer.issue <<EOT
   Ctrl+Alt+F2: a root shell, to do things by hand.
 
 EOT
+# and to the serial port, where a machine has one: the screen of a server without one, and of the test in CI
+# (.github/test-installer.sh). Whoever reads it there is at the machine too.
+if [ -c /dev/ttyS0 ]; then
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  timeout 5 sh -c 'printf "home-ve installer code: %s\r\n" "$(cat "$1")" >/dev/ttyS0' sh "$code" 2>/dev/null || true
+fi

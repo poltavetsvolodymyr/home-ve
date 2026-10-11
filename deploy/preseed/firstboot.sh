@@ -3,9 +3,13 @@
 #   1. the backup volume: a quarter of the volume group "home" (at most half of what is free), ext4, mounted at
 #      /var/backups/vm (docs/deployment.md "Backups");
 #   2. the thin pool "data": 90% of what is left, the rest a reserve (docs/deployment.md "The data thin pool");
+#      the home-ve installer image (home-ve-install) makes both itself, as sized on its page: with the pool there,
+#      neither is touched (a backup volume of 0 GB stays none);
 #   3. install.sh; once it went through, the service disables itself. If it didn't (no network?), the next boot
 #      tries again, or run this by hand: /opt/home-ve/deploy/preseed/firstboot.sh
-#   4. on the host's screen, with the login prompt: the setup code, next to the web UI's address. The login prompt
+#   4. the web UI's password, when the installer image's page set one (/root/home-ve-web-password, its hash):
+#      it becomes the backend's, and there is no first-run setup;
+#   5. otherwise, on the host's screen, with the login prompt: the setup code, next to the web UI's address. The login prompt
 #      clears the screen before it draws, so the code goes where it draws from: /etc/issue.d, in a file only root
 #      reads (agetty, which draws it, runs as root). Not to the output: that goes to the journal as well.
 # Each step is skipped when its result is already there, so running it again is safe.
@@ -13,7 +17,9 @@ set -euo pipefail
 
 VG=home
 
-if vgs "$VG" &>/dev/null; then
+if lvs "$VG/data" &>/dev/null; then
+  :
+elif vgs "$VG" &>/dev/null; then
   if ! lvs "$VG/backups" &>/dev/null; then
     read -r size free < <(vgs --noheadings --units m --nosuffix -o vg_size,vg_free "$VG")
     size=${size%.*} free=${free%.*}
@@ -37,6 +43,15 @@ fi
 
 /opt/home-ve/deploy/install.sh
 systemctl disable home-ve-firstboot.service
+
+web=/root/home-ve-web-password
+if [[ -s $web ]]; then
+  echo "==> the web UI's password, as set in the installer"
+  install -o home-backend -g home-backend -m 0600 "$web" /var/lib/home-backend/password
+  rm -f -- "$web" /var/lib/home-backend/setup-code /etc/issue.d/home-ve.setup.issue
+  systemctl restart home-backend.service
+  exit 0
+fi
 
 code=/var/lib/home-backend/setup-code
 if [[ -s $code ]]; then

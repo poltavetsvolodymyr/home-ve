@@ -1,0 +1,194 @@
+#!/bin/bash
+# home-ve-install <settings> <secrets>: installs a home-ve host onto a disk, from the installer image. The
+# installer's page (home-backend installer) writes both files into /run/home-ve-installer and starts this as the
+# unit home-ve-install; it reads the progress from the lines starting with "==> [n/N]".
+#   <settings>  KEY=value per line, checked by the page: DISK ROOT_GB SWAP_GB BACKUP_GB HOSTNAME TIMEZONE NIC NET
+#               (dhcp or static) ADDRESS GATEWAY DNS USER CHANNEL (stable or dev)
+#   <secrets>   ROOT_PASSWORD USER_PASSWORD WEB_PASSWORD_HASH, readable by root only, deleted when read
+# The disk, as docs/deployment.md lays a host out by hand:
+#   GPT: a BIOS boot partition and an EFI system partition (the disk boots with either firmware's loader), /boot,
+#   then LVM in the group "home": root, swap, backups (mounted at /var/backups/vm), the thin pool "data" (90% of
+#   the rest). Debian 13 from deb.debian.org (mmdebstrap), the boot loader for the firmware this machine runs
+#   (UEFI with Debian's signed shim, or BIOS), the bridge br0 on the chosen card, and home-ve: the checkout in
+#   /opt/home-ve, whose first boot runs install.sh (deploy/preseed/firstboot.sh) and sets the web UI's password.
+# Everything on the disk is erased.
+set -euo pipefail
+
+STEPS=8
+step=0
+say() {
+  step=$((step + 1))
+  echo "==> [$step/$STEPS] $*"
+}
+die() {
+  echo "home-ve-install: $*" >&2
+  exit 1
+}
+
+settings=${1:?usage: home-ve-install <settings> <secrets>}
+secrets=${2:?usage: home-ve-install <settings> <secrets>}
+
+# KEY=value, never sourced: the values come from a web page. Split at the first "=" by hand: read with IFS="="
+# would drop a password's trailing "="
+declare -A s secret
+while IFS= read -r line; do
+  k=${line%%=*}
+  [[ $line == *=* && $k =~ ^[A-Z_]+$ ]] && s[$k]=${line#*=}
+done <"$settings"
+while IFS= read -r line; do
+  k=${line%%=*}
+  [[ $line == *=* && $k =~ ^[A-Z_]+$ ]] && secret[$k]=${line#*=}
+done <"$secrets"
+rm -f -- "$secrets"
+
+disk=${s[DISK]:-}
+[[ $disk =~ ^/dev/[a-z0-9]+$ && -b $disk ]] || die "no disk '$disk'"
+[[ "$(lsblk -dno TYPE "$disk")" == disk ]] || die "$disk is not a whole disk"
+if lsblk -nro MOUNTPOINTS "$disk" | grep -q .; then die "something on $disk is mounted (the installer's own stick?)"; fi
+for k in ROOT_GB SWAP_GB BACKUP_GB; do [[ ${s[$k]:-} =~ ^[0-9]+$ ]] || die "bad $k"; done
+[[ ${s[HOSTNAME]:-} =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || die "bad HOSTNAME"
+[[ -f /usr/share/zoneinfo/${s[TIMEZONE]:-} && ${s[TIMEZONE]} != *..* ]] || die "bad TIMEZONE"
+[[ ${s[NIC]:-} =~ ^[a-zA-Z0-9_.-]+$ && -e /sys/class/net/${s[NIC]} ]] || die "no card '${s[NIC]:-}'"
+[[ ${s[USER]:-} =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "bad USER"
+[[ ${s[CHANNEL]:-} == stable || ${s[CHANNEL]:-} == dev ]] || die "bad CHANNEL"
+[[ -n ${secret[ROOT_PASSWORD]:-} && -n ${secret[USER_PASSWORD]:-} && ${secret[WEB_PASSWORD_HASH]:-} == pbkdf2-sha256\$* ]] ||
+  die "passwords missing"
+
+# nvme0n1 -> nvme0n1p1, sda -> sda1
+part() { if [[ $disk =~ [0-9]$ ]]; then echo "${disk}p$1"; else echo "$disk$1"; fi; }
+T=/target
+uefi=no
+[[ -d /sys/firmware/efi ]] && uefi=yes
+
+cleanup() {
+  for m in "$T/dev/pts" "$T/dev" "$T/proc" "$T/sys/firmware/efi/efivars" "$T/sys" "$T/run" "$T/boot/efi" "$T/boot" "$T"; do
+    mountpoint -q "$m" && umount -l "$m"
+  done
+  true
+}
+trap cleanup EXIT
+
+say "erasing $disk"
+cleanup
+# volume groups on it from before, then every signature and the partition table
+for vg in $(pvs --noheadings -o vg_name,pv_name 2>/dev/null | awk -v d="$disk" 'index($2, d) == 1 { print $1 }' | sort -u); do
+  vgchange -q -an "$vg" || true
+done
+for p in $(lsblk -nlpo NAME "$disk" | tail -n +2); do wipefs -q -a "$p" || true; done
+wipefs -q -a "$disk"
+sgdisk --zap-all "$disk" >/dev/null
+
+say "partitioning $disk"
+sgdisk -n 1:0:+1M -t 1:ef02 -c 1:bios \
+  -n 2:0:+512M -t 2:ef00 -c 2:efi \
+  -n 3:0:+1G -t 3:8300 -c 3:boot \
+  -n 4:0:0 -t 4:8e00 -c 4:lvm "$disk" >/dev/null
+partprobe "$disk" || true
+udevadm settle
+
+say "LVM: root ${s[ROOT_GB]} GB, swap ${s[SWAP_GB]} GB, backups ${s[BACKUP_GB]} GB, the rest for the VMs"
+pvcreate -q -ff -y "$(part 4)"
+vgcreate -q home "$(part 4)"
+lvcreate -q -y -L "${s[ROOT_GB]}g" -n root home
+if ((s[SWAP_GB] > 0)); then lvcreate -q -y -L "${s[SWAP_GB]}g" -n swap home; fi
+if ((s[BACKUP_GB] > 0)); then lvcreate -q -y -L "${s[BACKUP_GB]}g" -n backups home; fi
+lvcreate -q -y --type thin-pool -l 90%FREE -n data home
+mkfs.vfat -F 32 -n EFI "$(part 2)" >/dev/null
+mkfs.ext4 -q -F -L boot "$(part 3)"
+mkfs.ext4 -q -F -L root /dev/home/root
+if ((s[SWAP_GB] > 0)); then mkswap -q /dev/home/swap; fi
+if ((s[BACKUP_GB] > 0)); then mkfs.ext4 -q -F -L backups /dev/home/backups; fi
+
+say "Debian 13 from deb.debian.org (the longest step)"
+mkdir -p "$T"
+mount /dev/home/root "$T"
+rmdir "$T/lost+found"
+# with Debian's security and point-release updates, which the system keeps in its sources.list
+mmdebstrap --variant=important \
+  --include=systemd-resolved,systemd-timesyncd,lvm2,thin-provisioning-tools,openssh-server,sudo,git,curl,ca-certificates,zstd,dbus,less,nano,iproute2,iputils-ping,initramfs-tools,firmware-linux-free \
+  trixie "$T" \
+  "deb http://deb.debian.org/debian trixie main non-free-firmware" \
+  "deb http://deb.debian.org/debian trixie-updates main non-free-firmware" \
+  "deb http://security.debian.org/debian-security trixie-security main non-free-firmware"
+mkdir -p "$T/boot"
+mount "$(part 3)" "$T/boot"
+mkdir -p "$T/boot/efi"
+mount "$(part 2)" "$T/boot/efi"
+for m in dev dev/pts proc sys run; do mount --bind "/$m" "$T/$m"; done
+if [[ $uefi == yes ]]; then mount --bind /sys/firmware/efi/efivars "$T/sys/firmware/efi/efivars" || true; fi
+in() { chroot "$T" env DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8 "$@"; }
+
+say "the system's settings: disks, name, time zone, network, users"
+uuid() { blkid -s UUID -o value "$1"; }
+{
+  echo "# <file system> <mount point> <type> <options> <dump> <pass>"
+  echo "/dev/home/root / ext4 errors=remount-ro 0 1"
+  echo "UUID=$(uuid "$(part 3)") /boot ext4 defaults 0 2"
+  echo "UUID=$(uuid "$(part 2)") /boot/efi vfat umask=0077 0 1"
+  if ((s[SWAP_GB] > 0)); then echo "/dev/home/swap none swap sw 0 0"; fi
+  if ((s[BACKUP_GB] > 0)); then echo "/dev/home/backups /var/backups/vm ext4 defaults,nofail 0 2"; fi
+} >"$T/etc/fstab"
+if ((s[BACKUP_GB] > 0)); then mkdir -p "$T/var/backups/vm"; fi
+echo "${s[HOSTNAME]}" >"$T/etc/hostname"
+printf '127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n' "${s[HOSTNAME]}" >"$T/etc/hosts"
+ln -sf "/usr/share/zoneinfo/${s[TIMEZONE]}" "$T/etc/localtime"
+echo "${s[TIMEZONE]}" >"$T/etc/timezone"
+
+# the bridge br0 on the chosen card (docs/deployment.md "Bridge for VM networking"), by DHCP or a fixed address
+nic=${s[NIC]}
+printf '[NetDev]\nName=br0\nKind=bridge\n' >"$T/etc/systemd/network/10-br0.netdev"
+printf '[Match]\nName=%s\n\n[Network]\nBridge=br0\n' "$nic" >"$T/etc/systemd/network/20-br0-port.network"
+if [[ ${s[NET]:-dhcp} == static ]]; then
+  [[ ${s[ADDRESS]:-} =~ ^[0-9.]+/[0-9]+$ && ${s[GATEWAY]:-} =~ ^[0-9.]+$ ]] || die "bad ADDRESS or GATEWAY"
+  {
+    printf '[Match]\nName=br0\n\n[Network]\nAddress=%s\nGateway=%s\n' "${s[ADDRESS]}" "${s[GATEWAY]}"
+    for d in ${s[DNS]:-}; do [[ $d =~ ^[0-9a-fA-F.:]+$ ]] && printf 'DNS=%s\n' "$d"; done
+  } >"$T/etc/systemd/network/10-br0.network"
+else
+  printf '[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nClientIdentifier=mac\n' >"$T/etc/systemd/network/10-br0.network"
+fi
+in systemctl enable -q systemd-networkd systemd-resolved
+ln -sf ../run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
+
+printf 'root:%s\n' "${secret[ROOT_PASSWORD]}" | in chpasswd
+in useradd -m -s /bin/bash -G sudo "${s[USER]}"
+printf '%s:%s\n' "${s[USER]}" "${secret[USER_PASSWORD]}" | in chpasswd
+
+say "the kernel and the boot loader ($([[ $uefi == yes ]] && echo UEFI || echo BIOS))"
+# while installing, the chroot resolves names through the installer's own DNS
+rm -f "$T/etc/resolv.conf"
+cp /etc/resolv.conf "$T/etc/resolv.conf"
+if [[ $uefi == yes ]]; then
+  in apt-get install -y -q linux-image-amd64 grub-efi-amd64 grub-efi-amd64-signed shim-signed efibootmgr
+  in grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian --uefi-secure-boot
+  # also where firmware looks without a boot entry (a disk moved to another machine)
+  in grub-install --target=x86_64-efi --efi-directory=/boot/efi --uefi-secure-boot --removable --no-nvram
+else
+  id=$(find -L /dev/disk/by-id -samefile "$disk" -name 'ata-*' -o -samefile "$disk" -name 'nvme-*' -o -samefile "$disk" -name 'virtio-*' 2>/dev/null | head -n 1)
+  echo "grub-pc grub-pc/install_devices multiselect ${id:-$disk}" | in debconf-set-selections
+  in apt-get install -y -q linux-image-amd64 grub-pc
+  in grub-install --target=i386-pc "$disk"
+fi
+in update-grub
+
+say "home-ve (${s[CHANNEL]} channel)"
+branch=stable
+[[ ${s[CHANNEL]} == dev ]] && branch=main
+in git clone --quiet --filter=blob:none --sparse --branch "$branch" https://github.com/poltavetsvolodymyr/home-ve.git /opt/home-ve
+in git -C /opt/home-ve sparse-checkout set deploy
+echo "  commit $(in git -C /opt/home-ve rev-parse HEAD)"
+mkdir -p "$T/var/lib/home-backend"
+echo "${s[CHANNEL]}" >"$T/var/lib/home-backend/update-channel"
+# the web UI's password: firstboot.sh hands it to the backend once its user exists
+(
+  umask 077
+  printf '%s\n' "${secret[WEB_PASSWORD_HASH]}" >"$T/root/home-ve-web-password"
+)
+install -m 0644 "$T/opt/home-ve/deploy/preseed/home-ve-firstboot.service" "$T/etc/systemd/system/"
+in systemctl enable -q home-ve-firstboot.service
+
+say "finishing"
+ln -sf ../run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
+sync
+cleanup
+echo "==> done: take the installer's stick out and restart"

@@ -42,6 +42,15 @@ public sealed class InstallerOptions
     /// front of it is at the machine anyway, and the connection doesn't leave it.
     /// </summary>
     public bool TrustLoopback { get; set; } = true;
+
+    /// <summary>Where the install's settings, secrets and log go while it runs (a tmpfs: gone with the live system).</summary>
+    public string RunDir { get; set; } = "/run/home-ve-installer";
+
+    /// <summary>The time zones the page offers, as the installed system has them.</summary>
+    public string ZoneInfoDir { get; set; } = "/usr/share/zoneinfo";
+
+    /// <summary>With <see cref="Mock"/>: how long each made-up install step takes.</summary>
+    public double MockStepSeconds { get; set; } = 2;
 }
 
 public sealed record InstallerSessionRequest(string? Code);
@@ -54,6 +63,8 @@ public sealed record LocalAccess(string Code, IReadOnlyList<string> Urls);
 [JsonSerializable(typeof(InstallerSessionRequest))]
 [JsonSerializable(typeof(Machine))]
 [JsonSerializable(typeof(LocalAccess))]
+[JsonSerializable(typeof(InstallRequest))]
+[JsonSerializable(typeof(InstallStatus))]
 [JsonSerializable(typeof(ErrorResponse))]
 public partial class InstallerJsonContext : JsonSerializerContext;
 
@@ -109,6 +120,11 @@ public static class InstallerHost
         });
         if (options.Mock) builder.Services.AddSingleton<IMachineSource, MockMachineSource>();
         else builder.Services.AddSingleton<IMachineSource, LinuxMachineSource>();
+        builder.Services.AddSingleton<IInstallRunner>(options.Mock
+            ? new MockInstallRunner(TimeProvider.System, TimeSpan.FromSeconds(options.MockStepSeconds))
+            : new SystemdInstallRunner(Path.Combine(options.RunDir, "install.log")));
+        builder.Services.AddSingleton(sp => new InstallService(
+            sp.GetRequiredService<IInstallRunner>(), sp.GetRequiredService<IMachineSource>(), options));
 
         var app = builder.Build();
         app.UseSecurityHeaders();
@@ -135,6 +151,11 @@ public static class InstallerHost
         api.MapPost("/session", CreateSession).RequireRateLimiting(CodeRateLimit);
         api.MapGet("/session", () => TypedResults.NoContent()).RequireAuthorization();
         api.MapGet("/machine", (IMachineSource source, CancellationToken ct) => source.ReadAsync(ct)).RequireAuthorization();
+        api.MapPost("/install", StartInstall).RequireAuthorization();
+        api.MapGet("/install", (InstallService install, CancellationToken ct) => install.StatusAsync(ct)).RequireAuthorization();
+        api.MapPost("/reboot", async Task<Results<NoContent, Conflict<ErrorResponse>>> (InstallService install, CancellationToken ct) =>
+            await install.RebootAsync(ct) ? TypedResults.NoContent() : TypedResults.Conflict(new ErrorResponse("The install is still running.")))
+            .RequireAuthorization();
         api.MapGet("/local", Results<Ok<LocalAccess>, NotFound> (HttpContext http, IOptions<InstallerOptions> o) =>
             IsLocal(http, o.Value) ? TypedResults.Ok(new LocalAccess(Format(ReadCode(o.Value)), Addresses())) : TypedResults.NotFound());
 
@@ -160,6 +181,18 @@ public static class InstallerHost
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.Name, "installer")], CookieAuthenticationDefaults.AuthenticationScheme);
         await http.SignInAsync(new ClaimsPrincipal(identity));
         return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Accepted, BadRequest<ErrorResponse>, Conflict<ErrorResponse>>> StartInstall(
+        InstallRequest request, InstallService install, CancellationToken ct)
+    {
+        var (outcome, error) = await install.StartAsync(request, ct);
+        return outcome switch
+        {
+            InstallService.Outcome.Started => TypedResults.Accepted("/api/installer/install"),
+            InstallService.Outcome.AlreadyStarted => TypedResults.Conflict(new ErrorResponse(error!)),
+            _ => TypedResults.BadRequest(new ErrorResponse(error!)),
+        };
     }
 
     // the mock takes TEST-CODE when the live image's file isn't there

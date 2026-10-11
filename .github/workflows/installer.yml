@@ -1,12 +1,16 @@
 # The installer image (installer/): a small Debian that boots into the installer's page. Built for every push to
 # main that touches it, and by hand (Run workflow); the image goes to the pre-release "dev" as
 # home-ve-installer-live-dev.iso. Separate from ci.yml: live-build takes a while.
+# Then the image is tested end to end (.github/test-installer.sh), with BIOS and with UEFI: it installs onto an
+# empty virtual disk through its page's API, the installed system boots and takes the web password set there.
+# What each test saw goes to the same pre-release: home-ve-installer-test-<bios|uefi>.log and .png screenshots.
 name: Installer image
 
 on:
   push:
     branches: [main]
-    paths: [installer/**, backend/**, frontend/**, .github/workflows/installer.yml, .github/package.sh, build.sh]
+    paths: [installer/**, backend/**, frontend/**, deploy/preseed/**, .github/workflows/installer.yml, .github/package.sh,
+      .github/test-installer.sh, .github/ppm2png.py, build.sh]
   workflow_dispatch:
 
 permissions:
@@ -45,3 +49,56 @@ jobs:
         run: |
           sudo chown "$(id -u)" home-ve-installer-live-dev.iso home-ve-installer-live-dev.iso.sha256
           gh release upload dev home-ve-installer-live-dev.iso home-ve-installer-live-dev.iso.sha256 --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-iso
+          path: home-ve-installer-live-dev.iso
+          retention-days: 1
+          compression-level: 0
+
+  test:
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        firmware: [bios, uefi]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      OUT: test-installer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer-iso
+      # the runner's /dev/kvm is root's: open it to the job's user
+      - name: QEMU with KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf jq
+      - name: Install and boot (${{ matrix.firmware }})
+        run: .github/test-installer.sh home-ve-installer-live-dev.iso ${{ matrix.firmware }}
+      - name: Publish what the test saw
+        if: always()
+        run: |
+          f=home-ve-installer-test-${{ matrix.firmware }}
+          {
+            cat "$OUT/summary.log" 2>/dev/null || true
+            for log in "$OUT/install-tail.log" "$OUT"/*-serial.log; do
+              [ -f "$log" ] || continue
+              printf '\n----- %s (the end) -----\n' "$(basename "$log")"
+              tail -n 80 "$log" | tr -d '\r' | tr -cd '\11\12\40-\176'
+            done
+          } >"$f.log"
+          files=("$f.log")
+          for png in "$OUT"/*.png; do
+            [ -f "$png" ] || continue
+            cp "$png" "$f-$(basename "$png")"
+            files+=("$f-$(basename "$png")")
+          done
+          gh release upload dev "${files[@]}" --clobber
