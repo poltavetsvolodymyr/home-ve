@@ -1,7 +1,7 @@
 #!/bin/sh
-# The login shell of the user "kiosk", whom tty1 logs in by itself: the installer's page full screen on the
-# machine's own screen (cage: a compositor for a single window; cog: a WebKit browser). The page knows it is on
-# the machine (http://127.0.0.1) and needs no code. -s keeps Ctrl+Alt+F2 (the root shell) working.
+# home-ve-kiosk.service on tty1, as the user "kiosk": the installer's page full screen on the machine's own
+# screen (cage: a compositor for a single window; cog: a WebKit browser). The page knows it is on the machine
+# (http://127.0.0.1) and needs no code. -s keeps Ctrl+Alt+F2 (the root shell) working.
 # Without graphics, or should cage stop: the address and the code as text, redrawn as the network changes.
 
 # the page's service starts at the same time: give it a few seconds

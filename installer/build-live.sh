@@ -12,7 +12,7 @@ out=$(realpath -m "${2:?usage: build-live.sh <build.tar.gz> <out.iso>}")
 here="$(cd "$(dirname "$0")" && pwd)"
 
 apt-get update -q
-apt-get install -y -q --no-install-recommends live-build ca-certificates
+apt-get install -y -q --no-install-recommends live-build xorriso ca-certificates
 
 work=$(mktemp -d)
 trap 'rm -rf -- "${work:?}"' EXIT
@@ -33,18 +33,6 @@ lb config \
   --iso-application "home-ve installer" \
   --bootappend-live "boot=live quiet"
 
-# the boot menus: live-build's own, started after 5 s by themselves (theirs wait for a key forever) and named after
-# what they boot. Without the timeout an unattended machine never gets past the menu.
-cp -r /usr/share/live/build/bootloaders config/
-find config/bootloaders -name isolinux.cfg -exec sed -i 's/^timeout 0$/timeout 50/' {} +
-find config/bootloaders -name config.cfg -path '*grub*' -exec sed -i 's/^set default=0$/set default=0\nset timeout=5/' {} +
-if ! grep -rqx 'timeout 50' config/bootloaders || ! grep -rqx 'set timeout=5' config/bootloaders; then
-  echo "build-live: the boot menus' timeout wasn't set: live-build's templates changed" >&2
-  exit 1
-fi
-# the entries' names, where the templates have them (an optional nicety: never a reason to fail the build)
-grep -rl 'Live system' config/bootloaders | xargs -r sed -i 's/Live system/home-ve installer/g' || true
-
 # live-build's own package list brings live-config, which logs a "user" in on every console (one this image
 # doesn't have): out, ours lists live-boot itself
 rm -f config/package-lists/live.list.chroot
@@ -58,6 +46,17 @@ tar -xzf "$build" -C config/includes.chroot/opt/home-ve
 lb build
 iso=$(find . -maxdepth 1 -name '*.iso' | head -n 1)
 [[ -n $iso ]] || { echo "build-live: live-build made no image" >&2; exit 1; }
-mv -- "$iso" "$out"
+# Our boot menus over live-build's (installer/live/boot): plain, three entries, 5 s. Written into the finished
+# image, the boot records replayed as they are (as .github/build-iso.sh does).
+live=$(xorriso -indev "$iso" -ls /live 2>/dev/null)
+if [[ $live != *"'vmlinuz'"* || $live != *"'initrd.img'"* ]]; then
+  echo "build-live: no /live/vmlinuz or /live/initrd.img for the menus" >&2
+  exit 1
+fi
+rm -f -- "$out"
+xorriso -indev "$iso" -outdev "$out" \
+  -map "$here/live/boot/isolinux.cfg" /isolinux/isolinux.cfg \
+  -map "$here/live/boot/grub.cfg" /boot/grub/grub.cfg \
+  -boot_image any replay
 (cd "$(dirname "$out")" && sha256sum "$(basename "$out")" >"$(basename "$out").sha256")
 echo "==> $out ($(du -m "$out" | cut -f1) MB)"

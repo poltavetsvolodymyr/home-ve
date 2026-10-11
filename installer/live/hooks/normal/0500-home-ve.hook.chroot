@@ -1,8 +1,13 @@
 #!/bin/sh
 # Inside the image's system while live-build makes it: the services the installer needs at boot.
 set -e
-systemctl enable systemd-networkd systemd-resolved home-ve-installer.service
-# the screen's user: its shell shows the page (home-ve-kiosk); no password, it only ever logs in on tty1.
-# Without that shell tty1 would log in and out until systemd gives up: rather no image.
+systemctl enable systemd-networkd systemd-resolved home-ve-installer.service home-ve-kiosk.service
+# tty1 is the page's (home-ve-kiosk.service), not a login prompt's
+systemctl mask getty@tty1.service
+# live-boot writes an ifupdown config for every card at boot, and ifupdown's DHCP client would ask for a second
+# address next to networkd's: only networkd here
+systemctl mask networking.service ifup@.service
+# the screen's user, for home-ve-kiosk.service; no password and no shell, it never logs in otherwise.
+# Without the script the screen would stay black: rather no image.
 [ -x /usr/local/sbin/home-ve-kiosk ] || { echo "home-ve hook: /usr/local/sbin/home-ve-kiosk is missing" >&2; exit 1; }
-id kiosk >/dev/null 2>&1 || useradd --create-home --shell /usr/local/sbin/home-ve-kiosk --groups video,render,input kiosk
+id kiosk >/dev/null 2>&1 || useradd --create-home --shell /usr/sbin/nologin --groups video,render,input kiosk

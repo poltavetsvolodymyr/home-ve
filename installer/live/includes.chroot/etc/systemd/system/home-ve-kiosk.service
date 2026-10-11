@@ -1,0 +1,27 @@
+# The installer's page on the machine's own screen (home-ve-kiosk: cage and cog), on tty1 in place of the login
+# prompt (getty@tty1 is masked): nothing but the page after the boot menu. A session of the user "kiosk" (PAM,
+# logind), which gives it the screen, keyboard and mouse.
+[Unit]
+Description=home-ve installer page on the screen
+After=systemd-user-sessions.service home-ve-installer.service
+Conflicts=getty@tty1.service
+
+[Service]
+User=kiosk
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=tty
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Environment=TERM=linux
+ExecStart=/usr/local/sbin/home-ve-kiosk
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
