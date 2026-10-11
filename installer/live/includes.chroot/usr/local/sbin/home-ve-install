@@ -61,10 +61,17 @@ T=/target
 uefi=no
 [[ -d /sys/firmware/efi ]] && uefi=yes
 
+# Everything under /target let go: first what still runs inside it (apt and gpg leave agents behind), then the
+# mounts, inside out. Also at the start, so a second try after a failed one finds the disk free.
 cleanup() {
-  for m in "$T/dev/pts" "$T/dev" "$T/proc" "$T/sys/firmware/efi/efivars" "$T/sys" "$T/run" "$T/boot/efi" "$T/boot" "$T"; do
-    mountpoint -q "$m" && umount -l "$m"
+  local sig p
+  for sig in TERM KILL; do
+    for p in /proc/[0-9]*; do
+      [[ "$(readlink "$p/root" 2>/dev/null)" == "$T" ]] && kill -s "$sig" "${p#/proc/}" 2>/dev/null
+    done
+    sleep 1
   done
+  if mountpoint -q "$T"; then umount -R "$T" 2>/dev/null || umount -R -l "$T"; fi
   true
 }
 trap cleanup EXIT
