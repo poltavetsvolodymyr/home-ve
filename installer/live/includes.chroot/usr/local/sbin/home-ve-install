@@ -116,7 +116,7 @@ mkdir -p "$T/boot/efi"
 mount "$(part 2)" "$T/boot/efi"
 for m in dev dev/pts proc sys run; do mount --bind "/$m" "$T/$m"; done
 if [[ $uefi == yes ]]; then mount --bind /sys/firmware/efi/efivars "$T/sys/firmware/efi/efivars" || true; fi
-in() { chroot "$T" env DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8 "$@"; }
+chr() { chroot "$T" env DEBIAN_FRONTEND=noninteractive LC_ALL=C.UTF-8 "$@"; }
 
 say "the system's settings: disks, name, time zone, network, users"
 uuid() { blkid -s UUID -o value "$1"; }
@@ -144,41 +144,43 @@ if [[ ${s[NET]:-dhcp} == static ]]; then
   [[ ${s[ADDRESS]:-} =~ ^[0-9.]+/[0-9]+$ && ${s[GATEWAY]:-} =~ ^[0-9.]+$ ]] || die "bad ADDRESS or GATEWAY"
   {
     printf '[Match]\nName=br0\n\n[Network]\nAddress=%s\nGateway=%s\n' "${s[ADDRESS]}" "${s[GATEWAY]}"
-    for d in ${s[DNS]:-}; do [[ $d =~ ^[0-9a-fA-F.:]+$ ]] && printf 'DNS=%s\n' "$d"; done
+    for d in ${s[DNS]:-}; do
+      if [[ $d =~ ^[0-9a-fA-F.:]+$ ]]; then printf 'DNS=%s\n' "$d"; fi
+    done
   } >"$T/etc/systemd/network/10-br0.network"
 else
   printf '[Match]\nName=br0\n\n[Network]\nDHCP=ipv4\n\n[DHCPv4]\nClientIdentifier=mac\n' >"$T/etc/systemd/network/10-br0.network"
 fi
-in systemctl enable -q systemd-networkd systemd-resolved
+chr systemctl enable -q systemd-networkd systemd-resolved
 ln -sf ../run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
 
-printf 'root:%s\n' "${secret[ROOT_PASSWORD]}" | in chpasswd
-in useradd -m -s /bin/bash -G sudo "${s[USER]}"
-printf '%s:%s\n' "${s[USER]}" "${secret[USER_PASSWORD]}" | in chpasswd
+printf 'root:%s\n' "${secret[ROOT_PASSWORD]}" | chr chpasswd
+chr useradd -m -s /bin/bash -G sudo "${s[USER]}"
+printf '%s:%s\n' "${s[USER]}" "${secret[USER_PASSWORD]}" | chr chpasswd
 
 say "the kernel and the boot loader ($([[ $uefi == yes ]] && echo UEFI || echo BIOS))"
 # while installing, the chroot resolves names through the installer's own DNS
 rm -f "$T/etc/resolv.conf"
 cp /etc/resolv.conf "$T/etc/resolv.conf"
 if [[ $uefi == yes ]]; then
-  in apt-get install -y -q linux-image-amd64 grub-efi-amd64 grub-efi-amd64-signed shim-signed efibootmgr
-  in grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian --uefi-secure-boot
+  chr apt-get install -y -q linux-image-amd64 grub-efi-amd64 grub-efi-amd64-signed shim-signed efibootmgr
+  chr grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian --uefi-secure-boot
   # also where firmware looks without a boot entry (a disk moved to another machine)
-  in grub-install --target=x86_64-efi --efi-directory=/boot/efi --uefi-secure-boot --removable --no-nvram
+  chr grub-install --target=x86_64-efi --efi-directory=/boot/efi --uefi-secure-boot --removable --no-nvram
 else
   id=$(find -L /dev/disk/by-id -samefile "$disk" -name 'ata-*' -o -samefile "$disk" -name 'nvme-*' -o -samefile "$disk" -name 'virtio-*' 2>/dev/null | head -n 1)
-  echo "grub-pc grub-pc/install_devices multiselect ${id:-$disk}" | in debconf-set-selections
-  in apt-get install -y -q linux-image-amd64 grub-pc
-  in grub-install --target=i386-pc "$disk"
+  echo "grub-pc grub-pc/install_devices multiselect ${id:-$disk}" | chr debconf-set-selections
+  chr apt-get install -y -q linux-image-amd64 grub-pc
+  chr grub-install --target=i386-pc "$disk"
 fi
-in update-grub
+chr update-grub
 
 say "home-ve (${s[CHANNEL]} channel)"
 branch=stable
 [[ ${s[CHANNEL]} == dev ]] && branch=main
-in git clone --quiet --filter=blob:none --sparse --branch "$branch" https://github.com/poltavetsvolodymyr/home-ve.git /opt/home-ve
-in git -C /opt/home-ve sparse-checkout set deploy
-echo "  commit $(in git -C /opt/home-ve rev-parse HEAD)"
+chr git clone --quiet --filter=blob:none --sparse --branch "$branch" https://github.com/poltavetsvolodymyr/home-ve.git /opt/home-ve
+chr git -C /opt/home-ve sparse-checkout set deploy
+echo "  commit $(chr git -C /opt/home-ve rev-parse HEAD)"
 mkdir -p "$T/var/lib/home-backend"
 echo "${s[CHANNEL]}" >"$T/var/lib/home-backend/update-channel"
 # the web UI's password: firstboot.sh hands it to the backend once its user exists
@@ -187,7 +189,7 @@ echo "${s[CHANNEL]}" >"$T/var/lib/home-backend/update-channel"
   printf '%s\n' "${secret[WEB_PASSWORD_HASH]}" >"$T/root/home-ve-web-password"
 )
 install -m 0644 "$T/opt/home-ve/deploy/preseed/home-ve-firstboot.service" "$T/etc/systemd/system/"
-in systemctl enable -q home-ve-firstboot.service
+chr systemctl enable -q home-ve-firstboot.service
 
 say "finishing"
 ln -sf ../run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
