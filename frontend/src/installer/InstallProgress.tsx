@@ -69,6 +69,12 @@ export function InstallProgress({ status: first, onRetry }: { status: InstallSta
             <li>Restart. The machine&apos;s screen shows the web UI&apos;s address once it is up.</li>
             <li>Open it and sign in with the web UI&apos;s password set here.</li>
           </ol>
+          {restarting && (
+            <p className="installer-step">
+              Restarting. Once the machine&apos;s screen shows the web UI&apos;s address, reload this page: the browser
+              warns about the certificate once more, it is the installed system&apos;s own.
+            </p>
+          )}
           {rebootError && <div className="error-note">{rebootError}</div>}
           <button className="primary installer-go" disabled={restarting} onClick={restart}>
             {restarting ? 'Restarting…' : 'Restart'}

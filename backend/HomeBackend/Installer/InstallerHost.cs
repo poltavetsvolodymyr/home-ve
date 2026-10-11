@@ -163,7 +163,16 @@ public static class InstallerHost
         {
             var files = new PhysicalFileProvider(options.WwwDir);
             app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files, DefaultFileNames = ["installer.html"] });
-            app.UseStaticFiles(new StaticFileOptions { FileProvider = files });
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = files,
+                // the installed system answers on the same address later: a kept installer page would talk to an API
+                // that is gone. The built files (assets/, hashed names) may be kept.
+                OnPrepareResponse = f =>
+                {
+                    if (f.File.Name.EndsWith(".html", StringComparison.Ordinal)) f.Context.Response.Headers.CacheControl = "no-store";
+                },
+            });
         }
 
         app.Logger.LogInformation("Installer page on {Urls}", string.Join(", ", options.Urls));

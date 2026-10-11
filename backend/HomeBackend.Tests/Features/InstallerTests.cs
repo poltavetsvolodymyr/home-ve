@@ -226,3 +226,27 @@ public class InstallApiTests
         Directory.Delete(dir, recursive: true);
     }
 }
+
+public class InstallerPageCacheTests
+{
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task The_page_is_never_kept_by_the_browser()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "home-ve-installer-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "installer.html"), "<html></html>", Ct);
+        await using var app = InstallerHost.Build(
+            ["--Installer:Mock=true", "--Installer:Urls:0=http://127.0.0.1:0", $"--Installer:CodeFile={dir}/code", $"--Installer:WwwDir={dir}"]);
+        await app.StartAsync(Ct);
+        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+
+        var page = await client.GetAsync("/", Ct);
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.True(page.Headers.CacheControl?.NoStore);
+
+        await app.StopAsync(Ct);
+        Directory.Delete(dir, recursive: true);
+    }
+}
