@@ -1,11 +1,20 @@
 import { bytes } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { BrandMark, Card, ErrorNote, Skeleton } from '@/shared/ui'
-import { fetchLocalAccess, fetchMachine, type Disk, type Nic } from './api'
+import { useState } from 'react'
+import { fetchInstall, fetchLocalAccess, fetchMachine } from './api'
+import { InstallForm } from './InstallForm'
+import { InstallProgress } from './InstallProgress'
 
-/** What the installer found: the machine, its disks and network cards. Refreshed, so a cable plugged in shows up. */
+/**
+ * The installer: the machine, then the settings to install with, or the install running (also after the page was
+ * opened again, or on another device). The machine is refreshed, so a cable plugged in shows up.
+ */
 export function MachinePage() {
   const { data: m, error } = usePoll(fetchMachine, 5000)
+  const { data: install, refresh: refreshInstall } = usePoll(fetchInstall, 0)
+  // what the user switched to; until then, whatever the install's state says
+  const [view, setView] = useState<'form' | 'progress'>()
   // only the machine's own screen gets an answer; the address may come later (a cable plugged in)
   const { data: local } = usePoll(fetchLocalAccess, 5000)
 
@@ -44,57 +53,13 @@ export function MachinePage() {
         </dl>
       </Card>
 
-      <Card title="Disks">
-        {!m && <Skeleton width="14em" />}
-        {m?.disks.length === 0 && <p className="muted">No disks found.</p>}
-        <ul className="installer-list">
-          {m?.disks.map(d => (
-            <DiskRow key={d.name} disk={d} />
-          ))}
-        </ul>
-      </Card>
-
-      <Card title="Network cards">
-        {!m && <Skeleton width="14em" />}
-        {m?.nics.length === 0 && <p className="muted">No network cards found.</p>}
-        <ul className="installer-list">
-          {m?.nics.map(n => (
-            <NicRow key={n.name} nic={n} />
-          ))}
-        </ul>
-      </Card>
-
-      <p className="muted installer-next">Choosing the disk and the settings comes next.</p>
+      {!m || !install ? (
+        <Skeleton width="14em" />
+      ) : view === 'progress' || (view === undefined && install.state !== 'idle') ? (
+        <InstallProgress status={install} onRetry={() => setView('form')} />
+      ) : (
+        <InstallForm machine={m} onStarted={() => refreshInstall().then(() => setView('progress'))} />
+      )}
     </div>
-  )
-}
-
-function DiskRow({ disk: d }: { disk: Disk }) {
-  const kind = d.transport === 'nvme' ? 'NVMe' : d.rotational ? 'HDD' : d.transport === 'usb' ? 'USB' : 'SSD'
-  return (
-    <li className={d.inUse ? 'muted' : undefined}>
-      <div className="installer-row-main">
-        <span className="mono">/dev/{d.name}</span>
-        <span>{bytes(d.sizeBytes)}</span>
-      </div>
-      <div className="installer-row-sub muted">
-        {[d.model, kind, d.inUse ? 'the installer runs from it' : null].filter(Boolean).join(' · ')}
-      </div>
-    </li>
-  )
-}
-
-function NicRow({ nic: n }: { nic: Nic }) {
-  const state = n.wireless ? 'Wi-Fi: cannot be bridged' : n.link ? 'connected' : 'no cable'
-  return (
-    <li>
-      <div className="installer-row-main">
-        <span className="mono">{n.name}</span>
-        <span className={n.link && !n.wireless ? 'installer-ok' : 'muted'}>{state}</span>
-      </div>
-      <div className="installer-row-sub muted">
-        {[n.addresses.join(', ') || null, n.mac, n.driver].filter(Boolean).join(' · ')}
-      </div>
-    </li>
   )
 }

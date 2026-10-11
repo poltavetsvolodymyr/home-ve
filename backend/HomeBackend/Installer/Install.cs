@@ -165,6 +165,9 @@ public sealed class SystemdInstallRunner(string logFile) : IInstallRunner
     public async Task StartAsync(string settingsFile, string secretsFile, CancellationToken ct)
     {
         File.WriteAllText(logFile, "");
+        // after a failed install: the failed unit goes, so it can run again under the same name
+        try { await ProcessRunner.RunAsync("systemctl", ["reset-failed", Unit], ct); }
+        catch (InvalidOperationException) { /* it wasn't there */ }
         await ProcessRunner.RunAsync("systemd-run",
         [
             $"--unit={Unit}", "--remain-after-exit", "--quiet",
@@ -244,7 +247,9 @@ public sealed class InstallService(IInstallRunner runner, IMachineSource machine
         await _gate.WaitAsync(ct);
         try
         {
-            if (await runner.StateAsync(ct) != InstallRunState.NotStarted) return (Outcome.AlreadyStarted, "The install has started already.");
+            // once more after a failure (a cable came out, a mirror was down), never over a running or finished one
+            if (await runner.StateAsync(ct) is InstallRunState.Running or InstallRunState.Succeeded)
+                return (Outcome.AlreadyStarted, "The install has started already.");
             var error = InstallPlan.Validate(request, await machine.ReadAsync(ct), TimezoneExists);
             if (error is not null) return (Outcome.Invalid, error);
 

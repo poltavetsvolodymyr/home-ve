@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Unauthorized } from '@/shared/api/http'
-import { BrandMark } from '@/shared/ui'
+import { BrandMark, ConfirmHost } from '@/shared/ui'
 import { createSession, fetchSession } from './api'
 import { MachinePage } from './MachinePage'
 import '@/features/auth/login.css'
@@ -22,7 +22,12 @@ export function InstallerApp() {
 
   if (status === 'checking') return null
   if (status === 'code') return <CodePage onDone={() => setStatus('in')} />
-  return <MachinePage />
+  return (
+    <>
+      <MachinePage />
+      <ConfirmHost />
+    </>
+  )
 }
 
 function CodePage({ onDone }: { onDone: () => void }) {

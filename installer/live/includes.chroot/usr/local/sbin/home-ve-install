@@ -105,7 +105,7 @@ mount /dev/home/root "$T"
 rmdir "$T/lost+found"
 # with Debian's security and point-release updates, which the system keeps in its sources.list
 mmdebstrap --variant=important \
-  --include=systemd-resolved,systemd-timesyncd,lvm2,thin-provisioning-tools,openssh-server,sudo,git,curl,ca-certificates,zstd,dbus,less,nano,iproute2,iputils-ping,initramfs-tools,firmware-linux-free \
+  --include=tzdata,tzdata-legacy,systemd-resolved,systemd-timesyncd,lvm2,thin-provisioning-tools,openssh-server,sudo,git,curl,ca-certificates,zstd,dbus,less,nano,iproute2,iputils-ping,initramfs-tools,firmware-linux-free \
   trixie "$T" \
   "deb http://deb.debian.org/debian trixie main non-free-firmware" \
   "deb http://deb.debian.org/debian trixie-updates main non-free-firmware" \
@@ -136,7 +136,9 @@ echo "${s[TIMEZONE]}" >"$T/etc/timezone"
 
 # the bridge br0 on the chosen card (docs/deployment.md "Bridge for VM networking"), by DHCP or a fixed address
 nic=${s[NIC]}
-printf '[NetDev]\nName=br0\nKind=bridge\n' >"$T/etc/systemd/network/10-br0.netdev"
+# with the card's MAC: the router sees the machine it gave an address to in the installer, and by DHCP gives it the
+# same one again
+printf '[NetDev]\nName=br0\nKind=bridge\nMACAddress=%s\n' "$(cat "/sys/class/net/$nic/address")" >"$T/etc/systemd/network/10-br0.netdev"
 printf '[Match]\nName=%s\n\n[Network]\nBridge=br0\n' "$nic" >"$T/etc/systemd/network/20-br0-port.network"
 if [[ ${s[NET]:-dhcp} == static ]]; then
   [[ ${s[ADDRESS]:-} =~ ^[0-9.]+/[0-9]+$ && ${s[GATEWAY]:-} =~ ^[0-9.]+$ ]] || die "bad ADDRESS or GATEWAY"

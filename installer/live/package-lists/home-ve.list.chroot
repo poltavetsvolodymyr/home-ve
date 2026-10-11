@@ -8,6 +8,8 @@ systemd-timesyncd
 iproute2
 iputils-ping
 ca-certificates
+tzdata
+tzdata-legacy
 curl
 libssl3t64
 gdisk
