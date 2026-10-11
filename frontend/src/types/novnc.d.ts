@@ -3,6 +3,8 @@ declare module '@novnc/novnc' {
   export default class RFB extends EventTarget {
     constructor(target: HTMLElement, url: string, options?: { wsProtocols?: string[]; shared?: boolean })
     scaleViewport: boolean
+    /** CSS background around the screen when it doesn't fill the box */
+    background: string
     resizeSession: boolean
     viewOnly: boolean
     disconnect(): void

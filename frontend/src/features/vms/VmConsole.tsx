@@ -55,6 +55,8 @@ export default function VmConsole({ name }: { name: string }) {
     const r = new RFB(screen.current, consoleUrl(name), { wsProtocols: ['binary'] })
     r.scaleViewport = true
     r.resizeSession = false
+    // around the VM's screen when it doesn't fill the box: black like the box, not noVNC's grey
+    r.background = '#000'
     let retry: number | undefined
     let leaving = false // our own disconnect below (another tab, another VM) is no reason to retry
     r.addEventListener('connect', () => {
@@ -67,8 +69,15 @@ export default function VmConsole({ name }: { name: string }) {
       if (++failures.current <= maxRetries) retry = window.setTimeout(() => setAttempt(a => a + 1), retryMs)
     })
     rfb.current = r
+    // noVNC fits the screen to the box again when the VM changes resolution or the window resizes, not when
+    // only the box does (layout, a phone turned): setting scaleViewport again makes it fit now
+    const fit = new ResizeObserver(() => {
+      r.scaleViewport = true
+    })
+    fit.observe(screen.current)
     return () => {
       leaving = true
+      fit.disconnect()
       window.clearTimeout(retry)
       r.disconnect()
       rfb.current = null
