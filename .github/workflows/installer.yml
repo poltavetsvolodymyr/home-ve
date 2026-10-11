@@ -1,6 +1,6 @@
 # The installer image (installer/): a small Debian that boots into the installer's page. Built for every push to
 # main that touches it, and by hand (Run workflow); the image goes to the pre-release "dev" as
-# home-ve-installer-live-dev.iso. Separate from ci.yml: live-build takes a while.
+# home-ve-installer-dev.iso. Separate from ci.yml: live-build takes a while.
 # Then the image is tested end to end (.github/test-installer.sh), with BIOS and with UEFI: it installs onto an
 # empty virtual disk through its page's API, the installed system boots and takes the web password set there.
 # What each test saw goes to the same pre-release: home-ve-installer-test-<bios|uefi>.log and .png screenshots.
@@ -44,15 +44,19 @@ jobs:
       - name: Build the image
         run: |
           docker run --rm --privileged -v "$PWD:/src" -w /src debian:trixie \
-            installer/build-live.sh home-ve-build.tar.gz home-ve-installer-live-dev.iso
+            installer/build-live.sh home-ve-build.tar.gz home-ve-installer-dev.iso
       - name: Upload to the pre-release "dev"
         run: |
-          sudo chown "$(id -u)" home-ve-installer-live-dev.iso home-ve-installer-live-dev.iso.sha256
-          gh release upload dev home-ve-installer-live-dev.iso home-ve-installer-live-dev.iso.sha256 --clobber
+          sudo chown "$(id -u)" home-ve-installer-dev.iso*
+          gh release upload dev home-ve-installer-dev.iso home-ve-installer-dev.iso.sha256 \
+            home-ve-installer-dev.iso.packages --clobber
+          # its name before: gone
+          gh release delete-asset dev home-ve-installer-live-dev.iso --yes 2>/dev/null || true
+          gh release delete-asset dev home-ve-installer-live-dev.iso.sha256 --yes 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with:
           name: installer-iso
-          path: home-ve-installer-live-dev.iso
+          path: home-ve-installer-dev.iso
           retention-days: 1
           compression-level: 0
 
@@ -82,7 +86,7 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf jq lvm2
       - name: Install and boot (${{ matrix.firmware }})
-        run: .github/test-installer.sh home-ve-installer-live-dev.iso ${{ matrix.firmware }}
+        run: .github/test-installer.sh home-ve-installer-dev.iso ${{ matrix.firmware }}
       - name: Publish what the test saw
         if: always()
         run: |

@@ -99,14 +99,15 @@ jobs:
           # the .sha256 last: hosts take a build once its .sha256 is there (deploy/fetch-build.sh)
           gh release upload dev "home-ve-$GITHUB_SHA-linux-x64.tar.gz" --clobber
           gh release upload dev "home-ve-$GITHUB_SHA-linux-x64.tar.gz.sha256" --clobber
-      # the installer for the dev channel: one image, replaced by every push
-      - name: Installer ISO
+      # the text installer for the dev channel (Debian's, with deploy/preseed): one image, replaced by every push.
+      # The installer with its own page is installer.yml's.
+      - name: Preseed ISO
         run: |
           sudo apt-get install -y -q xorriso cpio
-          .github/build-iso.sh main home-ve-installer-dev.iso
-          gh release upload dev home-ve-installer-dev.iso home-ve-installer-dev.iso.sha256 --clobber
+          .github/build-iso.sh main home-ve-preseed-dev.iso
+          gh release upload dev home-ve-preseed-dev.iso home-ve-preseed-dev.iso.sha256 --clobber
       - name: Keep the newest 30 builds
         run: |
           gh release view dev --json assets \
-            --jq '[.assets[] | select(.name | startswith("home-ve-installer") | not)] | sort_by(.createdAt) | reverse | .[60:] | .[].name' |
+            --jq '[.assets[] | select(.name | test("^home-ve-(installer|preseed)") | not)] | sort_by(.createdAt) | reverse | .[60:] | .[].name' |
             while read -r name; do gh release delete-asset dev "$name" --yes; done

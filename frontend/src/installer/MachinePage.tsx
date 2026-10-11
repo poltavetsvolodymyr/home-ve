@@ -12,8 +12,9 @@ import { InstallProgress } from './InstallProgress'
  */
 export function MachinePage() {
   const { data: m, error } = usePoll(fetchMachine, 5000)
-  const { data: install, refresh: refreshInstall } = usePoll(fetchInstall, 0)
-  // what the user switched to; until then, whatever the install's state says
+  const { data: install, refresh: refreshInstall } = usePoll(fetchInstall, 3000)
+  // also polled while the form shows: the install may be started from another device (a phone, while this is the
+  // machine's own screen). What the user switched to wins; until then, whatever the install's state says
   const [view, setView] = useState<'form' | 'progress'>()
   // only the machine's own screen gets an answer; the address may come later (a cable plugged in)
   const { data: local } = usePoll(fetchLocalAccess, 5000)

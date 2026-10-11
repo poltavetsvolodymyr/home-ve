@@ -1,6 +1,11 @@
-# A published release vX.Y.Z gets its build: home-ve-vX.Y.Z-linux-x64.tar.gz (and .sha256), made from the
-# release's tag with build.sh, after the same checks as CI. Hosts on the stable channel download it
-# (deploy/fetch-build.sh); until it is there they take the dev build of the same commit.
+# A published release vX.Y.Z gets, from its tag:
+#   home-ve-vX.Y.Z-linux-x64.tar.gz      its build (build.sh, after the same checks as CI): hosts on the stable channel
+#                                        download it (deploy/fetch-build.sh); until it is there, the dev build of the
+#                                        same commit
+#   home-ve-vX.Y.Z-installer.iso         the installer with its own page (installer/), uploaded once it has installed
+#                                        the stable channel in QEMU with BIOS and UEFI (.github/test-installer.sh);
+#                                        .packages lists the Debian packages in it, for their source code
+#   home-ve-vX.Y.Z-preseed.iso           Debian's text installer with deploy/preseed (.github/build-iso.sh)
 name: Release build
 
 on:
@@ -45,9 +50,95 @@ jobs:
         run: |
           gh release upload "$TAG" "home-ve-$TAG-linux-x64.tar.gz" --clobber
           gh release upload "$TAG" "home-ve-$TAG-linux-x64.tar.gz.sha256" --clobber
-      # the installer: Debian's netboot image with deploy/preseed inside, installing the stable channel
-      - name: Installer ISO
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: home-ve-${{ github.event.release.tag_name }}-linux-x64.tar.gz
+          retention-days: 1
+      # the text installer: Debian's netboot image with deploy/preseed inside, installing the stable channel
+      - name: Preseed ISO
         run: |
           sudo apt-get install -y -q xorriso cpio
-          .github/build-iso.sh stable "home-ve-$TAG-installer.iso"
-          gh release upload "$TAG" "home-ve-$TAG-installer.iso" "home-ve-$TAG-installer.iso.sha256" --clobber
+          .github/build-iso.sh stable "home-ve-$TAG-preseed.iso"
+          gh release upload "$TAG" "home-ve-$TAG-preseed.iso" "home-ve-$TAG-preseed.iso.sha256" --clobber
+
+  # the installer image, with this release's build for its page (as installer.yml makes the dev one)
+  installer:
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+      - name: Build the image
+        run: |
+          docker run --rm --privileged -v "$PWD:/src" -w /src debian:trixie \
+            installer/build-live.sh "home-ve-$TAG-linux-x64.tar.gz" "home-ve-$TAG-installer.iso"
+          sudo chown "$(id -u)" "home-ve-$TAG-installer.iso"*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: home-ve-${{ github.event.release.tag_name }}-installer.iso*
+          retention-days: 1
+          compression-level: 0
+
+  test:
+    needs: installer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        firmware: [bios, uefi]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name }}
+      CHANNEL: stable
+      OUT: test-installer
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer
+      - name: QEMU with KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf jq lvm2
+      - name: Install and boot (${{ matrix.firmware }})
+        run: .github/test-installer.sh "home-ve-$TAG-installer.iso" ${{ matrix.firmware }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-${{ matrix.firmware }}
+          path: |
+            test-installer/summary.log
+            test-installer/*.png
+          retention-days: 30
+
+  # only an image that installed with both firmwares goes into the release
+  publish:
+    needs: test
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: installer
+      - name: Upload to the release
+        run: |
+          gh release upload "$TAG" "home-ve-$TAG-installer.iso" "home-ve-$TAG-installer.iso.packages" --clobber
+          gh release upload "$TAG" "home-ve-$TAG-installer.iso.sha256" --clobber

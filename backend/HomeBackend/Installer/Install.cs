@@ -226,7 +226,6 @@ public sealed class MockInstallRunner(TimeProvider time, TimeSpan stepTime) : II
         for (var i = 0; i < Math.Min(Done + 1, Steps.Length); i++)
         {
             lines.Add($"==> [{i + 1}/{Steps.Length}] {Steps[i]}");
-            lines.Add("  (mock: nothing done)");
         }
         if (Done >= Steps.Length) lines.Add("==> done: take the installer's stick out and restart");
         return lines;

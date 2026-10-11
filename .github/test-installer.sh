@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # test-installer.sh <iso> <bios|uefi>: the installer image end to end, in QEMU with KVM.
 #   1. boots the image from a CD, as a machine with an empty 40 GB disk; the code comes on the serial port;
-#   2. installs through the page's API, as its form would: the first free disk and wired card, DHCP, the dev
-#      channel, the web UI's password set;
+#   2. installs through the page's API, as its form would: the first free disk and wired card, DHCP, the channel
+#      $CHANNEL (dev, or stable for a release), the web UI's password set;
 #   3. waits for CI's build of the commit the install checked out (the first boot downloads it);
 #   4. boots the disk alone; once the first boot is through, signs in to the web UI with that password.
 # Everything goes to $OUT (default test-installer/): summary.log (what the workflow publishes), the install's
@@ -13,6 +13,7 @@ set -euo pipefail
 
 iso=$(realpath "${1:?usage: test-installer.sh <iso> <bios|uefi>}")
 firmware=${2:?usage: test-installer.sh <iso> <bios|uefi>}
+channel=${CHANNEL:-dev}
 out=$(mkdir -p "${OUT:-test-installer}" && realpath "${OUT:-test-installer}")
 here="$(cd "$(dirname "$0")" && pwd)"
 port=8443
@@ -109,7 +110,7 @@ until_ok() {
   log "$what (after $((SECONDS - start)) s)"
 }
 
-log "test: $(basename "$iso"), $firmware"
+log "test: $(basename "$iso"), $firmware, channel $channel"
 
 # 1. the live image
 cdrom=(-drive "file=$iso,media=cdrom,readonly=on")
@@ -131,9 +132,9 @@ log "machine: uefi $(jq -r .uefi "$out/machine.json"), disk $disk, card $nic"
 
 # 2. the install
 web_password=$(head -c 18 /dev/urandom | base64)
-jq -n --arg disk "$disk" --arg nic "$nic" --arg web "$web_password" '{
+jq -n --arg disk "$disk" --arg nic "$nic" --arg web "$web_password" --arg channel "$channel" '{
   disk: $disk, rootGb: 12, swapGb: 1, backupGb: 4, hostname: "home-ve-test", timezone: "Europe/Berlin", nic: $nic,
-  network: "dhcp", user: "tester", channel: "dev", rootPassword: "root-password", userPassword: "user-password",
+  network: "dhcp", user: "tester", channel: $channel, rootPassword: "root-password", userPassword: "user-password",
   webPassword: $web }' >"$out/form.json"
 status=$(api -o "$out/start.json" -w '%{http_code}' -H 'Content-Type: application/json' -d @"$out/form.json" "$url/api/installer/install")
 [[ $status == 202 ]] || fail "the install didn't start ($status): $(cat "$out/start.json")"
@@ -161,15 +162,16 @@ log "install done in $((SECONDS - start)) s"
 commit=$(grep -o 'commit [0-9a-f]\{40\}' "$out/install-tail.log" | cut -d' ' -f2 || true)
 stop
 
-# 3. the build the first boot downloads
-if [[ -n $commit ]]; then
+# 3. the build the first boot downloads: on the dev channel CI's build of the commit (ci.yml, running alongside);
+# a release's own build is uploaded before its image is tested (release.yml)
+if [[ -n $commit && $channel == dev ]]; then
   start=$SECONDS
   until gh release view dev --json assets -q '.assets[].name' | grep -qx "home-ve-$commit-linux-x64.tar.gz"; do
     ((SECONDS - start < 1800)) || fail "no build of $commit in the dev pre-release after 30 min"
     sleep 20
   done
   log "the build of ${commit:0:7} is there"
-else
+elif [[ -z $commit ]]; then
   log "note: the install's log names no commit; not waiting for its build"
 fi
 

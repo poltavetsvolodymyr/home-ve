@@ -16,21 +16,75 @@ deploy/
   preseed/                answers for the Debian installer: the automated installation below
 ```
 
-There are two ways to get there: the **automated installation**, which installs Debian and home-ve in one go on an
-empty machine, or **by hand** on a Debian that is already installed ([Preparing the host](#preparing-the-host) and
-the sections after it).
+There are three ways to get there, on an empty machine: the **installer image** with its own page (the easiest),
+the **automated installation** with Debian's own text installer; or **by hand** on a Debian that is already
+installed ([Preparing the host](#preparing-the-host) and the sections after it).
+
+## Installer image
+
+<p>
+  <img src="screenshots/installer-screen.jpg" alt="The installer on the machine's screen: the address and the code for a phone, the form" width="49%">
+  <img src="screenshots/installer-form.jpg" alt="The installer's form on a phone: the disk and how it is split" width="24%">
+  <img src="screenshots/installer-progress.jpg" alt="The install running, on a phone" width="24%">
+</p>
+
+A small Debian 13 that starts from a USB stick or a CD and shows the installer's page: on the machine's own screen,
+and on a phone or a computer in the same network. The settings are made on the page, and it installs Debian and
+home-ve onto the disk you choose.
+
+**What you need:** a 64-bit machine (or a VM) with a wired network card and DHCP on the network, internet access
+(Debian and home-ve are downloaded while it installs), and a disk of at least **32 GB that will be erased whole**.
+BIOS and UEFI both work, Secure Boot included (Debian's signed shim and GRUB).
+
+1. **The image**: `home-ve-vX.Y.Z-installer.iso` from the latest
+   [release](https://github.com/poltavetsvolodymyr/home-ve/releases/latest) (about 550 MB; the dev channel's is
+   `home-ve-installer-dev.iso` on the pre-release **dev**). Write it to a USB stick (`dd`, balenaEtcher, Rufus in DD
+   mode), or put it into a VM's CD drive.
+2. **Boot it.** The menu starts **Install home-ve** by itself after 5 seconds (**safe graphics** if the screen stays
+   black). The page comes up on the screen; above it, its address and a code.
+3. **Fill it in**, on the screen or on a phone: open the address shown (the browser warns about the certificate once:
+   it is made by the installer for this boot) and enter the code. Then:
+   - **the disk**, and how it is split: the system, swap, the backup volume (`/var/backups/vm`); the rest is the
+     thin pool `data` for the VMs ([the pool](#the-data-thin-pool));
+   - **the network card** for the bridge `br0`, by DHCP or with a fixed address. With DHCP the bridge takes the
+     card's MAC address, so the router gives the host the address the installer has;
+   - **the host name, the time zone, the update channel** (releases or every commit);
+   - **your user and the passwords**: one for your user, root and the web UI, or three apart. With the web UI's
+     password set here there is no first-run setup.
+4. **Install.** It asks once more before erasing the disk, then shows each step and its log; it takes a few minutes.
+5. **Restart** (the button), with the stick out. The first start installs home-ve (`home-ve-firstboot.service`, a few
+   minutes: it downloads the packages and the build); then the screen shows the web UI's address. Reload the page:
+   it is the web UI now (with a certificate of its own to accept), sign in with its password.
+
+What it sets up: GPT with partitions for both BIOS and UEFI booting, `/boot`, and the LVM volume group `home`
+(`root`, `swap`, `backups`, the thin pool `data`); Debian 13 with its security updates, SSH server, sudo for your
+user; the bridge; the journal kept on disk; home-ve in `/opt/home-ve` on the chosen channel.
+
+If it fails, the page shows the log and **Back to the settings** tries again. The live system's root shell is on
+**Ctrl+Alt+F2** (`/run/home-ve-installer/install.log` is the whole log). After the restart, the first boot's log is
+`journalctl -u home-ve-firstboot`; if it could not finish (no network, for example), it tries again at the next
+boot, or run `/usr/local/sbin/home-ve-firstboot` by hand.
+
+### Source code of the installer image
+
+The image is made of Debian's packages, unchanged (GPL and other free licenses), and home-ve. Next to each image,
+`….iso.packages` lists every package in it with its version; the source code of each is in Debian's archive and, for
+exactly that version, on [snapshot.debian.org](https://snapshot.debian.org/) (`apt-get source <package>=<version>`
+with that snapshot in `sources.list`). How the image is built: [installer/](../installer) and
+[.github/workflows/installer.yml](../.github/workflows/installer.yml).
 
 ## Automated installation
 
 The Debian installer can take its answers from a file (a "preseed"). `deploy/preseed/preseed.cfg` sets up the
 machine the way the rest of this page does by hand: LVM with room for the backups and the VMs, the bridge, home-ve.
+The installer image above does the same with a page; this is Debian's own text installer.
 
 **What you need:** a machine (or a VM) with a wired network card and DHCP on the network, internet access, and a
 disk of at least **64 GB that will be erased whole**.
 
-1. **The installer image**: `home-ve-vX.Y.Z-installer.iso` from the latest
+1. **The installer image**: `home-ve-vX.Y.Z-preseed.iso` from the latest
    [release](https://github.com/poltavetsvolodymyr/home-ve/releases/latest) (about 70 MB; the dev channel's is
-   `home-ve-installer-dev.iso` on the pre-release **dev**). It is Debian's own netboot installer, kernel and boot
+   `home-ve-preseed-dev.iso` on the pre-release **dev**). It is Debian's own netboot installer, kernel and boot
    loader untouched, with the answers below inside; it downloads Debian while it installs. Write it to a USB stick
    (`dd`, balenaEtcher, Rufus in DD mode), or put it into a VM's CD drive.
 2. **Boot it and choose Install** (or Graphical install). That's all the image needs.

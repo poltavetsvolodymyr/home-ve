@@ -63,4 +63,9 @@ xorriso -indev "$iso" -outdev "$out" \
   -map "$here/live/boot/grub.cfg" /boot/grub/grub.cfg \
   -boot_image any replay
 (cd "$(dirname "$out")" && sha256sum "$(basename "$out")" >"$(basename "$out").sha256")
+# every Debian package in the image with its version: their source code is at snapshot.debian.org (docs/deployment.md
+# "Source code of the installer image")
+packages=$(find . -maxdepth 1 -name '*.packages' | head -n 1)
+[[ -n $packages ]] || { echo "build-live: live-build listed no packages" >&2; exit 1; }
+cp "$packages" "$out.packages"
 echo "==> $out ($(du -m "$out" | cut -f1) MB)"

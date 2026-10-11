@@ -81,7 +81,11 @@ cd frontend && npm run dev     # then http://localhost:5173/installer.html
 ```
 
 The image itself (`installer/build-live.sh`, live-build) is built by `.github/workflows/installer.yml` and lands on
-the pre-release **dev** as `home-ve-installer-live-dev.iso`.
+the pre-release **dev** as `home-ve-installer-dev.iso`. The same workflow then tests it end to end
+(`.github/test-installer.sh`): in QEMU with KVM, with BIOS and with UEFI, it installs onto an empty disk through the
+page's API, boots the disk and signs in to the web UI with the password set in the installer. What the test saw
+goes to **dev** too: `home-ve-installer-test-<bios|uefi>.log` and screenshots; when the installed system fails,
+the log has its journal (the disk mounted on the runner).
 
 ## Conventions
 
@@ -120,11 +124,14 @@ Hosts don't need you to build anything: CI builds every commit for them.
   30. Hosts on the dev channel take it at their next update.
 - **A published release** `vX.Y.Z`: `.github/workflows/release.yml` runs the checks again, then `build.sh`, and
   attaches `home-ve-vX.Y.Z-linux-x64.tar.gz` to the release.
-- **The installer ISO**: `.github/build-iso.sh` takes Debian's netboot `mini.iso` (checked against Debian's
+- **The installer image** (`installer/`, above): releases get `home-ve-vX.Y.Z-installer.iso` and its
+  `.packages` list, uploaded only after the image has installed the stable channel in QEMU with BIOS and UEFI;
+  every push to `main` that touches it replaces `home-ve-installer-dev.iso` on **dev**.
+- **The preseed ISO**: `.github/build-iso.sh` takes Debian's netboot `mini.iso` (checked against Debian's
   SHA256SUMS), adds `deploy/preseed` to its initrd and writes the image anew with the original boot records.
-  Releases get `home-ve-vX.Y.Z-installer.iso` (stable channel), every push to `main` replaces
-  `home-ve-installer-dev.iso` on **dev**. A release's commit was on `main` before, so its dev build
-  is there too: hosts take whichever they find first.
+  Releases get `home-ve-vX.Y.Z-preseed.iso` (stable channel), every push to `main` replaces
+  `home-ve-preseed-dev.iso` on **dev**.
+- A release's commit was on `main` before, so its dev build is there too: hosts take whichever they find first.
 
 On the host, `deploy/fetch-build.sh` downloads the build of the checked-out commit, checks its SHA-256 and that it
 is the build of that commit, and puts it into `deploy/app` and `deploy/www`; `install.sh` runs it first. `update.sh`

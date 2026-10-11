@@ -44,12 +44,22 @@ as many VMs as its CPU, memory and disks allow, and it grows by adding disks to 
 - self-update from the web UI, stable or dev channel;
 - first-run setup: the password is chosen in the browser, with a code only the host knows.
 
-Getting started: [docs/deployment.md](docs/deployment.md): the installer image from a release (about 70 MB: boot it,
-set the passwords, done), or step by step on a Debian you already have.
+Getting started: [docs/deployment.md](docs/deployment.md): the installer image from a release (boot it from a stick,
+fill in its page on the screen or on a phone, done), or step by step on a Debian you already have.
 
 ## Screenshots
 
-On a phone (390 px wide), with the mock data the backend serves in development.
+The installer: on the machine's own screen, and on a phone with the code from that screen.
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%"><img src="docs/screenshots/installer-screen.jpg" alt="The installer on the machine's screen: the address and the code for a phone, the form"><br><sub>The machine's screen</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/installer-form.jpg" alt="The installer's form on a phone: the disk and how it is split"><br><sub>Settings</sub></td>
+    <td align="center" valign="top" width="25%"><img src="docs/screenshots/installer-progress.jpg" alt="The install running, on a phone"><br><sub>Installing</sub></td>
+  </tr>
+</table>
+
+The web UI on a phone (390 px wide), with the mock data the backend serves in development.
 
 <table>
   <tr>
