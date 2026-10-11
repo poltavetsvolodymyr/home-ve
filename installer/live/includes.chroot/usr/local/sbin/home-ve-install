@@ -79,8 +79,10 @@ trap cleanup EXIT
 say "erasing $disk"
 cleanup
 # volume groups on it from before, then every signature and the partition table
+# no swap of the old system on it (live-boot turns found swap on unless booted with noswap)
+swapoff -a || true
 for vg in $(pvs --noheadings -o vg_name,pv_name 2>/dev/null | awk -v d="$disk" 'index($2, d) == 1 { print $1 }' | sort -u); do
-  vgchange -q -an "$vg" || true
+  vgchange -q -an "$vg" || die "the volume group $vg on $disk is in use: restart the installer and try again"
 done
 for p in $(lsblk -nlpo NAME "$disk" | tail -n +2); do wipefs -q -a "$p" || true; done
 wipefs -q -a "$disk"

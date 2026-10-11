@@ -31,7 +31,7 @@ lb config \
   --firmware-binary false \
   --iso-volume "HOME-VE" \
   --iso-application "home-ve installer" \
-  --bootappend-live "boot=live quiet"
+  --bootappend-live "boot=live noswap quiet"
 
 # live-build's own package list brings live-config, which logs a "user" in on every console (one this image
 # doesn't have): out, ours lists live-boot itself
