@@ -182,7 +182,7 @@ vm disk "${boot[@]}"
 answered=
 set_up() {
   local needs
-  needs=$(api "$url/api/auth/setup" | jq -r '.needsSetup' 2>/dev/null) || true
+  needs=$(api "$url/api/auth/setup" | jq -r '.needed' 2>/dev/null) || true
   [[ $needs == false ]] && return 0
   if [[ $needs == true && -z $answered ]]; then
     answered=$SECONDS
