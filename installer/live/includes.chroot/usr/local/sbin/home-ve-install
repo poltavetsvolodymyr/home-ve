@@ -162,6 +162,8 @@ say "the kernel and the boot loader ($([[ $uefi == yes ]] && echo UEFI || echo B
 # while installing, the chroot resolves names through the installer's own DNS
 rm -f "$T/etc/resolv.conf"
 cp /etc/resolv.conf "$T/etc/resolv.conf"
+# mmdebstrap leaves no package lists behind
+chr apt-get update -q
 if [[ $uefi == yes ]]; then
   chr apt-get install -y -q linux-image-amd64 grub-efi-amd64 grub-efi-amd64-signed shim-signed efibootmgr
   chr grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=debian --uefi-secure-boot
