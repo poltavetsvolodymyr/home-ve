@@ -6,7 +6,8 @@
 #      the home-ve installer image (home-ve-install) makes both itself, as sized on its page: with the pool there,
 #      neither is touched (a backup volume of 0 GB stays none);
 #   3. install.sh; once it went through, the service disables itself. If it didn't (no network?), the next boot
-#      tries again, or run this by hand: /opt/home-ve/deploy/preseed/firstboot.sh
+#      tries again, or run this by hand: /opt/home-ve/deploy/preseed/firstboot.sh (installed by the installer
+#      image: /usr/local/sbin/home-ve-firstboot)
 #   4. the web UI's password, when the installer image's page set one (/root/home-ve-web-password, its hash):
 #      it becomes the backend's, and there is no first-run setup;
 #   5. otherwise, on the host's screen, with the login prompt: the setup code, next to the web UI's address. The login prompt

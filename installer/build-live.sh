@@ -39,6 +39,10 @@ rm -f config/package-lists/live.list.chroot
 cp -r "$here/live/package-lists/." config/package-lists/
 cp -r "$here/live/hooks/." config/hooks/
 cp -r "$here/live/includes.chroot/." config/includes.chroot/
+# the first boot of what it installs, this commit's (home-ve-install): the branch it installs may be older
+mkdir -p config/includes.chroot/usr/local/share/home-ve
+install -m 0755 "$here/../deploy/preseed/firstboot.sh" config/includes.chroot/usr/local/share/home-ve/
+install -m 0644 "$here/../deploy/preseed/home-ve-firstboot.service" config/includes.chroot/usr/local/share/home-ve/
 # the page's backend and frontend, from the build
 mkdir -p config/includes.chroot/opt/home-ve
 tar -xzf "$build" -C config/includes.chroot/opt/home-ve

@@ -10,7 +10,8 @@
 #   then LVM in the group "home": root, swap, backups (mounted at /var/backups/vm), the thin pool "data" (90% of
 #   the rest). Debian 13 from deb.debian.org (mmdebstrap), the boot loader for the firmware this machine runs
 #   (UEFI with Debian's signed shim, or BIOS), the bridge br0 on the chosen card, and home-ve: the checkout in
-#   /opt/home-ve, whose first boot runs install.sh (deploy/preseed/firstboot.sh) and sets the web UI's password.
+#   /opt/home-ve, whose first boot runs install.sh (deploy/preseed/firstboot.sh, from this image) and sets the web
+#   UI's password.
 # Everything on the disk is erased.
 set -euo pipefail
 
@@ -192,7 +193,10 @@ echo "${s[CHANNEL]}" >"$T/var/lib/home-backend/update-channel"
   umask 077
   printf '%s\n' "${secret[WEB_PASSWORD_HASH]}" >"$T/root/home-ve-web-password"
 )
-install -m 0644 "$T/opt/home-ve/deploy/preseed/home-ve-firstboot.service" "$T/etc/systemd/system/"
+# the first boot from this image, not from the branch: the stable one may be a release from before it
+install -m 0755 /usr/local/share/home-ve/firstboot.sh "$T/usr/local/sbin/home-ve-firstboot"
+sed 's#^ExecStart=.*#ExecStart=/usr/local/sbin/home-ve-firstboot#' /usr/local/share/home-ve/home-ve-firstboot.service \
+  >"$T/etc/systemd/system/home-ve-firstboot.service"
 chr systemctl enable -q home-ve-firstboot.service
 
 say "finishing"

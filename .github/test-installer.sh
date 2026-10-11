@@ -177,7 +177,20 @@ fi
 boot=()
 [[ $firmware == bios ]] && boot=(-boot c)
 vm disk "${boot[@]}"
-set_up() { [[ "$(api "$url/api/auth/setup" | jq -r '.needsSetup' 2>/dev/null)" == false ]]; }
+# the first boot downloads and installs home-ve, which can take a while; once its web UI answers, the password from
+# the installer comes within a minute (firstboot.sh), so 5 minutes after the first answer is a failure
+answered=
+set_up() {
+  local needs
+  needs=$(api "$url/api/auth/setup" | jq -r '.needsSetup' 2>/dev/null) || true
+  [[ $needs == false ]] && return 0
+  if [[ $needs == true && -z $answered ]]; then
+    answered=$SECONDS
+    log "the web UI answers, still without a password"
+  fi
+  [[ -z $answered ]] || ((SECONDS - answered < 300)) || fail "the web UI still asks for its setup 5 minutes after it came up"
+  return 1
+}
 until_ok 1500 "the web UI with its password set" set_up
 screenshot web
 
