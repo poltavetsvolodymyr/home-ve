@@ -1,0 +1,47 @@
+# The UEFI boot menu's look (grub.cfg), the same as the BIOS one (isolinux.cfg): black, the title and three entries
+# in the middle, the countdown under them. Unifont is the font live-build puts into the image (unicode.pf2).
+desktop-color: "#000000"
+title-text: ""
+terminal-font: "Unifont Regular 16"
+
++ label {
+	top = 50%-80
+	left = 0
+	width = 100%
+	height = 20
+	align = "center"
+	text = "home-ve installer"
+	color = "#ffffff"
+	font = "Unifont Regular 16"
+}
+
++ boot_menu {
+	left = 50%-200
+	width = 400
+	top = 50%-44
+	height = 84
+	item_font = "Unifont Regular 16"
+	item_color = "#bbbbbb"
+	selected_item_font = "Unifont Regular 16"
+	selected_item_color = "#000000"
+	selected_item_pixmap_style = "select_*.png"
+	item_height = 20
+	item_padding = 8
+	item_spacing = 4
+	icon_width = 0
+	icon_height = 0
+	item_icon_space = 0
+	scrollbar = false
+}
+
++ label {
+	id = "__timeout__"
+	top = 50%+90
+	left = 0
+	width = 100%
+	height = 20
+	align = "center"
+	text = "Starting in %d s"
+	color = "#888888"
+	font = "Unifont Regular 16"
+}

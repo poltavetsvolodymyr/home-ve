@@ -50,7 +50,8 @@ tar -xzf "$build" -C config/includes.chroot/opt/home-ve
 lb build
 iso=$(find . -maxdepth 1 -name '*.iso' | head -n 1)
 [[ -n $iso ]] || { echo "build-live: live-build made no image" >&2; exit 1; }
-# Our boot menus over live-build's (installer/live/boot): plain, three entries, 5 s. Written into the finished
+# Our boot menus over live-build's (installer/live/boot): plain, three entries in the middle, 5 s (on UEFI with
+# GRUB's theme in theme/). Written into the finished
 # image, the boot records replayed as they are (as .github/build-iso.sh does).
 live=$(xorriso -indev "$iso" -ls /live 2>/dev/null)
 if [[ $live != *"'vmlinuz'"* || $live != *"'initrd.img'"* ]]; then
@@ -61,6 +62,7 @@ rm -f -- "$out"
 xorriso -indev "$iso" -outdev "$out" \
   -map "$here/live/boot/isolinux.cfg" /isolinux/isolinux.cfg \
   -map "$here/live/boot/grub.cfg" /boot/grub/grub.cfg \
+  -map "$here/live/boot/theme" /boot/grub/home-ve \
   -boot_image any replay
 (cd "$(dirname "$out")" && sha256sum "$(basename "$out")" >"$(basename "$out").sha256")
 # every Debian package in the image with its version: their source code is at snapshot.debian.org (docs/deployment.md
