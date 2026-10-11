@@ -6,8 +6,9 @@
 #   3. waits for CI's build of the commit the install checked out (the first boot downloads it);
 #   4. boots the disk alone; once the first boot is through, signs in to the web UI with that password.
 # Everything goes to $OUT (default test-installer/): summary.log (what the workflow publishes), the install's
-# log, the serial port of each boot, a screenshot of each. Needs qemu-system-x86, qemu-utils, ovmf (uefi), curl,
-# jq, python3, gh (GH_TOKEN, GH_REPO).
+# log, the serial port of each boot, a screenshot of each; when the installed system fails, its journal (the disk
+# mounted with qemu-nbd: sudo, lvm2). Needs qemu-system-x86, qemu-utils, ovmf (uefi), curl, jq, python3, gh
+# (GH_TOKEN, GH_REPO).
 set -euo pipefail
 
 iso=$(realpath "${1:?usage: test-installer.sh <iso> <bios|uefi>}")
@@ -22,7 +23,36 @@ log() { echo "[$(date -u +%H:%M:%S)] $*" | tee -a "$out/summary.log"; }
 fail() {
   log "FAILED: $*"
   screenshot failed
+  if [[ $vm_name == disk ]]; then
+    log "the web UI answers: $(api -s -w ' (HTTP %{http_code})' "$url/api/auth/setup" 2>&1 || true)"
+    stop
+    inspect_disk
+  fi
   exit 1
+}
+
+# after a failed boot from the disk: its files and journal, read on the runner (qemu-nbd, as root)
+inspect_disk() {
+  local mnt=$out/mnt
+  sudo modprobe nbd max_part=8 || return 0
+  sudo qemu-nbd --connect=/dev/nbd0 "$out/disk.qcow2" || return 0
+  sleep 2
+  sudo vgchange -q -ay home >/dev/null || true
+  mkdir -p "$mnt"
+  if sudo mount -o ro /dev/home/root "$mnt"; then
+    {
+      echo "----- the installed system -----"
+      sudo ls -la "$mnt/var/lib/home-backend" "$mnt/root" "$mnt/etc/issue.d"
+      sudo ls -la "$mnt/etc/systemd/system/multi-user.target.wants"
+      for unit in home-ve-firstboot home-backend nginx systemd-networkd; do
+        echo "----- journal: $unit -----"
+        sudo journalctl -D "$mnt/var/log/journal" --no-pager -o short-monotonic -u "$unit" 2>&1 | tail -n 60
+      done
+    } >>"$out/summary.log" 2>&1
+    sudo umount "$mnt"
+  fi
+  sudo vgchange -q -an home >/dev/null || true
+  sudo qemu-nbd --disconnect /dev/nbd0 >/dev/null || true
 }
 api() { curl -sk --max-time 30 -b "$jar" -c "$jar" "$@"; }
 
@@ -148,7 +178,7 @@ boot=()
 [[ $firmware == bios ]] && boot=(-boot c)
 vm disk "${boot[@]}"
 set_up() { [[ "$(api "$url/api/auth/setup" | jq -r '.needsSetup' 2>/dev/null)" == false ]]; }
-until_ok 2400 "the web UI with its password set" set_up
+until_ok 1500 "the web UI with its password set" set_up
 screenshot web
 
 [[ "$(api -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"password":"not-the-password"}' "$url/api/auth/login")" == 401 ]] ||

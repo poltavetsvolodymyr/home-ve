@@ -80,7 +80,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf jq
+          sudo apt-get install -y -q --no-install-recommends qemu-system-x86 qemu-utils ovmf jq lvm2
       - name: Install and boot (${{ matrix.firmware }})
         run: .github/test-installer.sh home-ve-installer-live-dev.iso ${{ matrix.firmware }}
       - name: Publish what the test saw

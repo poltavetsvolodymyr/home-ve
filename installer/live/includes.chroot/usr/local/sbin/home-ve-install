@@ -129,6 +129,8 @@ uuid() { blkid -s UUID -o value "$1"; }
   if ((s[BACKUP_GB] > 0)); then echo "/dev/home/backups /var/backups/vm ext4 defaults,nofail 0 2"; fi
 } >"$T/etc/fstab"
 if ((s[BACKUP_GB] > 0)); then mkdir -p "$T/var/backups/vm"; fi
+# the journal on disk: it outlasts a restart (the web UI's logs, and what went wrong at the first boot)
+mkdir -p "$T/var/log/journal"
 echo "${s[HOSTNAME]}" >"$T/etc/hostname"
 printf '127.0.0.1\tlocalhost\n127.0.1.1\t%s\n::1\tlocalhost ip6-localhost ip6-loopback\n' "${s[HOSTNAME]}" >"$T/etc/hosts"
 ln -sf "/usr/share/zoneinfo/${s[TIMEZONE]}" "$T/etc/localtime"
