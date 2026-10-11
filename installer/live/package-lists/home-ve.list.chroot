@@ -20,6 +20,7 @@ lvm2
 thin-provisioning-tools
 mmdebstrap
 debian-archive-keyring
+gpg
 grub-pc-bin
 grub-efi-amd64-bin
 grub-efi-amd64-signed
