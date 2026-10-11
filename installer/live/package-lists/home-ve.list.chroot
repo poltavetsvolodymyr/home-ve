@@ -30,3 +30,10 @@ nano
 # network cards that need firmware (Realtek, Broadcom NetXtreme II)
 firmware-realtek
 firmware-bnx2x
+# the page on the machine's own screen (home-ve-kiosk): cage shows one program full screen, cog is a small
+# WebKit browser made for that; mesa draws without a graphics driver too
+cage
+cog
+libgl1-mesa-dri
+libegl-mesa0
+fonts-dejavu-core

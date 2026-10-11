@@ -1,11 +1,13 @@
 import { bytes } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { BrandMark, Card, ErrorNote, Skeleton } from '@/shared/ui'
-import { fetchMachine, type Disk, type Nic } from './api'
+import { fetchLocalAccess, fetchMachine, type Disk, type Nic } from './api'
 
 /** What the installer found: the machine, its disks and network cards. Refreshed, so a cable plugged in shows up. */
 export function MachinePage() {
   const { data: m, error } = usePoll(fetchMachine, 5000)
+  // only the machine's own screen gets an answer; the address may come later (a cable plugged in)
+  const { data: local } = usePoll(fetchLocalAccess, 5000)
 
   return (
     <div className="installer">
@@ -17,6 +19,19 @@ export function MachinePage() {
         </div>
       </header>
       <ErrorNote error={error} />
+
+      {local && (
+        <Card title="From a phone or another computer" className="installer-remote">
+          {local.urls.length ? (
+            <p>
+              Open <span className="mono">{local.urls.join('  or  ')}</span> and enter the code{' '}
+              <span className="mono installer-code">{local.code}</span>
+            </p>
+          ) : (
+            <p className="muted">No network yet: plug a cable in, the address shows up here.</p>
+          )}
+        </Card>
+      )}
 
       <Card title="This machine">
         <dl className="kv">

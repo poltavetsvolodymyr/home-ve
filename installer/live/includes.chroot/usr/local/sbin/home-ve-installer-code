@@ -19,6 +19,6 @@ cat >/etc/issue.d/home-ve-installer.issue <<EOT
   and enter the code   $(cat "$code")
 
   No address above: no network yet. Plug a cable in, the address appears by itself.
-  Alt+F2: a root shell, to do things by hand.
+  Ctrl+Alt+F2: a root shell, to do things by hand.
 
 EOT

@@ -46,8 +46,10 @@ public class InstallerTests
         var dir = Path.Combine(Path.GetTempPath(), "home-ve-installer-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         await File.WriteAllTextAsync(Path.Combine(dir, "code"), "ABCD-EFGH\n", Ct);
+        // this test's client is on loopback too: here it counts as a phone
         await using var app = InstallerHost.Build(
-            ["--Installer:Mock=true", "--Installer:Urls:0=http://127.0.0.1:0", $"--Installer:CodeFile={dir}/code", $"--Installer:WwwDir={dir}"]);
+            ["--Installer:Mock=true", "--Installer:Urls:0=http://127.0.0.1:0", $"--Installer:CodeFile={dir}/code", $"--Installer:WwwDir={dir}",
+             "--Installer:TrustLoopback=false"]);
         await app.StartAsync(Ct);
         using var client = new HttpClient(new HttpClientHandler { CookieContainer = new CookieContainer() }) { BaseAddress = new Uri(app.Urls.Single()) };
 
@@ -60,6 +62,25 @@ public class InstallerTests
         var machine = await client.GetFromJsonAsync<Machine>("/api/installer/machine", Ct);
         Assert.Equal(3, machine!.Disks.Count);
         Assert.Contains(machine.Disks, d => d.InUse);
+
+        await app.StopAsync(Ct);
+        Directory.Delete(dir, recursive: true);
+    }
+
+    [Fact]
+    public async Task The_machines_own_screen_needs_no_code_and_learns_how_a_phone_gets_in()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "home-ve-installer-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        await File.WriteAllTextAsync(Path.Combine(dir, "code"), "abcdefgh\n", Ct);
+        await using var app = InstallerHost.Build(
+            ["--Installer:Mock=true", "--Installer:Urls:0=http://127.0.0.1:0", $"--Installer:CodeFile={dir}/code", $"--Installer:WwwDir={dir}"]);
+        await app.StartAsync(Ct);
+        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/installer/machine", Ct)).StatusCode);
+        var local = await client.GetFromJsonAsync<LocalAccess>("/api/installer/local", Ct);
+        Assert.Equal("ABCD-EFGH", local!.Code);
 
         await app.StopAsync(Ct);
         Directory.Delete(dir, recursive: true);

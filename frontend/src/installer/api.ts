@@ -41,3 +41,6 @@ export const fetchSession = () => get<void>('/api/installer/session')
 /** The code from the machine's screen; throws with the server's reason when it's wrong. */
 export const createSession = (code: string) => post('/api/installer/session', { code })
 export const fetchMachine = () => get<Machine>('/api/installer/machine')
+
+/** On the machine's own screen only: how a phone gets in. Throws (404) anywhere else. */
+export const fetchLocalAccess = () => get<{ code: string; urls: string[] }>('/api/installer/local')

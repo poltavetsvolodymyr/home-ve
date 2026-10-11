@@ -36,13 +36,24 @@ public sealed class InstallerOptions
 
     /// <summary>A made-up machine, and no installing (development).</summary>
     public bool Mock { get; set; }
+
+    /// <summary>
+    /// The machine's own screen (the kiosk browser, on http://127.0.0.1) needs no code and no HTTPS: whoever sits in
+    /// front of it is at the machine anyway, and the connection doesn't leave it.
+    /// </summary>
+    public bool TrustLoopback { get; set; } = true;
 }
 
 public sealed record InstallerSessionRequest(string? Code);
 
+/// <summary>For the machine's own screen: how a phone gets in.</summary>
+/// <param name="Urls">https://&lt;address&gt;/ for each address the machine has now.</param>
+public sealed record LocalAccess(string Code, IReadOnlyList<string> Urls);
+
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(InstallerSessionRequest))]
 [JsonSerializable(typeof(Machine))]
+[JsonSerializable(typeof(LocalAccess))]
 [JsonSerializable(typeof(ErrorResponse))]
 public partial class InstallerJsonContext : JsonSerializerContext;
 
@@ -104,19 +115,28 @@ public static class InstallerHost
         if (options.Urls.Any(u => u.StartsWith("https:", StringComparison.Ordinal)))
             app.Use((ctx, next) =>
             {
-                // plain HTTP only points at the HTTPS page
-                if (ctx.Request.IsHttps) return next();
+                // plain HTTP only points at the HTTPS page, except for the machine's own screen
+                if (ctx.Request.IsHttps || IsLocal(ctx, options)) return next();
                 ctx.Response.Redirect($"https://{ctx.Request.Host.Host}{ctx.Request.Path}");
                 return Task.CompletedTask;
             });
         app.UseRateLimiter();
         app.UseAuthentication();
+        app.Use((ctx, next) =>
+        {
+            // the machine's own screen is signed in as it is
+            if (ctx.User.Identity?.IsAuthenticated != true && IsLocal(ctx, options))
+                ctx.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "screen")], "loopback"));
+            return next();
+        });
         app.UseAuthorization();
 
         var api = app.MapGroup("/api/installer");
         api.MapPost("/session", CreateSession).RequireRateLimiting(CodeRateLimit);
         api.MapGet("/session", () => TypedResults.NoContent()).RequireAuthorization();
         api.MapGet("/machine", (IMachineSource source, CancellationToken ct) => source.ReadAsync(ct)).RequireAuthorization();
+        api.MapGet("/local", Results<Ok<LocalAccess>, NotFound> (HttpContext http, IOptions<InstallerOptions> o) =>
+            IsLocal(http, o.Value) ? TypedResults.Ok(new LocalAccess(Format(ReadCode(o.Value)), Addresses())) : TypedResults.NotFound());
 
         if (Directory.Exists(options.WwwDir))
         {
@@ -145,6 +165,18 @@ public static class InstallerHost
     // the mock takes TEST-CODE when the live image's file isn't there
     private static string ReadCode(InstallerOptions options) =>
         File.Exists(options.CodeFile) ? Normalize(File.ReadAllText(options.CodeFile)) : options.Mock ? "TESTCODE" : "";
+
+    private static bool IsLocal(HttpContext ctx, InstallerOptions options) =>
+        options.TrustLoopback && ctx.Connection.RemoteIpAddress is { } ip && IPAddress.IsLoopback(ip);
+
+    private static string Format(string code) => code.Length == 8 ? $"{code[..4]}-{code[4..]}" : code;
+
+    private static List<string> Addresses() =>
+        System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+            .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IPAddress.IsLoopback(a.Address))
+            .Select(a => $"https://{a.Address}/")
+            .ToList();
 
     public static string Normalize(string code) =>
         new(code.ToUpperInvariant().Where(c => c is not ('-' or ' ' or '\n' or '\r' or '\t')).ToArray());

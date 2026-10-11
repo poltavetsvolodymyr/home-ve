@@ -2,3 +2,5 @@
 # Inside the image's system while live-build makes it: the services the installer needs at boot.
 set -e
 systemctl enable systemd-networkd systemd-resolved home-ve-installer.service
+# the screen's user: its shell shows the page (home-ve-kiosk); no password, it only ever logs in on tty1
+id kiosk >/dev/null 2>&1 || useradd --create-home --shell /usr/local/bin/home-ve-kiosk --groups video,render,input kiosk
