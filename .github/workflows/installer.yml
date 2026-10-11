@@ -1,6 +1,8 @@
 # The installer image (installer/): a small Debian that boots into the installer's page. Built for every push to
-# main that touches it, and by hand (Run workflow); the image goes to the pre-release "dev" as
-# home-ve-installer-dev.iso. Separate from ci.yml: live-build takes a while.
+# main that touches what installs a host from scratch (below), and by hand (Run workflow); the image goes to the
+# pre-release "dev" as home-ve-installer-dev.iso. Separate from ci.yml: live-build takes a while.
+# The rest of home-ve doesn't need it: hosts update from ci.yml's builds, and release.yml builds and tests the image
+# for every release anyway.
 # Then the image is tested end to end (.github/test-installer.sh), with BIOS and with UEFI: it installs onto an
 # empty virtual disk through its page's API, the installed system boots and takes the web password set there.
 # What each test saw goes to the same pre-release: home-ve-installer-test-<bios|uefi>.log and .png screenshots.
@@ -9,8 +11,19 @@ name: Installer image
 on:
   push:
     branches: [main]
-    paths: [installer/**, backend/**, frontend/**, deploy/preseed/**, .github/workflows/installer.yml, .github/package.sh,
-      .github/test-installer.sh, .github/ppm2png.py, build.sh]
+    # the image, the installer's page (backend and frontend), and deploy/: install.sh, firstboot.sh and fetch-build.sh
+    # run on a fresh install's first boot
+    paths:
+      - installer/**
+      - deploy/**
+      - backend/HomeBackend/Installer/**
+      - frontend/src/installer/**
+      - frontend/installer.html
+      - .github/workflows/installer.yml
+      - .github/package.sh
+      - .github/test-installer.sh
+      - .github/ppm2png.py
+      - build.sh
   workflow_dispatch:
 
 permissions:

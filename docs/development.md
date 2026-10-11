@@ -81,7 +81,9 @@ cd frontend && npm run dev     # then http://localhost:5173/installer.html
 ```
 
 The image itself (`installer/build-live.sh`, live-build) is built by `.github/workflows/installer.yml` and lands on
-the pre-release **dev** as `home-ve-installer-dev.iso`. The same workflow then tests it end to end
+the pre-release **dev** as `home-ve-installer-dev.iso`, for pushes to `main` that touch what installs a host from
+scratch: `installer/`, `deploy/`, the installer's page (`backend/HomeBackend/Installer/`, `frontend/src/installer/`),
+the workflow and its scripts; or by hand (Run workflow). The same workflow then tests it end to end
 (`.github/test-installer.sh`): in QEMU with KVM, with BIOS and with UEFI, it installs onto an empty disk through the
 page's API, boots the disk and signs in to the web UI with the password set in the installer. What the test saw
 goes to **dev** too: `home-ve-installer-test-<bios|uefi>.log` and screenshots; when the installed system fails,
@@ -126,7 +128,7 @@ Hosts don't need you to build anything: CI builds every commit for them.
   attaches `home-ve-vX.Y.Z-linux-x64.tar.gz` to the release.
 - **The installer image** (`installer/`, above): releases get `home-ve-vX.Y.Z-installer.iso` and its
   `.packages` list, uploaded only after the image has installed the stable channel in QEMU with BIOS and UEFI;
-  every push to `main` that touches it replaces `home-ve-installer-dev.iso` on **dev**.
+  pushes to `main` that touch it (above) replace `home-ve-installer-dev.iso` on **dev**.
 - **The preseed ISO**: `.github/build-iso.sh` takes Debian's netboot `mini.iso` (checked against Debian's
   SHA256SUMS), adds `deploy/preseed` to its initrd and writes the image anew with the original boot records.
   Releases get `home-ve-vX.Y.Z-preseed.iso` (stable channel), every push to `main` replaces
