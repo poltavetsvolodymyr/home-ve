@@ -4,11 +4,12 @@ import { usePoll } from '@/shared/hooks/usePoll'
 import { Card, confirm } from '@/shared/ui'
 import { fetchBridges, runVmAction, saveVmSettings, type Vm, type VmSettings } from './api'
 import { CdromField } from './CdromField'
+import { FirmwareField } from './ImageField'
 import { NetsEditor } from './NetsEditor'
 import { needsRestart, settingsFrom, validateSettings } from './settings'
 
 /**
- * CPUs, memory, CD drive, network cards, autostart and the nightly backup. Hardware changes apply at the VM's next start (like on a real
+ * CPUs, memory, firmware, CD drive, network cards, autostart and the nightly backup. Hardware changes apply at the VM's next start (like on a real
  * machine), so after saving a running VM the form offers to reboot it.
  */
 export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void }) {
@@ -86,6 +87,7 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
             {(form.memoryMb / 1024).toFixed(1)} GiB of the host's {(hostMemoryMb / 1024).toFixed(0)} GiB
           </small>
         </label>
+        <FirmwareField uefi={form.uefi} onChange={uefi => update({ uefi })} />
         <label className="check">
           <input type="checkbox" checked={form.autostart} onChange={e => update({ autostart: e.target.checked })} />
           Start at boot
@@ -103,6 +105,7 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
           <div className="muted">
             Disk: <span className="mono">{vm.config.disk}</span>
             {vm.config.diskSizeGb && ` · ${vm.config.diskSizeGb} GiB`}
+            {vm.config.image && ` · made from ${vm.config.image}`}
           </div>
           {problems.length > 0 && (
             <ul className="error-note vm-problems">

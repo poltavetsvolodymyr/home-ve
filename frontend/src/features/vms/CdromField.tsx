@@ -1,12 +1,12 @@
 import { Link } from 'react-router'
-import { fetchIsos } from '@/features/isos/api'
+import { fetchIsos, isIso } from '@/features/isos/api'
 import { bytes } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
 
 /** The CD drive: empty, or one of the host's ISO images. */
 export function CdromField({ value, onChange }: { value: string | null; onChange: (iso: string | null) => void }) {
   const isos = usePoll(fetchIsos, 0)
-  const files = isos.data?.files ?? []
+  const files = (isos.data?.files ?? []).filter(isIso)
 
   return (
     <label className="wide">
@@ -21,7 +21,7 @@ export function CdromField({ value, onChange }: { value: string | null; onChange
         ))}
       </select>
       <small className="muted">
-        <Link to="/isos">ISO images</Link>
+        <Link to="/isos">Images</Link>
       </small>
     </label>
   )

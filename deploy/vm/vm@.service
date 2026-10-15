@@ -11,10 +11,12 @@ RuntimeDirectory=vm-%i
 # sockets for root only; the console one is handed to the web UI below
 UMask=0077
 ExecStart=/usr/local/sbin/vm-run %i
-# QEMU makes vnc.sock a moment after it starts (after vm-run created a new disk: a few seconds): wait for
-# it, then let home-backend connect. Stops waiting when vm-run gives up. "-" = should that fail, the VM
-# still runs, just without a console in the web UI.
-ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 600 ] && kill -0 "$$MAINPID" 2>/dev/null; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"'
+# QEMU makes vnc.sock a moment after it starts (after vm-run created a new disk: a few seconds; made it
+# from an image: as long as writing the image takes): wait for it, then let home-backend connect. Stops
+# waiting when vm-run gives up. "-" = should that fail, the VM still runs, just without a console in the web UI.
+ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 18000 ] && kill -0 "$$MAINPID" 2>/dev/null; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"'
+# the VM is "starting" until then, and writing a big image takes minutes, not the default 90 s
+TimeoutStartSec=30min
 # press the power button, wait up to 120 s for the guest, then pull the plug (deploy/vm/vm-stop)
 ExecStop=/usr/local/sbin/vm-stop %i
 # then unplug its "cables": the taps <vm>-n0..n7 that vm-run made (only tap devices: they have tun_flags).

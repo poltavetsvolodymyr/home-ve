@@ -1,8 +1,9 @@
 namespace HomeBackend.Features.Isos;
 
-/// <summary>An ISO image on the host.</summary>
+/// <summary>An image on the host: an ISO for the CD drive, or a qcow2 disk image a new VM's disk is made from.</summary>
 /// <param name="UsedBy">VMs that have it in their CD drive; it can't be deleted while any do.</param>
-public sealed record IsoFile(string Name, long SizeBytes, DateTimeOffset Modified, IReadOnlyList<string> UsedBy);
+/// <param name="DiskBytes">A qcow2's disk size, the least a VM's disk made from it can have; null for an ISO.</param>
+public sealed record IsoFile(string Name, long SizeBytes, DateTimeOffset Modified, IReadOnlyList<string> UsedBy, long? DiskBytes = null);
 
 /// <summary>A download in progress, or one that failed (until it's dismissed).</summary>
 /// <param name="TotalBytes">From Content-Length; null when the server doesn't say.</param>

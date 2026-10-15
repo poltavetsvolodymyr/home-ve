@@ -104,6 +104,41 @@ public class VmConfigFileTests
         Assert.NotNull(VmConfigFile.Validate(c));
     }
 
+    [Fact]
+    public void Image_and_firmware_round_trip()
+    {
+        var c = VmConfigFile.Parse("haos", ["CPUS=2", "MEMORY=4096", "DISK=/dev/home/haos", "DISK_SIZE=32", "IMAGE=haos_ova-16.2.qcow2", "FIRMWARE=uefi"]);
+
+        Assert.Equal("haos_ova-16.2.qcow2", c.Image);
+        Assert.True(c.Uefi);
+        Assert.Equal(c with { Nets = [] }, VmConfigFile.Parse("haos", VmConfigFile.Format(c).Split('\n')) with { Nets = [] });
+    }
+
+    [Fact]
+    public void Bios_without_an_image_keeps_both_keys_out_of_the_file()
+    {
+        var c = VmConfigFile.Parse("router", [.. RouterConf, "FIRMWARE=bios"]);
+        Assert.False(c.Uefi);
+        var text = VmConfigFile.Format(c);
+        Assert.DoesNotContain("FIRMWARE", text);
+        Assert.DoesNotContain("IMAGE", text);
+    }
+
+    [Fact]
+    public void Firmware_is_bios_or_uefi() =>
+        Assert.Throws<FormatException>(() => VmConfigFile.Parse("router", [.. RouterConf, "FIRMWARE=coreboot"]));
+
+    [Theory]
+    [InlineData("../haos.qcow2")]
+    [InlineData(".haos.qcow2")]
+    [InlineData("haos.qcow2.xz")]
+    [InlineData("debian.iso")]
+    public void Image_must_be_a_plain_qcow2_file_name(string image)
+    {
+        var c = VmConfigFile.Parse("router", RouterConf) with { Image = image };
+        Assert.NotNull(VmConfigFile.Validate(c));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(4097)]

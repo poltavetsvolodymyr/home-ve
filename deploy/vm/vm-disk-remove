@@ -1,10 +1,12 @@
 #!/bin/sh
 # vm-disk-remove <name>: deletes the disk of a stopped VM, the thin volume <group>/<name> in the pool
-# "data". vm-disk-remove@<name>.service runs it as root when the web UI deletes a VM with its disk.
+# "data", and its UEFI NVRAM (the boot entries on that disk). vm-disk-remove@<name>.service runs it as
+# root when the web UI deletes a VM with its disk.
 # Only that volume: the name says which, and it must be thin in the pool, so nothing else can go.
 set -eu
 
 POOL=data
+EFI_DIR=/var/lib/vm-efi
 
 die() {
   echo "vm-disk-remove: $*" >&2
@@ -19,6 +21,8 @@ case $state in
   inactive | failed) ;;
   *) die "vm@$name is $state: stop it first" ;;
 esac
+
+rm -f -- "$EFI_DIR/${name:?}.fd"
 
 # the volume of that name that is thin in the pool (there could be one of that name elsewhere too)
 lv=$(lvs --noheadings --separator / -o vg_name,lv_name,pool_lv -S "lv_name=$name" 2>/dev/null |

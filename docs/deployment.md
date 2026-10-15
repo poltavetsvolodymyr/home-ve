@@ -343,7 +343,7 @@ bash /opt/home-ve/deploy/install.sh
 
 .NET is not installed on the host. What the script does:
 
-- installs whatever is missing from `qemu-system-x86`, `socat`, `lvm2`, `thin-provisioning-tools`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
+- installs whatever is missing from `qemu-system-x86`, `qemu-utils`, `ovmf`, `xz-utils`, `socat`, `lvm2`, `thin-provisioning-tools`, `dbus`, `polkitd`, `zstd`, `curl`, `ca-certificates`,
   `nginx`, `openssl`. `systemctl` run by a regular user talks to systemd over D-Bus, and a minimal Debian
   may not have it;
 - creates the system user `home-backend` (no shell, no home directory);
@@ -561,13 +561,28 @@ cat /var/lib/home-backend/setup-code
 
 ## New VM
 
-1. **ISO images → Download an ISO**: a link to an installation image, for example Debian netinst. The host downloads it
+1. **Images → Download an image**: a link to an installation image, for example Debian netinst. The host downloads it
    itself to `/var/lib/home-backend/iso`, so you can close the page on your phone.
 2. **New VM**: name, cores, memory, disk size, ISO in the CD drive, network cards. With "Start now" checked, the VM
    starts right away and the console with the installer opens.
 3. On first start, `vm-run` creates the disk `/dev/<DiskGroup>/<name>` (a thin volume in the `data` pool): space is used
-   as data is written. An empty disk is not bootable, so the BIOS boots from the CD. After installation the disk boots, so you
-   can leave the ISO in place or remove it in Settings → CD drive.
+   as data is written. An empty disk is not bootable, so the firmware boots from the CD. After installation the disk
+   boots, so you can leave the ISO in place or remove it in Settings → CD drive.
+
+### From a disk image (Home Assistant OS)
+
+Some systems come as a ready disk, a qcow2 image, not as an installer. Home Assistant OS, for example:
+
+1. **Images → Download an image**: the link to `haos_ova-<version>.qcow2.xz` from Home Assistant's releases. The host
+   unpacks `.xz` as it downloads, and keeps `haos_ova-<version>.qcow2`; the list shows the size of the disk inside (32 GiB).
+2. **New VM → Disk contents**: the image. The disk size goes up to the image's if it was smaller, and the firmware
+   switches to UEFI (Home Assistant OS boots only with UEFI). 2 cores and 4096 MiB are what Home Assistant asks for.
+3. On first start, `vm-run` creates the disk and writes the image onto it, which takes a while (the VM shows "Starting"
+   meanwhile; the log says when it is done). Blocks that are empty in the image take no space. Then the VM boots from it.
+
+The image is written only when the disk is created: a disk left over from a deleted VM of the same name is used as it
+is, and deleting the image afterwards changes nothing for the VM. A start that is interrupted while the image is being
+written (power off, a reboot of the host) leaves no half disk: the next start writes it again.
 
 **The VM's addresses** show on its card and on its Summary tab once `qemu-guest-agent` runs in the guest (Debian,
 Ubuntu: `apt install qemu-guest-agent`, it starts by itself; Windows: the guest agent from the virtio-win ISO). The
@@ -576,7 +591,12 @@ a bridge the VM is plugged into (the one you reach it at from the host and your 
 without such a network, the guest's first IPv4. The Summary tab lists all of them. The same agent lets backups freeze the guest's
 file systems (see Backups), so it is worth installing in every VM.
 
-VMs boot via BIOS (SeaBIOS). Installers support this, but you must install the system in BIOS/MBR mode.
+VMs boot via BIOS (SeaBIOS) unless their Firmware is UEFI (OVMF, without Secure Boot). A system boots only with the
+firmware it was installed with: changing it in Settings afterwards makes it unbootable until you change it back. With
+UEFI, the VM's boot entries (NVRAM) are kept in `/var/lib/vm-efi/<name>.fd`; deleting the VM with its disk deletes it
+too. Backups don't include it: a VM restored after it was lost boots through the fallback path `\EFI\BOOT\BOOTX64.EFI`,
+which Home Assistant OS and most images have, while a Debian installed with UEFI needs "install to the removable
+media path" for that.
 
 **Deleting**: VM → Settings → Delete VM, only when the VM is stopped. Without the checkbox only the `.conf` is deleted; the disk stays,
 and a new VM with the same name picks it up as is. With the checkbox the disk is deleted too; for that you must type the VM's name.

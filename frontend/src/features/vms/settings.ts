@@ -18,6 +18,7 @@ export const settingsFrom = (c: VmConfig): VmSettings => ({
   autostart: c.autostart,
   cdrom: c.cdrom,
   backup: c.backup,
+  uefi: c.uefi,
 })
 
 /** A new VM's starting point: small, one card on the first bridge, started for installing. */
@@ -30,17 +31,26 @@ export const newVm = (bridge: string): VmCreate => ({
   autostart: false,
   cdrom: null,
   backup: true,
+  image: null,
+  uefi: false,
   start: true,
 })
 
-/** The settings checks plus the name and the disk size. */
-export function validateNewVm(vm: VmCreate, existing: string[], hostCpus: number, hostMemoryMb: number): string[] {
+/** The settings checks plus the name and the disk size, which must take the image (`imageGb`) if there is one. */
+export function validateNewVm(
+  vm: VmCreate,
+  existing: string[],
+  hostCpus: number,
+  hostMemoryMb: number,
+  imageGb = 0,
+): string[] {
   const errors: string[] = []
   if (!namePattern.test(vm.name)) errors.push('Name: 1–12 lowercase letters, digits or dashes, starting with a letter')
   else if (reservedNames.includes(vm.name)) errors.push(`Name: "${vm.name}" is reserved`)
   else if (existing.includes(vm.name)) errors.push(`Name: there already is a VM ${vm.name}`)
   if (!Number.isInteger(vm.diskSizeGb) || vm.diskSizeGb < 1 || vm.diskSizeGb > maxDiskSizeGb)
     errors.push(`Disk: 1–${maxDiskSizeGb} GiB`)
+  else if (vm.image && vm.diskSizeGb < imageGb) errors.push(`Disk: at least ${imageGb} GiB, the size of ${vm.image}`)
   return [...errors, ...validateSettings(vm, hostCpus, hostMemoryMb)]
 }
 
@@ -78,6 +88,7 @@ export const newNet = (bridge: string): VmNet => ({ bridge, mac: randomMac() })
 export const needsRestart = (before: VmConfig, after: VmSettings) =>
   before.cpus !== after.cpus ||
   (before.cdrom ?? null) !== (after.cdrom ?? null) ||
+  before.uefi !== after.uefi ||
   before.memoryMb !== after.memoryMb ||
   JSON.stringify(before.nets.map(n => [n.bridge, n.mac.toUpperCase()])) !==
     JSON.stringify(after.nets.map(n => [n.bridge, n.mac.toUpperCase()]))

@@ -48,11 +48,14 @@ export function VmSummary({ vm }: { vm?: Vm }) {
               <>
                 <span className="mono">{c.disk}</span>
                 {c.diskSizeGb && <span className="muted"> · {c.diskSizeGb} GiB</span>}
+                {c.image && <span className="muted"> · from {c.image}</span>}
               </>
             ) : (
               <Skeleton width="9em" />
             )}
           </dd>
+          <dt>Firmware</dt>
+          <dd>{c ? c.uefi ? 'UEFI' : 'BIOS' : <Skeleton width="3em" />}</dd>
           <dt>CD drive</dt>
           <dd>{c ? c.cdrom ? <span className="mono">{c.cdrom}</span> : 'empty' : <Skeleton width="6em" />}</dd>
           {c ? (

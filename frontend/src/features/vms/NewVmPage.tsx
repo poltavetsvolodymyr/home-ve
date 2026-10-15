@@ -2,17 +2,20 @@ import { ArrowLeft } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { fetchHost } from '@/features/host/api'
+import { imageDiskGb, type IsoFile } from '@/features/isos/api'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { Card } from '@/shared/ui'
 import { createVm, fetchBridges, fetchVms, type VmCreate } from './api'
 import { CdromField } from './CdromField'
+import { FirmwareField, ImageField } from './ImageField'
 import { NetsEditor } from './NetsEditor'
 import { maxDiskSizeGb, newVm, validateNewVm } from './settings'
 import './vms.css'
 
 /**
  * A new VM: a new /etc/vm/<name>.conf. Its disk (a thin volume named after it) is created by vm-run at the
- * first start. With an ISO in the CD drive and "start now", the console opens on the installer.
+ * first start, empty or from a qcow2 image. With an ISO in the CD drive and "start now", the console opens
+ * on the installer; with an image, on the system booting from it.
  */
 export function NewVmPage() {
   const navigate = useNavigate()
@@ -20,6 +23,7 @@ export function NewVmPage() {
   const bridges = usePoll(fetchBridges, 0)
   const vms = usePoll(fetchVms, 0)
   const [form, setForm] = useState<VmCreate>(() => newVm(''))
+  const [imageGb, setImageGb] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -34,8 +38,16 @@ export function NewVmPage() {
     (vms.data ?? []).map(v => v.name),
     hostCpus,
     hostMemoryMb,
+    imageGb,
   )
   const update = (patch: Partial<VmCreate>) => setForm(f => ({ ...f, nets, ...patch }))
+
+  // an image sets the disk's least size, and most images are made for UEFI (Home Assistant OS needs it)
+  const pickImage = (image: IsoFile | null) => {
+    const gb = image ? imageDiskGb(image) : 0
+    setImageGb(gb)
+    update(image ? { image: image.name, uefi: true, diskSizeGb: Math.max(form.diskSizeGb || 0, gb) } : { image: null })
+  }
 
   const create = async (e: FormEvent) => {
     e.preventDefault()
@@ -109,6 +121,8 @@ export function NewVmPage() {
             />
             <small className="muted">thin: takes space as the guest writes</small>
           </label>
+          <ImageField value={form.image} onChange={pickImage} />
+          <FirmwareField uefi={form.uefi} onChange={uefi => update({ uefi })} />
           <CdromField value={form.cdrom} onChange={cdrom => update({ cdrom })} />
           <label className="check">
             <input type="checkbox" checked={form.autostart} onChange={e => update({ autostart: e.target.checked })} />
@@ -123,8 +137,9 @@ export function NewVmPage() {
 
           <div className="vm-form-foot">
             <div className="muted">
-              Disk: <span className="mono">/dev/home/{form.name || '<name>'}</span>, created at the first start. A disk
-              left over from a deleted VM of the same name is used as it is.
+              Disk: <span className="mono">/dev/home/{form.name || '<name>'}</span>, created at the first start
+              {form.image && <>, from {form.image}</>}. A disk left over from a deleted VM of the same name is used as
+              it is.
             </div>
             {form.name && problems.length > 0 && (
               <ul className="error-note vm-problems">

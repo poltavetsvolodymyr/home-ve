@@ -2,13 +2,20 @@ import { del, get, post } from '@/shared/api/http'
 
 // Mirrors backend/HomeBackend/Features/Isos/IsoModels.cs
 
+/** An ISO for the CD drive, or a qcow2 disk image a new VM's disk is made from. */
 export interface IsoFile {
   name: string
   sizeBytes: number
   modified: string
   /** VMs that have it in their CD drive; it can't be deleted while any do */
   usedBy: string[]
+  /** a qcow2's disk size, the least a disk made from it can have; null for an ISO */
+  diskBytes: number | null
 }
+
+export const isIso = (f: IsoFile) => f.name.endsWith('.iso')
+/** GiB a VM's disk needs to take the image */
+export const imageDiskGb = (f: IsoFile) => Math.ceil((f.diskBytes ?? 0) / 2 ** 30)
 
 export interface IsoDownload {
   name: string

@@ -16,8 +16,10 @@ public class VmLifecycleTests(TestApp app) : IClassFixture<TestApp>
         return client;
     }
 
-    private static object NewVm(string name, int? disk = 10, string? cdrom = null, bool start = false) => new
+    private static object NewVm(string name, int? disk = 10, string? cdrom = null, bool start = false, string? image = null) => new
     {
+        image,
+        uefi = image is not null,
         name,
         cpus = 1,
         memoryMb = 1024,
@@ -69,6 +71,41 @@ public class VmLifecycleTests(TestApp app) : IClassFixture<TestApp>
         var client = await SignedIn();
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/vms", NewVm("nodisk", disk: null), Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/vms", NewVm("noiso", cdrom: "missing.iso"), Ct)).StatusCode);
+    }
+
+    /// <summary>A file with just a qcow2 header, saying the disk inside is <paramref name="gib"/> GiB.</summary>
+    private async Task WriteQcow2(string name, int gib)
+    {
+        var header = new byte[512];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(header, 0x514649fb);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(header.AsSpan(24), (long)gib << 30);
+        Directory.CreateDirectory(app.IsoDir);
+        await File.WriteAllBytesAsync(Path.Combine(app.IsoDir, name), header, Ct);
+    }
+
+    [Fact]
+    public async Task A_disk_made_from_an_image_is_at_least_as_big_as_the_image()
+    {
+        var client = await SignedIn();
+        await WriteQcow2("haos.qcow2", 32);
+
+        var list = await client.GetFromJsonAsync<JsonElement>("/api/isos", Ct);
+        var image = list.GetProperty("files").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "haos.qcow2");
+        Assert.Equal(32L << 30, image.GetProperty("diskBytes").GetInt64());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/vms", NewVm("missing", disk: 32, image: "nope.qcow2"), Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/vms", NewVm("small", disk: 20, image: "haos.qcow2"), Ct)).StatusCode);
+        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync("/api/vms", NewVm("haos", disk: 32, image: "haos.qcow2"), Ct)).StatusCode);
+
+        var config = (await client.GetFromJsonAsync<JsonElement>("/api/vms/haos", Ct)).GetProperty("config");
+        Assert.Equal("haos.qcow2", config.GetProperty("image").GetString());
+        Assert.True(config.GetProperty("uefi").GetBoolean());
+
+        // the settings change the firmware, never the image
+        var settings = new { cpus = 2, memoryMb = 4096, nets = Array.Empty<object>(), autostart = true, uefi = false };
+        var saved = await (await client.PutAsJsonAsync("/api/vms/haos/config", settings, Ct)).Content.ReadFromJsonAsync<JsonElement>(Ct);
+        Assert.Equal("haos.qcow2", saved.GetProperty("config").GetProperty("image").GetString());
+        Assert.False(saved.GetProperty("config").GetProperty("uefi").GetBoolean());
     }
 
     [Fact]

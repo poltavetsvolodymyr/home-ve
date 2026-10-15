@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace HomeBackend.Tests.Features;
 
-/// <summary>A server that goes quiet fails the download instead of leaving it hanging.</summary>
+/// <summary>A server that goes quiet fails the download instead of leaving it hanging; .xz links are unpacked.</summary>
 public sealed class IsoDownloadTests : IDisposable
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -75,6 +75,80 @@ public sealed class IsoDownloadTests : IDisposable
         Assert.Null(_store.StartDownload($"http://127.0.0.1:{port}/test.iso", null));
 
         Assert.Equal("could not connect to 127.0.0.1: IPv4 127.0.0.1: ConnectionRefused", await ErrorAsync());
+    }
+
+    [Fact]
+    public async Task An_xz_link_lands_unpacked_under_the_name_without_xz()
+    {
+        var qcow2 = new byte[1 << 20];
+        Random.Shared.NextBytes(qcow2);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(qcow2, 0x514649fb);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(qcow2.AsSpan(24), 32L << 30);
+        var packed = await XzAsync(qcow2);
+        using var accepted = Serve(packed);
+
+        Assert.Null(_store.StartDownload(UrlOf("haos_ova-16.2.qcow2.xz"), null));
+
+        Assert.Null(await FinishedAsync());
+        Assert.Equal(qcow2, await File.ReadAllBytesAsync(Path.Combine(_dir, "haos_ova-16.2.qcow2"), Ct));
+        Assert.Equal(32L << 30, _store.List([]).Files.Single().DiskBytes);
+    }
+
+    [Fact]
+    public async Task A_qcow2_that_isnt_one_is_not_kept()
+    {
+        using var accepted = Serve(new byte[4096]);
+
+        Assert.Null(_store.StartDownload(UrlOf("fake.qcow2"), null));
+
+        Assert.Equal("not a qcow2 image", await FinishedAsync());
+        Assert.Empty(Directory.GetFiles(_dir));
+    }
+
+    [Fact]
+    public async Task A_broken_xz_says_what_xz_said()
+    {
+        using var accepted = Serve(new byte[4096]);
+
+        Assert.Null(_store.StartDownload(UrlOf("broken.iso.xz"), null));
+
+        Assert.StartsWith("xz: ", await FinishedAsync());
+        Assert.Empty(Directory.GetFiles(_dir));
+    }
+
+    private string UrlOf(string file) => $"http://127.0.0.1:{((IPEndPoint)_server.LocalEndpoint).Port}/{file}";
+
+    /// <summary>Answers one request with <paramref name="body"/>.</summary>
+    private IDisposable Serve(byte[] body) => Accept(async stream =>
+    {
+        await stream.WriteAsync(System.Text.Encoding.ASCII.GetBytes($"HTTP/1.1 200 OK\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n"), Ct);
+        await stream.WriteAsync(body, Ct);
+        await Task.Delay(Timeout.Infinite, Ct);
+    });
+
+    private static async Task<byte[]> XzAsync(byte[] data)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo("xz", "-c") { RedirectStandardInput = true, RedirectStandardOutput = true };
+        using var xz = System.Diagnostics.Process.Start(psi)!;
+        var output = new MemoryStream();
+        var read = xz.StandardOutput.BaseStream.CopyToAsync(output, Ct);
+        await xz.StandardInput.BaseStream.WriteAsync(data, Ct);
+        xz.StandardInput.Close();
+        await read;
+        await xz.WaitForExitAsync(Ct);
+        return output.ToArray();
+    }
+
+    /// <summary>The download's error once it's over, or null when it went through.</summary>
+    private async Task<string?> FinishedAsync()
+    {
+        for (var i = 0; i < 100; i++)
+        {
+            if (_store.List([]).Downloads.SingleOrDefault() is not { } d) return null;
+            if (d.Error is { } error) return error;
+            await Task.Delay(100, Ct);
+        }
+        throw new TimeoutException("the download didn't finish");
     }
 
     /// <summary>Answers one connection with <paramref name="serve"/>; disposing closes it.</summary>

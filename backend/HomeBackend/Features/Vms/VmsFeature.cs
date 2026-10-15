@@ -59,8 +59,8 @@ public static class VmsFeature
     }
 
     /// <summary>
-    /// CPUs, memory, network cards and autostart; the disk stays as it is. Applies at the next start of the VM,
-    /// like changing hardware on a real machine.
+    /// CPUs, memory, network cards, autostart and the firmware; the disk, and the image it was made from, stay as
+    /// they are. Applies at the next start of the VM, like changing hardware on a real machine.
     /// </summary>
     private static async Task<Results<Ok<VmInfo>, NotFound, BadRequest<ErrorResponse>>> SaveConfig(
         string name, VmSettingsRequest request, IVmHost host, IsoStore isos, VmMonitor monitor, CancellationToken ct)
@@ -75,6 +75,7 @@ public static class VmsFeature
             Autostart = request.Autostart,
             Cdrom = string.IsNullOrEmpty(request.Cdrom) ? null : request.Cdrom,
             Backup = request.Backup,
+            Uefi = request.Uefi,
         };
         if (Check(config, host, isos) is { } error) return TypedResults.BadRequest(new ErrorResponse(error));
 
@@ -83,7 +84,10 @@ public static class VmsFeature
         return monitor.Find(name) is { } saved ? TypedResults.Ok(saved) : TypedResults.NotFound();
     }
 
-    /// <summary>What both a new VM and changed settings must pass: the file rules, bridges that exist, an ISO that's there.</summary>
+    /// <summary>
+    /// What both a new VM and changed settings must pass: the file rules, bridges that exist, an ISO that's there.
+    /// The image only matters until vm-run has made the disk from it, so it's checked for a new VM only.
+    /// </summary>
     private static string? Check(VmConfig config, IVmHost host, IsoStore isos)
     {
         if (VmConfigFile.Validate(config) is { } error) return error;
@@ -96,7 +100,8 @@ public static class VmsFeature
 
     /// <summary>
     /// A new VM is just a new .conf: its disk, /dev/&lt;group&gt;/&lt;name&gt;, is created by vm-run (as root) at the
-    /// first start, with DISK_SIZE. A volume of that name left over from a deleted VM is used as it is.
+    /// first start, with DISK_SIZE, and the image written onto it if there is one. A volume of that name left over
+    /// from a deleted VM is used as it is.
     /// </summary>
     private static async Task<Results<Created<VmInfo>, Conflict<ErrorResponse>, BadRequest<ErrorResponse>, ProblemHttpResult>> Create(
         VmCreateRequest request, IVmHost host, IsoStore isos, VmMonitor monitor, IOptions<HomeBackendOptions> options, CancellationToken ct)
@@ -112,9 +117,17 @@ public static class VmsFeature
 
         var config = new VmConfig(name, request.Cpus, request.MemoryMb, $"/dev/{options.Value.DiskGroup}/{name}",
             request.Nets.Select(n => new VmNet(n.Bridge, n.Mac.ToUpperInvariant())).ToList(), request.Autostart,
-            request.DiskSizeGb, string.IsNullOrEmpty(request.Cdrom) ? null : request.Cdrom, request.Backup);
+            request.DiskSizeGb, string.IsNullOrEmpty(request.Cdrom) ? null : request.Cdrom, request.Backup,
+            string.IsNullOrEmpty(request.Image) ? null : request.Image, request.Uefi);
         if (config.DiskSizeGb is null) return TypedResults.BadRequest(new ErrorResponse("a new VM needs a disk size"));
         if (Check(config, host, isos) is { } error) return TypedResults.BadRequest(new ErrorResponse(error));
+        if (config.Image is { } image)
+        {
+            if (isos.DiskBytesOf(image) is not { } bytes) return TypedResults.BadRequest(new ErrorResponse($"there is no qcow2 image {image}"));
+            var least = (int)((bytes + (1L << 30) - 1) >> 30);
+            if (config.DiskSizeGb < least)
+                return TypedResults.BadRequest(new ErrorResponse($"{image} holds a {least} GiB disk: the VM's disk must be at least that"));
+        }
 
         host.WriteConfig(config);
         if (request.Start)
@@ -164,10 +177,14 @@ public static class VmsFeature
 /// <summary>Body of <c>PUT /api/vms/{name}/config</c>. The disk stays as it is.</summary>
 /// <param name="Cdrom">ISO file name for the CD drive; null or empty to eject.</param>
 /// <param name="Backup">In the nightly backups.</param>
-public sealed record VmSettingsRequest(int Cpus, int MemoryMb, IReadOnlyList<VmNet> Nets, bool Autostart, string? Cdrom = null, bool Backup = true);
+/// <param name="Uefi">Boot with UEFI instead of the BIOS.</param>
+public sealed record VmSettingsRequest(int Cpus, int MemoryMb, IReadOnlyList<VmNet> Nets, bool Autostart, string? Cdrom = null, bool Backup = true,
+    bool Uefi = false);
 
 /// <summary>Body of <c>POST /api/vms</c>.</summary>
 /// <param name="DiskSizeGb">Size of the new disk, which vm-run creates at the first start.</param>
 /// <param name="Start">Start it right away (to install from the ISO in the console).</param>
+/// <param name="Image">qcow2 file to make the disk from instead of an empty one; null or empty for an empty disk.</param>
+/// <param name="Uefi">Boot with UEFI instead of the BIOS.</param>
 public sealed record VmCreateRequest(string Name, int Cpus, int MemoryMb, int? DiskSizeGb, IReadOnlyList<VmNet> Nets,
-    bool Autostart, string? Cdrom, bool Start, bool Backup = true);
+    bool Autostart, string? Cdrom, bool Start, bool Backup = true, string? Image = null, bool Uefi = false);

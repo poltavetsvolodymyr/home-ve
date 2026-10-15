@@ -8,7 +8,7 @@ import { VmMeters } from './VmMeters'
 import { stateBadge } from './vmState'
 import './vms.css'
 
-/** Every VM as a card: state, load, size. A card opens the VM's page. Above them: new VM, ISO images. */
+/** Every VM as a card: state, load, size. A card opens the VM's page. Above them: new VM, images. */
 export function VmsPage() {
   const { data, error } = usePoll(fetchVms, 2000)
 
@@ -19,7 +19,7 @@ export function VmsPage() {
           <Plus size={16} aria-hidden /> New VM
         </Link>
         <Link className="button" to="/isos">
-          <Disc3 size={16} aria-hidden /> ISO images
+          <Disc3 size={16} aria-hidden /> Images
         </Link>
       </div>
       <ErrorNote error={error} />

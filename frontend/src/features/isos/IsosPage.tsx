@@ -4,13 +4,14 @@ import { Link } from 'react-router'
 import { bytes, dateTime } from '@/shared/format'
 import { usePoll } from '@/shared/hooks/usePoll'
 import { Card, confirm, ErrorNote, Skeleton } from '@/shared/ui'
-import { deleteIso, downloadIso, fetchIsos, type IsoDownload } from './api'
+import { deleteIso, downloadIso, fetchIsos, imageDiskGb, isIso, type IsoDownload } from './api'
 import { downloadPercent } from './progress'
 import './isos.css'
 
 /**
- * Installer images for the VMs' CD drives. The host downloads them itself from a link (handier on a phone
- * than uploading 700 MB), into home-backend's ISO directory, where vm-run takes them from.
+ * Installer ISOs for the VMs' CD drives, and qcow2 disk images a new VM's disk is made from. The host
+ * downloads them itself from a link (handier on a phone than uploading 700 MB), unpacking .xz on the way,
+ * into home-backend's ISO directory, where vm-run takes them from.
  */
 export function IsosPage() {
   const { data, error, refresh } = usePoll(fetchIsos, 2000)
@@ -53,7 +54,7 @@ export function IsosPage() {
         <ArrowLeft size={16} aria-hidden /> All VMs
       </Link>
 
-      <Card title="Download an ISO">
+      <Card title="Download an image">
         <form className="iso-form" onSubmit={start}>
           <input
             type="url"
@@ -63,7 +64,7 @@ export function IsosPage() {
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            aria-label="Link to the ISO"
+            aria-label="Link to the image"
           />
           <input
             placeholder="file name (optional)"
@@ -79,8 +80,9 @@ export function IsosPage() {
           </button>
         </form>
         <p className="hint">
-          The host fetches the file itself, the phone can be closed meanwhile. The name comes from the link unless
-          given; it has to end in .iso.
+          The host fetches the file itself, the phone can be closed meanwhile. An ISO goes into a VM's CD drive, a qcow2
+          (e.g. Home Assistant OS) becomes a new VM's disk. A .xz link is unpacked on the way. The name comes from the
+          link unless given; it has to end in .iso or .qcow2.
         </p>
       </Card>
 
@@ -91,7 +93,7 @@ export function IsosPage() {
       ))}
 
       <Card
-        title="ISO images"
+        title="Images"
         actions={data?.freeBytes != null && <span className="muted">{bytes(data.freeBytes)} free</span>}
       >
         {!data && <Skeleton width="60%" />}
@@ -101,7 +103,8 @@ export function IsosPage() {
             <div className="iso-main">
               <span className="mono iso-name">{f.name}</span>
               <span className="muted">
-                {bytes(f.sizeBytes)} · {dateTime(f.modified)}
+                {isIso(f) ? 'ISO' : `disk image, ${imageDiskGb(f)} GiB disk`} · {bytes(f.sizeBytes)} ·{' '}
+                {dateTime(f.modified)}
                 {f.usedBy.length > 0 && ` · in ${f.usedBy.join(', ')}`}
               </span>
             </div>

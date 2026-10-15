@@ -39,7 +39,7 @@ The backend has to manage VMs without being root. So permissions are granted nar
 | What | How it is allowed | What is not allowed |
 |---|---|---|
 | start / stop / restart / kill a VM | polkit, `deploy/vm/50-home-backend.rules`: only `vm@<name>.service` and only these four actions | any other units, enable/disable, editing units |
-| delete a VM together with its disk | the same polkit rule: only `start` for `vm-disk-remove@<name>.service`. The script runs as root and removes the volume `<group>/<name>`, only a thin one in the pool `data` and only for a stopped VM | deleting any other volume |
+| delete a VM together with its disk | the same polkit rule: only `start` for `vm-disk-remove@<name>.service`. The script runs as root and removes the volume `<group>/<name>` (and its UEFI NVRAM), only a thin one in the pool `data` and only for a stopped VM | deleting any other volume |
 | backups | the same polkit rule: `restart` for `vm-backup@<name>.service`, `start` for `vm-restore@<name>:<time>` and `vm-backup-delete@<name>:<time>`. The scripts run as root and validate the name, the time and the disk themselves: only the thin `<group>/<name>` of that very VM; restore only onto a stopped VM | reading the backups themselves: the folders `/var/backups/vm/<name>` give the group `home-backend` only the list of files, the files themselves are 0600 root |
 | offsite upload | the same polkit rule: `restart` for `vm-offsite.service`. `/etc/vm-offsite` is `root`, 0711: the backend can see whether `rclone.conf` exists, but cannot read it | R2 keys and encryption passwords: root only |
 | Update button | the same polkit rule: only `restart` for `home-update.service`. The unit runs `update.sh` as root | choosing what to run: the command is fixed in the unit, the backend can only restart the unit |
@@ -60,6 +60,15 @@ is created not by the backend but by `vm-run` on first start, and only a volume 
 itself (descriptor 3, QEMU reads it via `/proc/self/fd/3`) and checks the already opened file: a regular file, located
 directly in `/var/lib/home-backend/iso`, owned by `home-backend`. A symlink to `/dev/home/root`, a hard link to a file
 owned by root, or swapping the file between the check and the open do not get through.
+
+**A qcow2 image is not read by root at all.** A qcow2 can name other files it is made of (a backing file, an external
+data file), and `qemu-img` opens them: as root, an image naming `/dev/home/root` would copy the host's disk into the VM.
+Checking the header first doesn't help, since the backend owns the file and could change it right after the check. So
+`vm-run` (root) only creates the volume and serves it over NBD (`qemu-nbd`, a socket in `/run/vm-<name>/import/` only
+the group `home-backend` can open), and `qemu-img convert` runs as `home-backend` (`setpriv`, no capabilities, no new
+privileges): whatever the image names is opened with that user's rights, and all it can write to is that one volume.
+The volume is `<name>_import` (a name no VM can have) until the image is written, then renamed to `<name>`: a VM
+stopped in the middle never boots half a disk, and the next start removes the leftover and begins again.
 
 ## The `/etc/vm/<name>.conf` format
 
@@ -82,6 +91,8 @@ AUTOSTART=yes
 | `AUTOSTART` | `yes` / `no` | `vm-autostart.service` starts VMs with `yes` at boot |
 | `DISK_SIZE` | GiB, optional | if the volume does not exist yet, `vm-run` creates it with this size (only a volume named after the VM) |
 | `CDROM` | `.iso` file name, optional | an ISO from `/var/lib/home-backend/iso` in the CD drive; boots from it if the disk is empty |
+| `IMAGE` | `.qcow2` file name, optional | when `vm-run` creates the disk, it writes this image from `/var/lib/home-backend/iso` onto it (see below); ignored once the disk exists |
+| `FIRMWARE` | `bios` / `uefi`, optional | `uefi`: OVMF (no Secure Boot) and the VM's NVRAM in `/var/lib/vm-efi/<name>.fd`, copied from the empty template at the first start; without the line, the BIOS |
 | `BACKUP` | `no`, optional | without this line the VM is backed up every night (`vm-backup-all`); with `no` it is skipped |
 
 Empty lines and lines with `#` are skipped. The backend rewrites the whole file (temporary file + rename),
@@ -123,7 +134,7 @@ Infrastructure/
 | `Host` | Host | `GET /api/host` | assembled from SystemStatus |
 | `SystemStatus` | (on Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp from /sys/class/hwmon) |
 | `Vms` | VMs, VM page, New VM | `POST /api/vms` (create), `DELETE /api/vms/{name}[?disk=true]` (delete), `GET /api/vms`, `GET /api/vms/{name}`, `POST /api/vms/{name}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{name}/config`, `GET /api/vms/{name}/logs`, `GET /api/vms/{name}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
-| `Isos` | ISO images | `GET /api/isos`, `POST /api/isos` (download from a URL), `DELETE /api/isos/{name}` (delete or cancel a download) | `IsoStore`: the `IsoDir` folder, background downloads via `.<name>.part` |
+| `Isos` | Images (ISO and qcow2) | `GET /api/isos`, `POST /api/isos` (download from a URL), `DELETE /api/isos/{name}` (delete or cancel a download) | `IsoStore`: the `IsoDir` folder, background downloads via `.<name>.part`, `.xz` unpacked by `xz -dc` on the way; a qcow2's disk size from its header |
 | `Backups` | Backups tab of a VM | `GET/POST /api/vms/{name}/backups` (list / Back up now), `POST /api/vms/{name}/backups/{time}/restore`, `DELETE /api/vms/{name}/backups/{time}` | `LinuxBackupHost`: list of files in `BackupDir`, `systemctl` for the units `vm-backup@`/`vm-restore@`/`vm-backup-delete@` and their log; `BackupRestores` keeps a running restore in memory; `MockBackupHost` |
 | `Offsite` | Settings | `GET /api/host/offsite`, `POST /api/host/offsite` | `SystemctlOffsiteRunner`: `systemctl restart/show vm-offsite.service`, its log, whether `/etc/vm-offsite/rclone.conf` exists; `MockOffsiteRunner` |
 | `Logs` | (Logs tab of a VM) | — | `JournalctlSource`: `journalctl -o json -u vm@<name>.service` |
@@ -196,16 +207,17 @@ features/
   auth/                   LoginPage, useAuthState, api.ts
   settings/               SettingsPage = UpdateCard: Update button with confirmation, status and update.sh output
   host/                   HostPage = HostStats (CPU, temperature, memory, disk, uptime) + HostCard
-  isos/                   IsosPage: download an ISO from a URL, download progress, list and deletion
+  isos/                   IsosPage: download an ISO or a qcow2 from a URL, download progress, list and deletion
   vms/
     VmsPage.tsx           New VM and ISO images buttons, VM cards with status and load
-    NewVmPage.tsx         new VM (/vms/new): name, cores, memory, disk size, ISO, cards; "start and open console"
+    NewVmPage.tsx         new VM (/vms/new): name, cores, memory, disk size and contents (empty or a qcow2), firmware,
+                          ISO, cards; "start and open console"
     VmDelete.tsx          deleting a stopped VM; with the disk, only after typing its name
-    NetsEditor.tsx, CdromField.tsx   shared parts of the new VM and settings forms
+    NetsEditor.tsx, CdromField.tsx, ImageField.tsx   shared parts of the new VM and settings forms
     VmPage.tsx            one VM: action buttons + tabs ?tab=summary|console|settings|logs
     VmActions.tsx         Start / Shut down / Reboot / Power off, with confirmation for the disruptive ones
     VmSummary.tsx, VmMeters.tsx
-    VmSettingsForm.tsx    cores, memory, network cards, autostart; after saving offers a reboot
+    VmSettingsForm.tsx    cores, memory, firmware, network cards, autostart; after saving offers a reboot
     VmConsole.tsx         noVNC (loaded only when the tab is opened): scaling, Ctrl+Alt+Del, full screen,
                           input line for phones (letters are sent as key presses)
     VmKeys.tsx            key panel under the screen: Esc, Tab, arrows (repeat while held), Home/End,

@@ -16,6 +16,8 @@ namespace HomeBackend.Features.Vms;
 /// DISK_SIZE=20          (GiB; vm-run creates the disk with it when the volume doesn't exist yet)
 /// CDROM=debian-13.iso   (a file in the ISO directory, in the VM's CD drive)
 /// BACKUP=no             (left out of the nightly backups; without the line it's backed up)
+/// IMAGE=haos.qcow2      (a qcow2 in the ISO directory: vm-run writes it onto the disk when it creates it)
+/// FIRMWARE=uefi         (bios without the line)
 /// </code>
 /// Plain KEY=VALUE lines, no shell: nothing in the file is ever executed.
 /// </summary>
@@ -32,6 +34,9 @@ public static partial class VmConfigFile
     /// <summary>An ISO file name: no paths, no hidden files.</summary>
     public static bool IsValidIsoName(string? name) => name is not null && IsoPattern().IsMatch(name);
 
+    /// <summary>A qcow2 disk image's file name, by the same rules.</summary>
+    public static bool IsValidImageName(string? name) => name is not null && ImagePattern().IsMatch(name);
+
     /// <summary>A VM name: also part of the unit name, the tap names (name-n0) and paths.</summary>
     public static bool IsValidName(string? name) => name is not null && NamePattern().IsMatch(name);
 
@@ -39,10 +44,11 @@ public static partial class VmConfigFile
     public static VmConfig Parse(string name, IEnumerable<string> lines)
     {
         int? cpus = null, memory = null;
-        string? disk = null, cdrom = null;
+        string? disk = null, cdrom = null, image = null;
         int? diskSize = null;
         var autostart = false;
         var backup = true;
+        var uefi = false;
         var nets = new List<VmNet>();
 
         foreach (var raw in lines)
@@ -62,6 +68,15 @@ public static partial class VmConfigFile
                 case "BACKUP": backup = value != "no"; break;
                 case "DISK_SIZE": diskSize = ParseInt(key, value); break;
                 case "CDROM": cdrom = value.Length == 0 ? null : value; break;
+                case "IMAGE": image = value.Length == 0 ? null : value; break;
+                case "FIRMWARE":
+                    uefi = value switch
+                    {
+                        "uefi" => true,
+                        "bios" => false,
+                        _ => throw new FormatException($"FIRMWARE must be bios or uefi: {value}"),
+                    };
+                    break;
                 case "NET":
                     var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length != 2) throw new FormatException($"NET needs a bridge and a MAC: {value}");
@@ -74,7 +89,7 @@ public static partial class VmConfigFile
             cpus ?? throw new FormatException("CPUS is missing"),
             memory ?? throw new FormatException("MEMORY is missing"),
             disk ?? throw new FormatException("DISK is missing"),
-            nets, autostart, diskSize, cdrom, backup);
+            nets, autostart, diskSize, cdrom, backup, image, uefi);
         if (Validate(config) is { } error) throw new FormatException(error);
         return config;
     }
@@ -92,6 +107,8 @@ public static partial class VmConfigFile
         if (c.DiskSizeGb is { } size) sb.Append(CultureInfo.InvariantCulture, $"DISK_SIZE={size}\n");
         if (c.Cdrom is { } iso) sb.Append(CultureInfo.InvariantCulture, $"CDROM={iso}\n");
         if (!c.Backup) sb.Append("BACKUP=no\n");
+        if (c.Image is { } image) sb.Append(CultureInfo.InvariantCulture, $"IMAGE={image}\n");
+        if (c.Uefi) sb.Append("FIRMWARE=uefi\n");
         return sb.ToString();
     }
 
@@ -104,6 +121,7 @@ public static partial class VmConfigFile
         if (!DiskPattern().IsMatch(c.Disk)) return "the disk must be an LVM volume, /dev/<group>/<volume>";
         if (c.DiskSizeGb is < 1 or > MaxDiskSizeGb) return $"the disk must be 1–{MaxDiskSizeGb} GiB";
         if (c.Cdrom is not null && !IsValidIsoName(c.Cdrom)) return $"'{c.Cdrom}' is not an ISO file name";
+        if (c.Image is not null && !IsValidImageName(c.Image)) return $"'{c.Image}' is not a qcow2 file name";
         if (c.Nets.Count > MaxNets) return $"at most {MaxNets} network cards";
         foreach (var n in c.Nets)
         {
@@ -133,4 +151,7 @@ public static partial class VmConfigFile
 
     [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._+-]{0,123}\.iso$")]
     private static partial Regex IsoPattern();
+
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._+-]{0,121}\.qcow2$")]
+    private static partial Regex ImagePattern();
 }

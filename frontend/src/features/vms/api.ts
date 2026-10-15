@@ -26,6 +26,10 @@ export interface VmConfig {
   cdrom: string | null
   /** in the nightly backups */
   backup: boolean
+  /** qcow2 file vm-run writes onto the disk when it creates it; null for an empty disk */
+  image: string | null
+  /** boots with UEFI instead of the BIOS */
+  uefi: boolean
 }
 
 /** An address the guest has, e.g. 192.168.178.119/24 on br0. */
@@ -55,13 +59,15 @@ export interface Vm {
 /** shutdown and reboot ask the guest; poweroff pulls the plug */
 export type VmAction = 'start' | 'shutdown' | 'reboot' | 'poweroff'
 
-/** Body of PUT /api/vms/{name}/config: everything but the name and the disk. */
-export type VmSettings = Omit<VmConfig, 'name' | 'disk' | 'diskSizeGb'>
+/** Body of PUT /api/vms/{name}/config: everything but the name and the disk (with the image it was made from). */
+export type VmSettings = Omit<VmConfig, 'name' | 'disk' | 'diskSizeGb' | 'image'>
 
 /** Body of POST /api/vms. */
 export interface VmCreate extends VmSettings {
   name: string
   diskSizeGb: number
+  /** qcow2 file to make the disk from; null for an empty disk */
+  image: string | null
   /** start it right away, to install from the ISO in the console */
   start: boolean
 }

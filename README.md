@@ -35,10 +35,10 @@ as many VMs as its CPU, memory and disks allow, and it grows by adding disks to 
 ## What it does
 
 - host status: CPU, temperature, memory, disk;
-- VMs: create (installation from an ISO through the console in the browser), start, shut down, reboot, power off,
-  delete with or without the disk; cores, memory, network cards, CD drive, autostart; the VM's log; its IP addresses
-  (from qemu-guest-agent in the guest);
-- ISO images downloaded by the host from a URL;
+- VMs: create (installation from an ISO through the console in the browser, or a disk made from a qcow2 image such
+  as Home Assistant OS), start, shut down, reboot, power off, delete with or without the disk; cores, memory, BIOS or
+  UEFI, network cards, CD drive, autostart; the VM's log; its IP addresses (from qemu-guest-agent in the guest);
+- ISO and qcow2 images downloaded by the host from a URL (`.xz` unpacked on the way);
 - backups: nightly and on demand, restore, undo a restore;
 - optional encrypted offsite copy of the backups (rclone to Cloudflare R2);
 - self-update from the web UI, stable or dev channel;

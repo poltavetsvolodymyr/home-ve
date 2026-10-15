@@ -8,13 +8,16 @@
 #
 # A new VM's disk doesn't exist yet: vm-run creates it (DISK_SIZE GiB, thin, in the pool), but only one
 # named after the VM. An ISO in the CD drive (CDROM) comes from home-backend's own directory, and is
-# checked after opening it, so a symlink can't slip a host file into the VM.
+# checked after opening it, so a symlink can't slip a host file into the VM. A disk made from an image
+# (IMAGE, a qcow2 in that directory) is filled by qemu-img running as home-backend, not as root.
 # "check || die" on purpose: die exits, so it never runs after a passing check
 # shellcheck disable=SC2015
 set -eu
 
 POOL=data
 ISO_DIR=/var/lib/home-backend/iso
+OVMF=/usr/share/OVMF
+EFI_DIR=/var/lib/vm-efi
 
 die() {
   echo "vm-run: $*" >&2
@@ -36,7 +39,7 @@ if systemctl list-units --no-legend --state=activating "vm-restore@$name:*" | gr
   die "a backup is being restored onto $name"
 fi
 
-cpus='' memory='' disk='' nets='' disk_size='' cdrom=''
+cpus='' memory='' disk='' nets='' disk_size='' cdrom='' image='' firmware=bios
 # read trims the spaces around a line; the last line may lack its newline
 while read -r line || [ -n "$line" ]; do
   case $line in '' | '#'*) continue ;; esac
@@ -50,6 +53,8 @@ while read -r line || [ -n "$line" ]; do
 " ;;
     DISK_SIZE) disk_size=$value ;;
     CDROM) cdrom=$value ;;
+    IMAGE) image=$value ;;
+    FIRMWARE) firmware=$value ;;
     AUTOSTART) ;; # read by vm-autostart
     BACKUP) ;;    # read by vm-backup-all
     *) die "$conf: unknown key $key" ;;
@@ -59,6 +64,61 @@ done <"$conf"
 matches "$cpus" '[1-9][0-9]?' && [ "$cpus" -le 64 ] || die "CPUS must be 1-64, not '$cpus'"
 matches "$memory" '[1-9][0-9]{2,5}' && [ "$memory" -ge 128 ] && [ "$memory" -le 262144 ] ||
   die "MEMORY must be 128-262144 MiB, not '$memory'"
+case $firmware in bios | uefi) ;; *) die "FIRMWARE must be bios or uefi, not '$firmware'" ;; esac
+[ -z "$image" ] || matches "$image" '[A-Za-z0-9][A-Za-z0-9._+-]{0,121}[.]qcow2' || die "IMAGE must be a qcow2 file name, not '$image'"
+
+# Runs a command as home-backend, with no way back to root. The image is that user's file, and qemu-img
+# opens whatever the image names besides itself (a backing file, an external data file): as root that
+# could be /dev/home/root, copied into the VM's disk. As home-backend it is only what that user may read.
+as_backend() {
+  setpriv --reuid=home-backend --regid=home-backend --clear-groups --inh-caps=-all --no-new-privs "$@"
+}
+
+# The new disk, filled from $image. Into <name>_import first (a name no VM can have), renamed once
+# complete: a VM powered off in the middle of it never boots half a disk, the next start begins again.
+# Root only serves that one volume over NBD; the unprivileged qemu-img reads the qcow2 and writes into
+# it. Blocks that are zeros in the image are not written, so the volume stays thin.
+import_image() {
+  src=$ISO_DIR/$image
+  [ -f "$src" ] || die "no image $src"
+  size=$(as_backend qemu-img info -f qcow2 "$src" | sed -n 's/^virtual size: .*(\([0-9]*\) bytes)$/\1/p') || true
+  [ -n "$size" ] || die "$image is not a qcow2 image"
+  [ "$size" -le $((disk_size << 30)) ] ||
+    die "$image holds a $(((size + (1 << 30) - 1) >> 30)) GiB disk: DISK_SIZE must be at least that"
+
+  vg=${lv%%/*} tmp=${lv%%/*}/${name}_import
+  if lvs -- "$tmp" >/dev/null 2>&1; then
+    [ "$(lvs --noheadings -o pool_lv -- "$tmp" | tr -d ' ')" = "$POOL" ] || die "$tmp is in the way, and not a thin volume in $POOL"
+    echo "removing $tmp, left over from an import that didn't finish"
+    lvremove -qy -- "$tmp"
+  fi
+  echo "creating $lv from $image: $disk_size GiB, thin, in $vg/$POOL"
+  lvcreate -qq --yes --type thin --virtualsize "${disk_size}G" --thinpool "$POOL" --name "${name}_import" -- "$vg"
+
+  # the socket only for home-backend: the directory is its group's, the socket too once it is there
+  nbd=$run/import
+  [ -d "$nbd" ] || mkdir -m 0750 "$nbd"
+  chgrp home-backend "$nbd"
+  # --fork returns once the socket listens; the server exits after its client is done
+  qemu-nbd --fork --pid-file="$nbd/pid" --format=raw --cache=none --aio=native --discard=unmap \
+    --socket="$nbd/sock" "/dev/$tmp"
+  chgrp home-backend "$nbd/sock"
+  chmod 0660 "$nbd/sock"
+
+  started=$(date +%s) ok=yes
+  as_backend qemu-img convert -n --target-is-zero -W -f qcow2 -O raw "$src" "nbd+unix:///?socket=$nbd/sock" || ok=no
+  # gone by itself after a client, but not if qemu-img never got to connect; the volume is busy until then
+  pid=$(cat "$nbd/pid")
+  kill "$pid" 2>/dev/null || true
+  t=0
+  while [ -e "/proc/$pid" ] && [ $t -lt 100 ]; do sleep 0.1; t=$((t + 1)); done
+  if [ $ok = no ]; then
+    lvremove -qy -- "$tmp" || true
+    die "writing $image onto the disk failed"
+  fi
+  lvrename -qq -- "$vg" "${name}_import" "$name"
+  echo "$lv made from $image in $(($(date +%s) - started)) s"
+}
 
 # the disk: /dev/<group>/<volume>, a thin volume in $POOL
 matches "$disk" '/dev/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*' || die "DISK must be /dev/<group>/<volume>, not '$disk'"
@@ -68,8 +128,12 @@ if ! lvs -- "$lv" >/dev/null 2>&1; then
   [ -n "$disk_size" ] || die "no LVM volume $lv (and no DISK_SIZE to create it with)"
   matches "$disk_size" '[1-9][0-9]{0,3}' && [ "$disk_size" -le 4096 ] || die "DISK_SIZE must be 1-4096 GiB, not '$disk_size'"
   [ "${lv#*/}" = "$name" ] || die "only a disk named after the VM is created: /dev/<group>/$name, not $disk"
-  echo "creating $lv: $disk_size GiB, thin, in ${lv%%/*}/$POOL"
-  lvcreate --yes --type thin --virtualsize "${disk_size}G" --thinpool "$POOL" --name "$name" -- "${lv%%/*}"
+  if [ -n "$image" ]; then
+    import_image
+  else
+    echo "creating $lv: $disk_size GiB, thin, in ${lv%%/*}/$POOL"
+    lvcreate --yes --type thin --virtualsize "${disk_size}G" --thinpool "$POOL" --name "$name" -- "${lv%%/*}"
+  fi
 fi
 pool=$(lvs --noheadings -o pool_lv -- "$lv" 2>/dev/null | tr -d ' ') || die "no LVM volume $lv"
 [ "$pool" = "$POOL" ] || die "$lv is not a thin volume in the pool $POOL"
@@ -80,6 +144,16 @@ set -- -name "$name" -machine q35,accel=kvm -cpu host -smp "$cpus" -m "$memory" 
   -nodefaults -vga std -display "vnc=unix:$run/vnc.sock" \
   -drive "if=none,id=disk0,file=$disk,format=raw,cache=none,aio=native,discard=unmap" \
   -device virtio-scsi-pci,id=scsi0 -device scsi-hd,drive=disk0,bus=scsi0.0,rotation_rate=1,bootindex=1
+
+# UEFI instead of the BIOS: OVMF (without Secure Boot), and the VM's own NVRAM (its boot entries),
+# copied from the empty template at the first start. Flash, not PCI: the slots below stay where they are.
+if [ "$firmware" = uefi ]; then
+  vars=$EFI_DIR/$name.fd
+  [ -d "$EFI_DIR" ] || mkdir -m 0700 "$EFI_DIR"
+  [ -f "$vars" ] || cp -- "$OVMF/OVMF_VARS_4M.fd" "$vars"
+  set -- "$@" -drive "if=pflash,unit=0,format=raw,readonly=on,file=$OVMF/OVMF_CODE_4M.fd" \
+    -drive "if=pflash,unit=1,format=raw,file=$vars"
+fi
 
 # the CD drive. The ISO directory belongs to home-backend, so the file is opened here (fd 3, which QEMU
 # inherits and reads through /proc/self/fd/3) and what was really opened is checked: a regular file in

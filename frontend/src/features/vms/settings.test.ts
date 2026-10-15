@@ -15,6 +15,8 @@ const router: VmConfig = {
   diskSizeGb: null,
   cdrom: null,
   backup: true,
+  image: null,
+  uefi: false,
 }
 
 describe('vm settings', () => {
@@ -67,6 +69,12 @@ describe('new vm', () => {
   it('needs a disk of 1–4096 GiB', () => {
     expect(validateNewVm({ ...vm, diskSizeGb: 0 }, [], 16, 30000)).toHaveLength(1)
     expect(validateNewVm({ ...vm, diskSizeGb: Number.NaN }, [], 16, 30000)).toHaveLength(1)
+  })
+
+  it('makes a disk from an image no smaller than the image', () => {
+    const haos = { ...vm, image: 'haos.qcow2', diskSizeGb: 20 }
+    expect(validateNewVm(haos, [], 16, 30000, 32)).toEqual(['Disk: at least 32 GiB, the size of haos.qcow2'])
+    expect(validateNewVm({ ...haos, diskSizeGb: 32 }, [], 16, 30000, 32)).toEqual([])
   })
 
   it('takes a new ISO in the drive as a change for the next start', () =>

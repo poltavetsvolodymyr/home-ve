@@ -10,8 +10,10 @@ namespace HomeBackend.Features.Vms;
 /// <param name="DiskSizeGb">Size the disk gets when vm-run creates it at the VM's first start; null for disks made by hand.</param>
 /// <param name="Cdrom">ISO image in the CD drive: a file name in the ISO directory; null for an empty drive.</param>
 /// <param name="Backup">Backed up every night by vm-backup-all (on unless the file says BACKUP=no).</param>
+/// <param name="Image">qcow2 file in the ISO directory that vm-run writes onto the disk when it creates it; null for an empty disk.</param>
+/// <param name="Uefi">Boots with UEFI (OVMF) instead of the BIOS.</param>
 public sealed record VmConfig(string Name, int Cpus, int MemoryMb, string Disk, IReadOnlyList<VmNet> Nets, bool Autostart,
-    int? DiskSizeGb = null, string? Cdrom = null, bool Backup = true);
+    int? DiskSizeGb = null, string? Cdrom = null, bool Backup = true, string? Image = null, bool Uefi = false);
 
 /// <summary>One network card: the host bridge it's plugged into and its MAC address.</summary>
 public sealed record VmNet(string Bridge, string Mac);

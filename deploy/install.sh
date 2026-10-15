@@ -47,13 +47,14 @@ note_unusual_location() {
 }
 
 # QEMU and socat run the VMs on LVM thin volumes (thin_check from thin-provisioning-tools activates the pool
-# at boot; without it the pool stays down); polkitd lets the backend start and stop them without
+# at boot; without it the pool stays down); qemu-utils writes a qcow2 image onto a new VM's disk, ovmf is the
+# UEFI firmware, xz unpacks downloaded images (.qcow2.xz); polkitd lets the backend start and stop them without
 # being root. systemctl run by a non-root user talks to systemd over the system D-Bus, which a minimal
 # (debootstrap) Debian may not have yet: dbus provides it. nginx serves the UI, openssl makes its first
 # certificate; curl (with the CA certificates) fetches rclone.
 install_packages() {
   local missing=()
-  for p in qemu-system-x86 socat lvm2 thin-provisioning-tools dbus polkitd zstd curl ca-certificates nginx openssl; do
+  for p in qemu-system-x86 qemu-utils ovmf xz-utils socat lvm2 thin-provisioning-tools dbus polkitd zstd curl ca-certificates nginx openssl; do
     dpkg -s "$p" &>/dev/null || missing+=("$p")
   done
   if (( ${#missing[@]} )); then
