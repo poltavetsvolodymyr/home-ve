@@ -247,6 +247,12 @@ Rules:
   load first; feature styles are imported by their components and come after. So, for example, `.login-card`
   can override the `padding` of `.card`. Colors only through variables from `tokens.css`; then the dark
   theme works by itself.
+- **Buttons with an icon**: every `<button>` and `.button` is `inline-flex` with `align-items: center` and `gap: 6px`
+  (`styles/base.css`), so a lucide icon and its label sit on one centre line by themselves:
+  `<button><Plus size={15} aria-hidden /> New VM</button>`, no styles of its own, no `&nbsp;`. Don't give buttons
+  `display: block`/`inline-block` or wrap the label in a block. A square icon-only button is `icon-button`, with its
+  label in `aria-label` and `title`. A button that changes width (a confirmation) hides its neighbours meanwhile, so
+  the row doesn't jump.
 - **Theme**: the `<html data-theme>` attribute, dark by default, the choice is stored in `localStorage`.
 
 ## Recipes

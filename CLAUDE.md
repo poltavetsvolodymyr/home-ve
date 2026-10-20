@@ -36,6 +36,8 @@ bash -n <script> && shellcheck <script>     # every shell script touched
 ## Conventions
 
 - Code, comments, docs and commit messages in English. Comments say why, not what. Match the surrounding style.
+- Buttons with an icon: just `<button><Icon size={15} aria-hidden /> Label</button>`; the global `button` rule lines
+  them up (docs/architecture.md, "Buttons with an icon"). Look at a new button on a 390px-wide mock screenshot.
 - No new dependencies without a good reason.
 - Shell: `set -euo pipefail`; never `pkill -f` (it matches the calling shell); `rm` with `"${VAR:?}"`.
 - Security boundaries: the backend never takes a path from a request (a VM's disk is always
