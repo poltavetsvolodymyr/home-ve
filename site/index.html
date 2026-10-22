@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>home-ve</title>
+<meta name="description" content="A small self-hosted virtualization platform for one Debian machine. Create, install, watch and back up VMs from the browser, on a computer or a phone.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: dark control-room page. Nav, then the thesis headline over the live 3D scene, a spec strip,
+   features as a 3-col grid, a horizontal rail of real screens, the request path as a terminal, install steps, license, footer. */
+:root{
+  color-scheme:dark;
+  --bg:#0A0E13; --bg-2:#0E141B; --panel:#111922; --line:#1E2935; --line-2:#2A3847;
+  --fg:#E6EDF5; --muted:#8C99A8; --dim:#5D6B7A;
+  --accent:#4C8DF6; --accent-ink:#06101F; --ok:#4ADE80; --warm:#E8743B;
+  /* scene tokens */
+  --scene:#0B1016; --floor:#121A23; --phone:#04070B; --pulse:#4C8DF6;
+  --chassis:#C95C2E; --bezel:#B04C22; --vent:#8E3B1A; --eye:#4BE3D5; --chip-fg:#06101F;
+  --font-display:"Tektur","Chakra Petch","Segoe UI",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.gut{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1160px;margin:0 auto}
+.mono{font-family:var(--font-mono)}
+.eyebrow{font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:-.01em;text-wrap:balance;margin:0}
+h2{font-size:clamp(28px,4vw,42px);line-height:1.08}
+h3{font-size:19px;letter-spacing:0}
+p{margin:0}
+
+/* nav */
+nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;background:var(--bg)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:800 19px var(--font-display);letter-spacing:.02em}
+.brand svg{width:30px;height:30px}
+.navlinks{display:flex;gap:4px;align-items:center}
+.navlinks a{text-decoration:none;color:var(--muted);font-size:14px;padding:8px 12px;border-radius:8px}
+.navlinks a:hover{color:var(--fg);background:var(--panel)}
+.navlinks .gh{color:var(--fg);border:1px solid var(--line-2)}
+@media (max-width:640px){.navlinks a:not(.gh){display:none}}
+
+/* hero */
+.hero{position:relative;padding-block:64px 40px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:44px 44px;opacity:.35;
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 20%,#000 30%,transparent 75%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 20%,#000 30%,transparent 75%)}
+.hero .wrap{position:relative;display:flex;flex-direction:column;gap:22px}
+.hero h1{font-size:clamp(38px,7vw,82px);line-height:.98;font-weight:800;max-width:15ch}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.lede{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:60ch}
+.lede b{color:var(--fg);font-weight:500}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+.btn{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font:600 15px var(--font-body);padding:12px 20px;border-radius:10px;border:1px solid var(--line-2);color:var(--fg);background:var(--panel)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:hover{filter:brightness(1.1)}
+.btn:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.btn svg{width:18px;height:18px}
+
+.stage{position:relative;width:100%;max-width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:var(--scene);
+  border:1px solid var(--line);margin-top:18px;box-shadow:0 40px 120px -40px color-mix(in srgb,var(--accent) 35%,transparent)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.chip{position:absolute;top:14px;right:14px;pointer-events:none;background:var(--accent);color:var(--chip-fg);
+  font:600 11px var(--font-mono);letter-spacing:.08em;padding:4px 8px;border-radius:5px}
+.scene-ctl{position:absolute;left:14px;bottom:14px;display:flex;gap:8px}
+.scene-ctl button{font:600 12px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg);
+  background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(6px);border:1px solid var(--line-2);border-radius:999px;padding:7px 14px;cursor:pointer}
+.scene-ctl button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.caption{font:12px var(--font-mono);color:var(--dim);margin-top:10px}
+
+/* spec strip */
+.specs{border-block:1px solid var(--line);background:var(--bg-2)}
+.specs .wrap{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.spec{padding:26px 20px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+.spec:first-child{border-left:0;padding-left:0}
+.spec .v{font:700 clamp(22px,3vw,30px) var(--font-display);font-variant-numeric:tabular-nums}
+.spec .k{font-size:14px;color:var(--muted)}
+@media (max-width:760px){.specs .wrap{grid-template-columns:repeat(2,minmax(0,1fr))}.spec:nth-child(3){border-left:0;padding-left:0}.spec{border-top:1px solid var(--line)}.spec:nth-child(-n+2){border-top:0}}
+
+section{padding-block:88px}
+.sec-head{display:flex;flex-direction:column;gap:12px;margin-bottom:40px;max-width:60ch}
+.sec-head p{color:var(--muted);font-size:17px}
+
+/* features */
+.features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.feat{background:var(--bg);padding:28px 26px 30px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.feat .tag{font:600 11px var(--font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.feat p{color:var(--muted);font-size:15px}
+.feat code{font:13px var(--font-mono);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+@media (max-width:900px){.features{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.features{grid-template-columns:minmax(0,1fr)}}
+
+/* screens rail */
+.rail{display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:14px;scrollbar-color:var(--line-2) transparent}
+.shot{flex:0 0 220px;scroll-snap-align:start;display:flex;flex-direction:column;gap:10px;margin:0}
+.shot img{width:100%;max-width:100%;aspect-ratio:780/1688;object-fit:cover;border-radius:16px;border:1px solid var(--line-2);background:var(--panel);display:block}
+.shot figcaption{font:600 12px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.shot figcaption span{display:block;font:400 13px var(--font-body);letter-spacing:0;text-transform:none;color:var(--dim);margin-top:2px}
+
+/* how it works */
+.term{background:#070A0E;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.term-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font:12px var(--font-mono);color:var(--dim)}
+.term-bar i{width:10px;height:10px;border-radius:50%;background:var(--line-2);display:block}
+.term pre{margin:0;padding:22px;overflow-x:auto;font:13px/1.65 var(--font-mono);color:#B9C6D4}
+.term pre .hl{color:var(--accent)}
+.term pre .ok{color:var(--ok)}
+.how-notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:28px}
+.how-notes div{border-top:1px solid var(--line-2);padding-top:14px;color:var(--muted);font-size:15px;min-width:0}
+.how-notes b{display:block;color:var(--fg);font-family:var(--font-display);font-weight:700;font-size:16px;margin-bottom:4px}
+@media (max-width:760px){.how-notes{grid-template-columns:minmax(0,1fr)}}
+
+/* install */
+.install{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:48px;align-items:start}
+@media (max-width:860px){.install{grid-template-columns:minmax(0,1fr)}}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;padding-block:16px;border-top:1px solid var(--line)}
+.steps li:last-child{border-bottom:1px solid var(--line)}
+.steps li::before{content:counter(s,decimal-leading-zero);font:600 13px var(--font-mono);color:var(--accent);padding-top:3px}
+.steps b{display:block;font-family:var(--font-display);font-weight:700;margin-bottom:2px}
+.steps span{color:var(--muted);font-size:15px}
+.need{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;display:flex;flex-direction:column;gap:12px}
+.need h3{font-size:16px}
+.need ul{margin:0;padding-left:18px;color:var(--muted);font-size:15px;display:flex;flex-direction:column;gap:6px}
+.need .btn{align-self:flex-start;margin-top:6px}
+
+/* license */
+.lic{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.lic div{border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lic .free{border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.lic h3{display:flex;align-items:center;gap:10px}
+.lic h3 i{width:8px;height:8px;border-radius:50%;display:block}
+.lic p{color:var(--muted);font-size:15px}
+@media (max-width:700px){.lic{grid-template-columns:minmax(0,1fr)}}
+
+footer{border-top:1px solid var(--line);padding-block:30px 40px;color:var(--dim);font-size:14px}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
+footer a{color:var(--muted)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+
+<nav class="gut">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="home-ve">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#13233A" stroke="#2D4E7E"/><rect x="8" y="9" width="16" height="5.5" rx="1.6" stroke="#4C8DF6" stroke-width="1.8"/><rect x="8" y="17.5" width="16" height="5.5" rx="1.6" stroke="#4C8DF6" stroke-width="1.8"/><circle cx="11.2" cy="11.75" r="1" fill="#4C8DF6"/><circle cx="11.2" cy="20.25" r="1" fill="#4ADE80"/></svg>
+      home-ve
+    </a>
+    <div class="navlinks">
+      <a href="#features">Features</a>
+      <a href="#screens">Screens</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a class="gh" href="https://github.com/poltavetsvolodymyr/home-ve">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero gut" id="top">
+  <div class="wrap">
+    <div class="eyebrow">Self-hosted virtualization · Debian 13 · QEMU/KVM</div>
+    <h1>Run VMs on one Debian box. <em>From your phone.</em></h1>
+    <p class="lede">home-ve turns a plain Debian machine into a VM host you run from the browser: <b>create and install VMs, watch and control them, back them up every night</b> and keep an encrypted copy off-site. No Proxmox, no custom kernel, and the web UI never runs as root.</p>
+    <div class="ctas">
+      <a class="btn primary" href="https://github.com/poltavetsvolodymyr/home-ve/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+        Download the installer
+      </a>
+      <a class="btn" href="https://github.com/poltavetsvolodymyr/home-ve">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        Source on GitHub
+      </a>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="c" aria-label="Animation: a small orange robot hops across a giant phone running the home-ve web UI, tapping buttons in time with music"></canvas>
+      <div class="chip" id="state">LOGIN</div>
+      <div class="scene-ctl">
+        <button id="play" type="button">Pause</button>
+        <button id="sound" type="button" aria-pressed="false">Sound on</button>
+      </div>
+    </div>
+    <p class="caption">Real screens from the web UI. The animation and the beat are generated live in your browser.</p>
+  </div>
+</header>
+
+<div class="specs gut">
+  <div class="wrap">
+    <div class="spec"><span class="v">1 box</span><span class="k">plain Debian 13, no cluster</span></div>
+    <div class="spec"><span class="v">0 root</span><span class="k">the web UI never runs as root</span></div>
+    <div class="spec"><span class="v">1 file</span><span class="k">readable config per VM</span></div>
+    <div class="spec"><span class="v">7 + 4</span><span class="k">daily and weekly backups kept</span></div>
+  </div>
+</div>
+
+<section class="gut" id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Why home-ve</div>
+      <h2>Tools you already know, without the lock-in.</h2>
+      <p>Made for a home server or a small office box: a router VM, Home Assistant, a NAS, a few Linux servers.</p>
+    </div>
+    <div class="features">
+      <div class="feat"><span class="tag">Plain Debian</span><h3>Nothing custom underneath</h3><p>QEMU/KVM, LVM thin volumes, systemd and nginx. Each VM is one text file in <code>/etc/vm/</code> and one <code>vm@name</code> unit, so anything the UI does, the shell can do too.</p></div>
+      <div class="feat"><span class="tag">Least privilege</span><h3>The backend is not root</h3><p>It may only start and stop <code>vm@…</code> units through polkit and write VM settings. Root-side scripts parse those files and never execute them.</p></div>
+      <div class="feat"><span class="tag">Any screen</span><h3>A phone is enough</h3><p>The whole UI works on a phone as well as on a desktop, including the VM console in the browser, with a key panel for the keys a phone keyboard lacks.</p></div>
+      <div class="feat"><span class="tag">Backups</span><h3>Without stopping the VM</h3><p>File systems freeze for a moment, a thin snapshot is taken and compressed with zstd. Nightly, restore in one tap with an undo snapshot, optional encrypted copy to Cloudflare R2.</p></div>
+      <div class="feat"><span class="tag">Self-updating</span><h3>One button to update</h3><p>One idempotent <code>install.sh</code> sets it up. After that, updates come from the web UI on the stable or dev channel.</p></div>
+      <div class="feat"><span class="tag">Small</span><h3>No database, no runtime</h3><p>A self-contained backend binary with no .NET on the host, a static frontend, and state in plain files.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="gut" id="screens" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">The web UI</div>
+      <h2>Everything from a 390&nbsp;px screen.</h2>
+      <p>Scroll through the real pages, shown with the mock data the backend serves in development.</p>
+    </div>
+    <div class="rail" tabindex="0" aria-label="Screenshots of the web UI">
+      <figure class="shot"><img data-shot="vms" alt="The VM list: a running router VM and a stopped test VM"><figcaption>VMs<span>Status, CPU, memory, address</span></figcaption></figure>
+      <figure class="shot"><img data-shot="vm-summary" alt="A VM's page: buttons, load, IP addresses, hardware"><figcaption>VM<span>Load, uptime, guest IPs</span></figcaption></figure>
+      <figure class="shot"><img data-shot="vm-console" alt="A VM console in the browser with a key panel"><figcaption>Console<span>noVNC with a phone key panel</span></figcaption></figure>
+      <figure class="shot"><img data-shot="vm-settings" alt="VM settings: CPUs, memory, autostart, backup, CD drive, network"><figcaption>Settings<span>Cores, memory, NICs, autostart</span></figcaption></figure>
+      <figure class="shot"><img data-shot="vm-backups" alt="A VM's backups: back up now, restore, delete"><figcaption>Backups<span>On demand, restore, undo</span></figcaption></figure>
+      <figure class="shot"><img data-shot="new-vm" alt="The New VM form"><figcaption>New VM<span>From an ISO or a qcow2 image</span></figcaption></figure>
+      <figure class="shot"><img data-shot="isos" alt="ISO images: download by URL and the list"><figcaption>ISOs<span>The host downloads by URL</span></figcaption></figure>
+      <figure class="shot"><img data-shot="host" alt="Host status: CPU, temperature, memory, disk"><figcaption>Host<span>CPU, temperature, disk</span></figcaption></figure>
+      <figure class="shot"><img data-shot="settings" alt="Update channel and offsite backup"><figcaption>Update<span>Stable or dev channel</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="gut" id="how" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">How it works</div>
+      <h2>One request path. No magic in between.</h2>
+    </div>
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span>home-ve · request path</span></div>
+<pre>browser ──► <span class="hl">nginx</span> on the host ─┬─► /var/www/home           frontend: static files (React)
+                               └─► /api/ → 127.0.0.1:5000  <span class="hl">backend</span>: ASP.NET Core, API only
+                                                ├─► /etc/vm/*.conf               VM settings (reads and writes)
+                                                ├─► systemctl … vm@&lt;name&gt;        via polkit, only these units
+                                                ├─► /run/vm-&lt;name&gt;/vnc.sock      console, WebSocket ⇄ VNC
+                                                └─► /proc, /sys, journalctl      load, temperature, log
+
+<span class="ok">vm@&lt;name&gt;.service</span> ──► vm-run &lt;name&gt; ──► qemu-system-x86_64     (root; validates the .conf itself, executes nothing from it)</pre>
+    </div>
+    <div class="how-notes">
+      <div><b>Private by default</b>The backend listens only on localhost, lets in private networks only, and only after a password login.</div>
+      <div><b>Readable state</b>VM settings are plain <span class="mono">.conf</span> files. Back them up, diff them, edit them by hand.</div>
+      <div><b>No root in the UI</b>Only the small <span class="mono">vm-run</span> script runs as root, and it trusts nothing it reads.</div>
+    </div>
+  </div>
+</section>
+
+<section class="gut" id="install" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">Install</div>
+      <h2>From a USB stick to a VM host in minutes.</h2>
+      <p>The installer image brings its own page, on the machine's screen or on your phone.</p>
+    </div>
+    <div class="install">
+      <ol class="steps">
+        <li><div><b>Get the image</b><span>The installer ISO from the latest release, about 550 MB. Write it to a USB stick or attach it to a VM.</span></div></li>
+        <li><div><b>Boot it</b><span>It starts the installer by itself. The screen shows an address and a code.</span></div></li>
+        <li><div><b>Fill in the page</b><span>On the screen or on a phone: the disk and how it is split, the network card, host name, update channel, passwords.</span></div></li>
+        <li><div><b>Install</b><span>It asks once more before erasing the disk, then shows each step with its log.</span></div></li>
+        <li><div><b>Restart and sign in</b><span>The first start finishes setup, then the screen shows the web UI's address.</span></div></li>
+      </ol>
+      <div class="need">
+        <h3>What you need</h3>
+        <ul>
+          <li>A 64-bit machine or a VM with a wired network card and DHCP</li>
+          <li>Internet access during the install</li>
+          <li>A disk of at least 32 GB that will be erased whole</li>
+          <li>BIOS or UEFI, Secure Boot included</li>
+        </ul>
+        <p style="color:var(--muted);font-size:15px">Already on Debian 13? Install step by step instead, see the deployment guide.</p>
+        <a class="btn primary" href="https://github.com/poltavetsvolodymyr/home-ve/blob/main/docs/deployment.md">Deployment guide</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="gut" id="license" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="eyebrow">License</div>
+      <h2>Free at home. Licensed for business.</h2>
+      <p>PolyForm Noncommercial 1.0.0 with an additional permission. This is a summary; the LICENSE file is what applies.</p>
+    </div>
+    <div class="lic">
+      <div class="free"><h3><i style="background:var(--ok)"></i>Free of charge</h3><p>At home, for hobby, study and research; for noncommercial, educational and government organizations; for an individual, freelancer or sole proprietor for their own work. Change it and share it.</p></div>
+      <div><h3><i style="background:var(--warm)"></i>Commercial license</h3><p>For any company that makes money, and for anyone who sells it, builds it into a product or device, offers it as a service or installs it for clients for a fee. Contact the author via GitHub.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="gut">
+  <div class="wrap">
+    <span>home-ve by <a href="https://github.com/poltavetsvolodymyr">Volodymyr Poltavets</a></span>
+    <span class="mono"><a href="https://github.com/poltavetsvolodymyr/home-ve">github.com/poltavetsvolodymyr/home-ve</a></span>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+const SHOTS = window.HOMEVE_SHOTS = {};
+const BPM = 120, BEAT = 60 / BPM, BAR = 4 * BEAT, N = 12, T = N * BAR, FPS = 60, NF = Math.round(T * FPS), TAU = Math.PI * 2;
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const win = (t, a, b) => clamp((t - a) / (b - a));
+const wrapPi = a => Math.atan2(Math.sin(a), Math.cos(a));
+const wrapT = t => ((t % T) + T) % T;
+
+// tap k happens on page PAGE[k]; it opens PAGE[k+1]. RECT in screenshot px (780x1688)
+const PAGE = ['login', 'vms', 'vm-summary', 'vm-console', 'vm-settings', 'vm-backups', 'vm-backups', 'vms', 'new-vm', 'isos', 'host', 'settings'];
+const NAME = ['LOGIN', 'VMS', 'VM · SUMMARY', 'VM · CONSOLE', 'VM · SETTINGS', 'VM · BACKUPS', 'VM · BACKUPS', 'VMS', 'NEW VM', 'ISO IMAGES', 'HOST', 'SETTINGS'];
+const TAP = ['SIGN IN', 'ROUTER', 'CONSOLE', 'SETTINGS', 'BACKUPS', 'BACK UP NOW', 'ALL VMS', 'NEW VM', 'ISO IMAGES', 'HOST', 'SETTINGS', 'SIGN OUT'];
+const RECT = [[109, 988, 669, 1060], [36, 256, 746, 626], [280, 510, 396, 566], [436, 300, 548, 352], [585, 512, 712, 564], [70, 738, 355, 806],
+  [30, 148, 215, 194], [36, 154, 246, 218], [62, 1098, 212, 1140], [520, 1582, 640, 1670], [522, 28, 578, 84], [688, 28, 740, 84]];
+const IW = 780, IH = 1688, SW = 7.8, SH = 16.88, TOP = .405;
+const toW = (u, v) => [(u / IW - .5) * SW, (v / IH - .5) * SH];
+const P = RECT.map(r => toW((r[0] + r[2]) / 2, (r[1] + r[3]) / 2)); P.push(P[0]);
+const DIR = P.slice(0, N).map((p, k) => Math.atan2(P[k + 1][0] - p[0], P[k + 1][1] - p[1]));
+const DIST = P.slice(0, N).map((p, k) => Math.hypot(P[k + 1][0] - p[0], P[k + 1][1] - p[1]));
+
+// ---------- three ----------
+const canvas = document.getElementById('c'), stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xffffff, 26, 60);
+const camera = new THREE.PerspectiveCamera(34, 16 / 9, .1, 200);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a96a3, .7));
+const sun = new THREE.DirectionalLight(0xffffff, .9);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 60 });
+sun.shadow.bias = -0.0006; sun.shadow.radius = 3;
+scene.add(sun); scene.add(sun.target);
+
+let C = {};
+const mats = [];
+const solid = key => { const m = new THREE.MeshStandardMaterial({ roughness: .6, metalness: .05 }); m.userData.key = key; mats.push(m); return m; };
+const mesh = (geo, key, parent, x, y, z) => { const m = new THREE.Mesh(geo, solid(key)); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
+
+const floor = mesh(new THREE.BoxGeometry(80, .5, 80), 'floor', scene, 0, -.25, 0); floor.castShadow = false;
+mesh(new THREE.BoxGeometry(SW + .7, .4, SH + .9), 'phone', scene, 0, .2, 0);
+const glowMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false });
+const glow = new THREE.Mesh(new THREE.PlaneGeometry(SW + 1.6, SH + 1.8), glowMat);
+glow.rotation.x = -Math.PI / 2; glow.position.y = .01; scene.add(glow);
+
+const scv = document.createElement('canvas'); scv.width = IW; scv.height = IH;
+const sx = scv.getContext('2d');
+const tex = new THREE.CanvasTexture(scv); tex.encoding = THREE.sRGBEncoding;
+tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const scr = new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }));
+scr.rotation.x = -Math.PI / 2; scr.position.y = TOP; scene.add(scr);
+const sc = new THREE.Mesh(new THREE.PlaneGeometry(SW, SH), new THREE.ShadowMaterial({ opacity: .28 }));
+sc.rotation.x = -Math.PI / 2; sc.position.y = TOP + .002; sc.receiveShadow = true; scene.add(sc);
+const IMG = {};
+for (const k of new Set(PAGE)) { const im = new Image(); im.onload = () => { lastKey = ''; draw(t); }; im.src = SHOTS[k] || ('screenshots/' + k + '.jpg'); IMG[k] = im; }
+let lastKey = '';
+function rr(x0, y0, x1, y1, r) {
+  sx.beginPath(); sx.moveTo(x0 + r, y0); sx.lineTo(x1 - r, y0); sx.quadraticCurveTo(x1, y0, x1, y0 + r);
+  sx.lineTo(x1, y1 - r); sx.quadraticCurveTo(x1, y1, x1 - r, y1); sx.lineTo(x0 + r, y1); sx.quadraticCurveTo(x0, y1, x0, y1 - r);
+  sx.lineTo(x0, y0 + r); sx.quadraticCurveTo(x0, y0, x0 + r, y0); sx.closePath();
+}
+const ok = im => im && im.complete && im.naturalWidth;
+// page transition: the new page slides in sideways with a short scale settle
+const TOAST_K = PAGE.findIndex((p, i) => p === PAGE[(i + 1) % N]); // a tap that stays on its page shows a toast instead
+function drawScreen(k, fr, hl, toast) {
+  const key = k + ':' + fr.toFixed(3) + ':' + hl.toFixed(3) + ':' + toast.toFixed(3);
+  if (PAGE[k] === PAGE[(k + 1) % N]) fr = 0;
+  if (key === lastKey) return; lastKey = key;
+  sx.fillStyle = '#0b0f14'; sx.fillRect(0, 0, IW, IH);
+  const a = IMG[PAGE[k]], b = IMG[PAGE[(k + 1) % N]];
+  if (fr <= 0) { if (ok(a)) sx.drawImage(a, 0, 0, IW, IH); }
+  else {
+    const dx = (1 - fr) * IW;
+    if (ok(a)) { sx.globalAlpha = 1 - fr * .6; sx.drawImage(a, -fr * IW * .35, 0, IW, IH); }
+    sx.globalAlpha = 1;
+    if (ok(b)) sx.drawImage(b, dx, 0, IW, IH);
+  }
+  sx.globalAlpha = 1;
+  if (hl > 0 && fr < .5) {
+    const [x0, y0, x1, y1] = RECT[k], g = 10;
+    rr(x0 - g, y0 - g, x1 + g, y1 + g, 20);
+    sx.fillStyle = `rgba(91,147,242,${.32 * hl})`; sx.fill();
+    sx.lineWidth = 7; sx.strokeStyle = `rgba(120,170,255,${hl})`; sx.stroke();
+  }
+  if (toast > 0) {
+    const w = 560, h = 104, x0 = (IW - w) / 2, y0 = 930 + (1 - toast) * 40; // overlays the backup list, in view of the close-up camera
+    sx.globalAlpha = toast; rr(x0, y0, x0 + w, y0 + h, 26);
+    sx.fillStyle = 'rgba(28,36,46,.96)'; sx.fill(); sx.lineWidth = 3; sx.strokeStyle = 'rgba(91,147,242,.9)'; sx.stroke();
+    sx.fillStyle = '#4ade80'; sx.beginPath(); sx.arc(x0 + 58, y0 + h / 2, 20, 0, TAU); sx.fill();
+    sx.strokeStyle = '#0b0f14'; sx.lineWidth = 6; sx.beginPath(); sx.moveTo(x0 + 48, y0 + h / 2); sx.lineTo(x0 + 56, y0 + h / 2 + 8); sx.lineTo(x0 + 69, y0 + h / 2 - 8); sx.stroke();
+    sx.fillStyle = '#e6edf5'; sx.font = '600 34px system-ui, -apple-system, Segoe UI, sans-serif'; sx.textBaseline = 'middle';
+    sx.fillText('Backup started · router', x0 + 100, y0 + h / 2 + 1);
+    sx.globalAlpha = 1;
+  }
+  tex.needsUpdate = true;
+}
+
+const ripMat = [0, 1, 2].map(() => new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, toneMapped: false }));
+const rips = ripMat.map(m => { const r = new THREE.Mesh(new THREE.RingGeometry(.86, 1, 64), m); r.rotation.x = -Math.PI / 2; r.position.y = TOP + .01; scene.add(r); return r; });
+
+// ---------- Claude ----------
+const MS = .34;
+const M = new THREE.Group(); scene.add(M);
+const R = new THREE.Group(); M.add(R);
+const MB = new THREE.Group(); R.add(MB);
+const BW = 3.6, BH = 3.7, BD = 3.0, BB = .3, BCY = .5 + BH / 2;
+R.position.y = BCY; MB.position.y = -BCY; // flips pivot around the body centre
+function roundedBox(w, h, d, r) {
+  const c = r * .9, s = new THREE.Shape();
+  s.moveTo(-w / 2 + c, -h / 2); s.lineTo(w / 2 - c, -h / 2); s.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + c);
+  s.lineTo(w / 2, h / 2 - c); s.quadraticCurveTo(w / 2, h / 2, w / 2 - c, h / 2);
+  s.lineTo(-w / 2 + c, h / 2); s.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - c);
+  s.lineTo(-w / 2, -h / 2 + c); s.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + c, -h / 2);
+  const g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r * .6, bevelSegments: 5, curveSegments: 10 });
+  g.translate(0, 0, -(d - 2 * r) / 2); g.computeVertexNormals(); return g;
+}
+mesh(roundedBox(BW - BB * 1.2, BH - BB * 1.2, BD, BB), 'chassis', MB, 0, BCY, 0);
+for (const s of [-1, 1]) mesh(new THREE.BoxGeometry(.9, .5, 1.15), 'vent', MB, s * .85, .25, .25);
+const eyeMat = new THREE.MeshBasicMaterial({ toneMapped: false });
+const eyes = [-.7, .7].map(dx => { const e = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), eyeMat); e.position.set(dx, BCY + .45, BD / 2 + .01); e.scale.set(.25, .33, .06); MB.add(e); return e; });
+function arm(side) {
+  const g = new THREE.Group(); g.position.set(side * (BW / 2 + .2), 2.15, .1); MB.add(g);
+  mesh(new THREE.BoxGeometry(.42, .42, 1.6), 'chassis', g, 0, 0, .7);
+  const el = new THREE.Group(); el.position.set(0, 0, 1.45); g.add(el);
+  mesh(new THREE.BoxGeometry(.42, .42, .8), 'chassis', el, 0, 0, .35);
+  mesh(new THREE.BoxGeometry(.52, .4, .42), 'bezel', el, 0, -.02, .9);
+  g.userData = { side, el }; return g;
+}
+const arms = [arm(-1), arm(1)];
+
+// ---------- motion: one bar per tap ----------
+// beat 1: land on the button (press, page slides in), beats 2-3: bounce to the beat facing camera,
+// turn toward the next button, beat 4: crouch and leap, landing on the next downbeat.
+const B = BEAT;
+const wob = tau => .22 * Math.sin(TAU * (tau - .45) / (2 * B));
+function state(t) {
+  t = wrapT(t);
+  const k = Math.floor(t / BAR) % N, tau = t - k * BAR;
+  const prevDir = DIR[(k + N - 1) % N], nextDir = DIR[k];
+  let x = P[k][0], z = P[k][1], y = 0, sy = 1, face, mood = 'open', armUp = 0, press = 0, roll = 0;
+  if (tau < .2) face = prevDir;
+  else if (tau < .45) face = prevDir + wrapPi(0 - prevDir) * ease(win(tau, .2, .45));
+  else if (tau < 2.5 * B) face = wob(tau);
+  else if (tau < 3.05 * B) { const f0 = wob(2.5 * B); face = f0 + wrapPi(nextDir - f0) * ease(win(tau, 2.5 * B, 3.05 * B)); }
+  else face = nextDir;
+  // landing squash + press on the downbeat
+  if (tau < .3) { const s = win(tau, 0, .3); sy = 1 - .32 * Math.sin(Math.PI * s); press = Math.sin(Math.PI * s); }
+  // little bounces on beats 2 and 3
+  for (const bb of [1, 2]) {
+    const s = win(tau, bb * B - .05, bb * B + .3);
+    if (s > 0 && s < 1) { y = .32 * Math.sin(Math.PI * s); sy = 1 + .06 * Math.sin(Math.PI * s); armUp = .45 * Math.sin(Math.PI * s); }
+    const q = win(tau, bb * B - .14, bb * B - .02);
+    if (q > 0 && q < 1) sy = 1 - .12 * Math.sin(Math.PI * q);
+  }
+  if (tau > .45 && tau < 1.4) mood = 'happy';
+  // crouch then leap (beat 4)
+  if (tau > 3 * B && tau < 3.2 * B) sy = 1 - .26 * Math.sin(Math.PI * win(tau, 3 * B, 3.2 * B));
+  if (tau >= 3.2 * B) {
+    const p = win(tau, 3.2 * B, 4 * B), q = ease(p);
+    x = lerp(P[k][0], P[k + 1][0], q); z = lerp(P[k][1], P[k + 1][1], q);
+    y = (.75 + .09 * DIST[k]) * 4 * p * (1 - p);
+    sy = 1 + .16 * Math.sin(Math.PI * p);
+    armUp = Math.sin(Math.PI * Math.min(1, p * 1.3));
+    roll = DIST[k] > 6 ? TAU * ease(p) : 0; // long jumps get a flip
+    mood = p > .2 && p < .8 ? 'happy' : 'open';
+  }
+  if (tau > 1.6 && tau < 1.72) mood = 'blink';
+  return { k, tau, x, y, z, sy, face, mood, armUp, press, roll };
+}
+
+// ---------- music (Web Audio, synthesized) ----------
+const midi = m => 440 * Math.pow(2, (m - 69) / 12);
+const CHORDS = [[45, [69, 72, 76]], [41, [65, 69, 72]], [48, [67, 72, 76]], [43, [67, 71, 74]]]; // Am F C G
+const BLIP = [76, 79, 81, 84, 81, 79, 76, 79, 84, 86, 88, 91];
+let actx = null, master = null, noiseBuf = null, audioStart = 0, nextStep = 0, stepIdx = 0, schedTimer = 0, soundOn = false;
+function initAudio() {
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = actx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
+  master = actx.createGain(); master.gain.value = .7; master.connect(comp); comp.connect(actx.destination);
+  noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+  const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+function env(g, t0, peak, dec) { g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(peak, t0 + .004); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dec); }
+function kick(t0) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.frequency.setValueAtTime(160, t0); o.frequency.exponentialRampToValueAtTime(42, t0 + .13);
+  env(g, t0, 1, .32); o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + .35);
+}
+function noise(t0, hp, peak, dec, bp) {
+  const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; f.type = bp ? 'bandpass' : 'highpass'; f.frequency.value = hp; if (bp) f.Q.value = 1.2;
+  env(g, t0, peak, dec); s.connect(f); f.connect(g); g.connect(master); s.start(t0, Math.random() * .5); s.stop(t0 + dec + .02);
+}
+function tone(t0, freq, type, peak, dec, cut, q) {
+  const o = actx.createOscillator(), f = actx.createBiquadFilter(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  f.type = 'lowpass'; f.frequency.setValueAtTime(cut, t0); f.frequency.exponentialRampToValueAtTime(Math.max(120, cut * .25), t0 + dec); f.Q.value = q || 1;
+  env(g, t0, peak, dec); o.connect(f); f.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dec + .02);
+}
+function blip(t0, m) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'triangle'; o.frequency.setValueAtTime(midi(m), t0); o.frequency.exponentialRampToValueAtTime(midi(m + 12), t0 + .07);
+  env(g, t0, .28, .18); o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + .2);
+}
+function whoosh(t0) {
+  const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; f.type = 'bandpass'; f.Q.value = 2;
+  f.frequency.setValueAtTime(400, t0); f.frequency.exponentialRampToValueAtTime(5000, t0 + .4);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(.12, t0 + .3); g.gain.exponentialRampToValueAtTime(0.0001, t0 + .5);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t0); s.stop(t0 + .55);
+}
+// one 16th-note step of the song (192 steps = 12 bars)
+function playStep(i, t0) {
+  const bar = Math.floor(i / 16), st = i % 16, [root, tones] = CHORDS[bar % 4];
+  const full = bar >= 2, arpOn = bar >= 4 && bar < 11;
+  if (st % 4 === 0) kick(t0);
+  if (full && (st === 4 || st === 12)) { noise(t0, 1800, .45, .16, true); noise(t0, 3000, .2, .09); }
+  if (st % 4 === 2) noise(t0, 7000, .13, st === 14 ? .16 : .05);
+  if (full && st % 2 === 1) noise(t0, 9000, .05, .03);
+  if ([0, 3, 6, 8, 10, 11, 14].includes(st)) tone(t0, midi(root + (st === 10 ? 12 : 0)), 'sawtooth', .32, .2, 900, 6);
+  if (arpOn) { const seq = [0, 1, 2, 1, 2, 0, 1, 2]; const m = tones[seq[st % 8]] + (st >= 8 && bar % 2 ? 12 : 0); tone(t0, midi(m), 'square', .07, .13, 3200, 2); }
+  if (st === 0) blip(t0, BLIP[bar]);
+  if (st === 12) whoosh(t0 + .02);
+  if (bar === 11 && st >= 8) noise(t0, 1800, .25 + .04 * (st - 8), .1, true); // snare roll into the loop
+}
+function anchorAudio() {
+  audioStart = actx.currentTime + .05 - t;
+  stepIdx = Math.ceil((actx.currentTime + .05 - audioStart) / (BEAT / 4) - 1e-6);
+  nextStep = audioStart + stepIdx * BEAT / 4;
+}
+function scheduler() {
+  if (!actx || !soundOn || !playing) return;
+  while (nextStep < actx.currentTime + .15) { playStep(((stepIdx % 192) + 192) % 192, nextStep); stepIdx++; nextStep += BEAT / 4; }
+}
+
+// ---------- theme ----------
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['scene', 'floor', 'accent', 'chassis', 'bezel', 'vent', 'eye', 'phone', 'pulse'])
+    C[k] = new THREE.Color(cs.getPropertyValue('--' + k).trim() || '#888').convertSRGBToLinear();
+  scene.background = C.scene; scene.fog.color = C.scene;
+  mats.forEach(m => m.color.copy(C[m.userData.key]));
+  eyeMat.color.copy(C.eye); ripMat.forEach(m => m.color.copy(C.pulse)); glowMat.color.copy(C.pulse);
+  draw(t);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTheme);
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- draw ----------
+let t = 0;
+function draw(t) {
+  if (!C.scene) return;
+  const s = state(t), tau = s.tau;
+
+  M.position.set(s.x, TOP + s.y, s.z);
+  M.rotation.y = s.face; R.rotation.x = s.roll;
+  const sxz = 1 / Math.sqrt(s.sy);
+  M.scale.set(MS * sxz, MS * s.sy, MS * sxz);
+  eyes.forEach(e => { e.scale.y = s.mood === 'open' ? .33 : s.mood === 'blink' ? .05 : .13; });
+  arms.forEach(a => {
+    const sd = a.userData.side;
+    a.rotation.set(lerp(1.05, -1.5, s.armUp) + .35 * s.press, sd * -.35 * s.armUp, 0);
+    a.userData.el.rotation.set(lerp(.25, 0, s.armUp), 0, 0);
+  });
+
+  const fr = easeOut(win(tau, .08, .42));
+  const hl = tau < .45 ? Math.min(easeOut(win(tau, 0, .06)), 1 - ease(win(tau, .25, .45))) : 0;
+  const toast = s.k === TOAST_K ? easeOut(win(tau, .1, .32)) : s.k === (TOAST_K + 1) % N ? 1 - ease(win(tau, .25, .55)) : 0;
+  drawScreen(s.k, fr, hl, toast);
+
+  rips.forEach((r, i) => {
+    const q = win(tau, i * .1, .6 + i * .1);
+    r.visible = q > 0 && q < 1;
+    if (r.visible) { r.position.x = P[s.k][0]; r.position.z = P[s.k][1]; r.scale.setScalar(.25 + (1.4 + i * .5) * easeOut(q)); ripMat[i].opacity = .85 * (1 - q); }
+  });
+  // phone edge pulses on every beat
+  const beatPhase = (t % BEAT) / BEAT;
+  glowMat.opacity = .5 * Math.pow(1 - beatPhase, 3);
+
+  // camera: tight follow, punch-in on each downbeat, gentle orbit across the loop
+  let tx = 0, tz = 0; const lags = [0, .07, .14, .21, .28];
+  lags.forEach(d => { const q = state(t - d); tx += q.x; tz += q.z; });
+  tx /= lags.length; tz /= lags.length;
+  const orbit = .35 * Math.sin(TAU * t / T * 2), r = 11.2 - 1.2 * Math.pow(1 - win(tau, 0, .5), 2);
+  camera.position.set(tx + Math.sin(.28 + orbit) * r, 7.4 + .3 * s.y, tz + Math.cos(.28 + orbit) * r);
+  camera.lookAt(tx, TOP + .7 + .45 * s.y, tz - .5);
+  camera.fov = 34 - 2.5 * Math.pow(1 - win(tau, 0, .4), 2); camera.updateProjectionMatrix();
+  sun.position.set(tx + 5, 16, tz + 7); sun.target.position.set(tx, 0, tz);
+
+  renderer.render(scene, camera);
+
+  stateEl.textContent = hl > .2 ? 'TAP · ' + TAP[s.k] : toast > .5 ? 'BACKUP STARTED' : NAME[fr > .5 ? (s.k + 1) % N : s.k];
+}
+
+// ---------- UI ----------
+const stateEl = document.getElementById('state');
+const playBtn = document.getElementById('play'), soundBtn = document.getElementById('sound');
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  draw(t);
+}
+new ResizeObserver(resize).observe(stage);
+let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+let anchor = performance.now(), anchorT = 0;
+if (!playing) t = 2.1;
+const setPlayLabel = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; };
+setPlayLabel();
+playBtn.addEventListener('click', () => {
+  playing = !playing; setPlayLabel();
+  anchor = performance.now(); anchorT = t;
+  if (actx && soundOn) { if (playing) actx.resume().then(anchorAudio); else actx.suspend(); }
+});
+soundBtn.addEventListener('click', () => {
+  try {
+    if (!actx) initAudio();
+    soundOn = !soundOn;
+    soundBtn.setAttribute('aria-pressed', String(soundOn));
+    soundBtn.textContent = soundOn ? 'Sound off' : 'Sound on';
+    if (soundOn) { if (!playing) { playing = true; setPlayLabel(); } actx.resume().then(anchorAudio); }
+    else { actx.suspend(); anchor = performance.now(); anchorT = t; }
+  } catch (e) { soundBtn.textContent = 'No audio here'; soundBtn.disabled = true; }
+});
+let onScreen = true;
+new IntersectionObserver(es => { onScreen = es[0].isIntersecting; }).observe(stage);
+setInterval(scheduler, 25);
+function loop(now) {
+  if (playing) {
+    t = (actx && soundOn && actx.state === 'running') ? wrapT(actx.currentTime - audioStart) : wrapT(anchorT + (now - anchor) / 1000);
+    scheduler(); if (onScreen) draw(t);
+  }
+  requestAnimationFrame(loop);
+}
+readTheme(); resize();
+requestAnimationFrame(loop);
+window.renderFrame = n => { playing = false; setPlayLabel(); t = (n % NF) / FPS; draw(t); };
+})();
+
+</script>
+<script>
+// screenshot rail: embedded data when present, otherwise the files next to the page
+(() => { const S = window.HOMEVE_SHOTS || {}; document.querySelectorAll('img[data-shot]').forEach(im => { const k = im.dataset.shot; im.loading = 'lazy'; im.decoding = 'async'; im.src = S[k] || ('screenshots/' + k + '.jpg'); }); })();
+</script>
+
