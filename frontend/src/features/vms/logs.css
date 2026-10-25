@@ -5,14 +5,15 @@
   font-size: 12.5px;
   max-height: calc(100vh - 220px);
   overflow: auto;
-  margin: 0 -18px -16px;
+  /* out to the frame on three sides: the card's padding (shared/ui/ui.css), negated */
+  margin: 0 -16px -12px;
   border-top: 1px solid var(--grid);
 }
 .log-line {
   display: grid;
   grid-template-columns: 128px 44px 140px 1fr;
   gap: 12px;
-  padding: 3px 18px;
+  padding: 3px 16px;
   border-bottom: 1px solid var(--grid);
 }
 .log-line:hover {
