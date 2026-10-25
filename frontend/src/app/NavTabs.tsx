@@ -1,24 +1,23 @@
 import { NavLink } from 'react-router'
 import { pages } from './routes'
 
-interface NavTabsProps {
-  /** "top": a segmented pill in the header on wide screens; "bottom": a tab bar at the bottom on phones. */
-  placement: 'top' | 'bottom'
-}
-
-/** The page tabs. The app renders both placements; CSS shows the one that fits the screen. */
-export function NavTabs({ placement }: NavTabsProps) {
+/**
+ * The page tabs, as a terminal UI's function keys along the bottom: each with its key (1, 2, 3…: Layout
+ * listens for them) and its name. The open one is lit.
+ */
+export function NavTabs() {
   return (
-    <nav className={`tabs tabs-${placement}`} aria-label="Pages">
-      {pages.map(({ path, label, icon: Icon }) => (
+    <nav className="tabs" aria-label="Pages">
+      {pages.map(({ path, label }, i) => (
         // NavLink marks the current page with aria-current="page"
         <NavLink key={path} to={path} className={({ isActive }) => (isActive ? 'on' : '')}>
-          <span className="tab-icon">
-            <Icon size={placement === 'top' ? 16 : 22} strokeWidth={placement === 'top' ? 2 : 1.75} aria-hidden />
+          <span className="tab-key" aria-hidden>
+            {i + 1}
           </span>
           <span className="tab-label">{label}</span>
         </NavLink>
       ))}
+      <span className="tabs-hint">press 1–{pages.length} to switch</span>
     </nav>
   )
 }

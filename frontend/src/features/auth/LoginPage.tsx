@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Unauthorized } from '@/shared/api/http'
-import { BrandMark } from '@/shared/ui'
 import { login } from './api'
 import './login.css'
 
+/** A login prompt in a frame, as a terminal would show one: the field, then the key to press. */
 export function LoginPage({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string>()
@@ -17,7 +17,7 @@ export function LoginPage({ onLogin }: { onLogin: () => void }) {
       await login(password)
       onLogin()
     } catch (err) {
-      setError(err instanceof Unauthorized ? 'Wrong password' : err instanceof Error ? err.message : String(err))
+      setError(err instanceof Unauthorized ? 'wrong password' : err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
@@ -26,10 +26,12 @@ export function LoginPage({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="login">
       <form className="card login-card" onSubmit={submit}>
-        <BrandMark large />
-        <h1>Home</h1>
-        <label>
-          Password
+        <header className="card-head">
+          <h1>home · login</h1>
+        </header>
+        <p className="hint">The VM host: VMs, disks, backups.</p>
+        <label className="login-field">
+          <span className="login-prompt">password:</span>
           <input
             type="password"
             autoFocus
@@ -44,7 +46,7 @@ export function LoginPage({ onLogin }: { onLogin: () => void }) {
           </div>
         )}
         <button className="primary" disabled={busy || !password}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? 'signing in…' : 'sign in ⏎'}
         </button>
       </form>
     </div>

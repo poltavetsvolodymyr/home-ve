@@ -1,48 +1,73 @@
-/* Design tokens: every colour, radius and font the app uses. The light theme is the base;
-   <html data-theme="dark"> (the default, see app/theme.ts) swaps in the dark values. */
+/* Design tokens: every colour, size and font the app uses. The light theme is the base;
+   <html data-theme="dark"> (the default, see app/theme.ts) swaps in the dark values.
+
+   The look: a terminal UI. One monospace face; panels are plain frames of a thin line with their title set
+   into the top line; colour means something, as in a console: cyan for headings and links, green / yellow /
+   red for state, yellow blocks for bars. A status line at the top, function-key tabs at the bottom.
+   Dark is the terminal; light is the same on paper. */
 :root {
   color-scheme: light;
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --surface-2: #f2f1ed;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --accent: #2a78d6;
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --good: #0ca30c;
-  --good-ink: #006300;
-  --warning: #fab219;
-  --warning-ink: #8a5a00;
-  --critical: #d03b3b;
-  --critical-ink: #b02a2a;
-  --critical-wash: rgba(208, 59, 59, 0.08);
-  --warning-wash: rgba(250, 178, 25, 0.1);
-  --radius: 12px;
-  --mono: ui-monospace, 'Cascadia Mono', 'SFMono-Regular', Consolas, monospace;
+  --page: #f6f6f3;
+  --surface: #f6f6f3;
+  --surface-2: #e6e6e1;
+  --well: #ecece7;
+  --ink: #1f1f1f;
+  --ink-2: #3c3c3a;
+  --muted: #7c7c77;
+  --rule: #9a9a94;
+  --grid: #d2d2cc;
+  --axis: #a8a8a3;
+  --border: #9a9a94;
+  --cyan: #007c99;
+  --accent: #d9a300;
+  --on-accent: #111111;
+  --accent-ink: #8e6a00;
+  --bar: #d9a300;
+  --bar-track: #dcdcd6;
+  --series-1: #007c99;
+  --series-2: #d9a300;
+  --good: #2f8f2f;
+  --good-ink: #2f8f2f;
+  --warning: #b37f00;
+  --warning-ink: #8e6a00;
+  --critical: #c62828;
+  --critical-ink: #c62828;
+  --critical-wash: transparent;
+  --warning-wash: transparent;
+  --good-wash: transparent;
+  --status-bg: #1f1f1f;
+  --status-ink: #f0f0ec;
+  --radius: 0;
+  --font: 'JetBrains Mono', 'Cascadia Mono', ui-monospace, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  --mono: var(--font);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --page: #0d0d0d;
-  --surface: #1a1a19;
-  --surface-2: #232322;
-  --ink: #ffffff;
-  --ink-2: #c3c2b7;
-  --muted: #898781;
-  --grid: #2c2c2a;
-  --axis: #383835;
-  --border: rgba(255, 255, 255, 0.1);
-  --accent: #3987e5;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --good-ink: #0ca30c;
-  --warning-ink: #fab219;
-  --critical-ink: #e66767;
-  --critical-wash: rgba(208, 59, 59, 0.14);
-  --warning-wash: rgba(250, 178, 25, 0.08);
+  --page: #161616;
+  --surface: #161616;
+  --surface-2: #262626;
+  --well: #1d1d1d;
+  --ink: #d6d6d6;
+  --ink-2: #bdbdbd;
+  --muted: #808080;
+  --rule: #5c5c5c;
+  --grid: #303030;
+  --axis: #4a4a4a;
+  --border: #5c5c5c;
+  --cyan: #4fc3dc;
+  --accent: #f0d43a;
+  --accent-ink: #f0d43a;
+  --bar: #f0d43a;
+  --bar-track: #2c2c2c;
+  --series-1: #4fc3dc;
+  --series-2: #f0d43a;
+  --good: #5fd75f;
+  --good-ink: #5fd75f;
+  --warning: #f0d43a;
+  --warning-ink: #f0d43a;
+  --critical: #ff5f5f;
+  --critical-ink: #ff5f5f;
+  --status-bg: #262626;
+  --status-ink: #d6d6d6;
 }

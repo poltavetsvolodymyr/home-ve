@@ -136,7 +136,7 @@
 .installer-space-bar {
   display: flex;
   height: 14px;
-  border-radius: 7px;
+  border-radius: 0;
   overflow: hidden;
   background: var(--border);
 }
@@ -156,7 +156,7 @@
   display: inline-block;
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: 0;
   margin-right: 6px;
   vertical-align: -1px;
 }

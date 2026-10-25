@@ -1,171 +1,153 @@
-/* The app shell: a sticky top bar (brand, tabs on wide screens, actions), the main column, and a tab bar
-   at the bottom on phones and small tablets. Both bars are translucent and blur what scrolls under them. */
+/* The app shell, as a terminal UI: a status line at the top, the main column, the function-key tabs along
+   the bottom. Both bars are solid and inverted against the page. */
 
-.topbar {
+.statusline {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--page) 88%, transparent);
-  -webkit-backdrop-filter: saturate(1.8) blur(20px);
-  backdrop-filter: saturate(1.8) blur(20px);
-  border-bottom: 1px solid var(--border);
+  background: var(--status-bg);
+  color: var(--status-ink);
 }
-.topbar-inner {
-  max-width: 1200px;
-  height: 56px;
+.statusline-inner {
+  max-width: 1100px;
   margin: 0 auto;
+  min-height: 34px;
   /* safe areas: the notch in landscape on an iPhone */
-  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  padding: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
 }
-
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink);
+  padding: 1px 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
 }
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
+.brand:hover {
+  text-decoration: none;
 }
-.brand-text small {
+/* the fields, divided by │ as in a status line */
+.status-items {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.status-items > * + *::before {
+  content: '│';
+  margin: 0 0.7em;
   color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0;
+}
+.status-items .ok {
+  color: var(--good);
+}
+.status-items .bad {
+  color: var(--critical);
 }
 
 .topbar-actions {
   margin-left: auto;
   display: flex;
-  gap: 4px;
+  align-items: center;
 }
 .icon-button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   min-height: 0;
   padding: 0;
   border: 0;
-  border-radius: 10px;
   background: transparent;
-  color: var(--ink-2);
-  transition:
-    background-color 0.15s,
-    color 0.15s;
+  color: inherit;
 }
 .icon-button:hover {
-  background: var(--surface-2);
-  color: var(--ink);
+  background: rgba(127, 127, 127, 0.25);
 }
 
-/* --- tabs on wide screens: a segmented pill in the top bar ----------------- */
+/* --- function-key tabs along the bottom ----------------------------------- */
 
-.tabs-top {
+.tabs {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 10;
   display: flex;
+  align-items: stretch;
   gap: 2px;
-  padding: 3px;
-  border-radius: 12px;
-  background: var(--surface-2);
+  padding: 0 max(12px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(12px, env(safe-area-inset-left));
+  background: var(--status-bg);
+  color: var(--status-ink);
 }
-.tabs-top a {
+.tabs a {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
-  border-radius: 9px;
-  color: var(--ink-2);
-  font-weight: 500;
-  white-space: nowrap;
-  transition:
-    background-color 0.15s,
-    color 0.15s;
+  gap: 6px;
+  padding: 6px 12px 6px 0;
+  color: inherit;
+  text-decoration: none;
 }
-.tabs-top a:hover {
-  color: var(--ink);
+/* the key: inverted, like F1 in htop */
+.tab-key {
+  padding: 0 6px;
+  background: var(--status-ink);
+  color: var(--status-bg);
+  font-weight: 700;
 }
-.tabs-top a.on {
-  color: var(--ink);
-  background: var(--surface);
-  box-shadow:
-    0 0 0 1px var(--border),
-    0 1px 3px rgba(0, 0, 0, 0.12);
+.tabs a.on .tab-key {
+  background: var(--accent);
+  color: var(--on-accent);
 }
-.tabs-top .tab-icon {
-  display: grid;
-}
-.tabs-top a.on .tab-icon {
+.tabs a.on .tab-label {
   color: var(--accent);
 }
-
-/* --- tabs on phones: a tab bar at the bottom, in thumb reach ---------------- */
-
-.tabs-bottom {
-  display: none;
+.tabs a:hover .tab-label {
+  text-decoration: underline;
+}
+.tabs-hint {
+  margin-left: auto;
+  align-self: center;
+  color: var(--muted);
 }
 
 main {
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 20px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+  /* room above for the first panel's title on its top line, below for the tab bar */
+  padding: 26px max(12px, env(safe-area-inset-right)) calc(64px + env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
 }
 
-/* the five labelled tabs need about 860px next to the brand and the buttons */
-@media (max-width: 860px) {
-  .tabs-top {
+/* on a phone: the less important status fields drop out, the tabs share the width */
+@media (max-width: 640px) {
+  .status-wide,
+  .tabs-hint {
     display: none;
   }
-  .tabs-bottom {
-    position: fixed;
-    inset: auto 0 0 0;
-    z-index: 10;
+  /* the first field shown gets no divider before it */
+  .status-items > .status-wide:first-child + *::before {
+    content: none;
+  }
+  /* six tabs don't fit a phone side by side: each one becomes a column, its key above a small label */
+  .tabs {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: 1fr;
-    padding: 6px max(4px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
-      max(4px, env(safe-area-inset-left));
-    background: color-mix(in srgb, var(--page) 88%, transparent);
-    -webkit-backdrop-filter: saturate(1.8) blur(20px);
-    backdrop-filter: saturate(1.8) blur(20px);
-    border-top: 1px solid var(--border);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
-  .tabs-bottom a {
-    display: flex;
+  .tabs a {
     flex-direction: column;
-    align-items: center;
     gap: 3px;
-    padding: 2px 0;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 500;
+    padding: 7px 0 6px;
+    min-width: 0;
   }
-  .tabs-bottom .tab-icon {
-    display: grid;
-    place-items: center;
-    width: 56px;
-    height: 30px;
-    border-radius: 15px;
-    transition:
-      background-color 0.2s,
-      color 0.2s;
-  }
-  .tabs-bottom a.on {
-    color: var(--ink);
-  }
-  .tabs-bottom a.on .tab-icon {
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
-  }
-  /* room for the tab bar under the last card */
-  main {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  .tab-label {
+    font-size: 10px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }

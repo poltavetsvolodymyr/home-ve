@@ -157,14 +157,12 @@ button.danger {
   flex-wrap: wrap;
   background: var(--warning-wash);
   color: var(--warning-ink);
-  border-radius: 8px;
   padding: 8px 12px;
 }
 
 /* console */
 .vm-screen {
   background: #000;
-  border-radius: 8px;
   overflow: hidden;
   /* noVNC scales the screen into this box */
   height: min(70vh, 640px);

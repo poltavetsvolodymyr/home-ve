@@ -5,6 +5,9 @@
   grid-template-columns: minmax(0, 1fr) 200px auto;
   gap: 8px;
 }
+.iso-form + .hint {
+  margin-top: 10px;
+}
 @media (max-width: 640px) {
   .iso-form {
     grid-template-columns: minmax(0, 1fr);

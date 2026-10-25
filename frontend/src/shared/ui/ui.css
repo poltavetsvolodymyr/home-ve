@@ -1,41 +1,62 @@
 /* Styles of the UI kit (this folder) and of the layout primitives pages share. Loaded globally,
    right after the base styles, so feature styles can build on them. */
 
-/* --- layout -------------------------------------------------------------- */
+/* --- layout: one column of panels --------------------------------------- */
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 22px;
 }
 .grid-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
 }
 
-/* --- Card ---------------------------------------------------------------- */
+/* --- Card: a frame of a thin line, its title set into the top line ------- */
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 18px;
+  position: relative;
+  border: 1px solid var(--rule);
+  padding: 16px 16px 12px;
   min-width: 0;
 }
+/* The head is pulled up onto the top line, its first line centred on it; its parts get the page colour behind
+   them, cutting the line like ─ Title ─ in a terminal. It stays in the flow: a head taller than a line (a search
+   field, a state under the title, controls wrapping on a phone) pushes the content down instead of covering it. */
 .card-head {
+  position: relative;
+  margin: calc(-16px - 0.8em) -6px 10px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  gap: 4px 12px;
+}
+.card-head > * {
+  background: var(--page);
+  padding: 0 6px;
+  min-width: 0;
+}
+.card-head h2 {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-head h2 a {
+  color: inherit;
 }
 .card-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+}
+/* a panel's last line: when it was updated, dim */
+.card-foot {
+  margin-top: 12px;
+  color: var(--muted);
 }
 
 /* --- Segmented ----------------------------------------------------------- */
@@ -44,137 +65,113 @@
   display: inline-flex;
   /* the buttons' offsetLeft counts from here (Segmented.tsx scrolls the chosen one into sight) */
   position: relative;
+  width: fit-content;
   max-width: 100%;
+  border: 1px solid var(--rule);
   /* more tabs than a phone is wide: they scroll sideways inside the bar, not the whole page */
   overflow-x: auto;
   scrollbar-width: none;
-  background: var(--surface-2);
-  border-radius: 8px;
-  padding: 2px;
 }
 .segmented button {
   flex-shrink: 0;
   white-space: nowrap;
   border: 0;
-  background: transparent;
   min-height: 28px;
-  padding: 4px 10px;
+  padding: 2px 10px;
   color: var(--ink-2);
-  border-radius: 6px;
 }
 .segmented button.on {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 0 0 1px var(--border);
-  font-weight: 600;
+  background: var(--ink);
+  color: var(--page);
 }
 
 /* --- Stat ---------------------------------------------------------------- */
 
 .stat {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  padding: 10px 14px;
 }
 .stat-label {
-  font-size: 13px;
-  color: var(--ink-2);
+  color: var(--cyan);
 }
 .stat-value {
-  font-size: 24px;
-  font-weight: 600;
-  margin-top: 2px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
 }
 .stat-sub {
-  font-size: 12px;
   color: var(--muted);
-  margin-top: 6px;
-}
-.meter {
-  height: 6px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  margin-top: 8px;
-  overflow: hidden;
-}
-.meter > div {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  transition: width 0.4s;
-}
-.meter.warning {
-  background: color-mix(in srgb, var(--warning) 22%, transparent);
-}
-.meter.warning > div {
-  background: var(--warning);
-}
-.meter.critical {
-  background: color-mix(in srgb, var(--critical) 18%, transparent);
-}
-.meter.critical > div {
-  background: var(--critical);
 }
 
-/* --- Badge --------------------------------------------------------------- */
+/* a bar of blocks, like ▇▇▇▇░░░░ in a terminal: yellow on a dim track */
+.meter {
+  height: 0.9em;
+  background: var(--bar-track);
+}
+.meter > div,
+.meter > span {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--bar) 0 0.55em, transparent 0.55em 0.65em);
+  transition: width 0.4s;
+}
+.meter.warning > div,
+.meter.warning > span {
+  background: repeating-linear-gradient(90deg, var(--warning) 0 0.55em, transparent 0.55em 0.65em);
+}
+.meter.critical > div,
+.meter.critical > span {
+  background: repeating-linear-gradient(90deg, var(--critical) 0 0.55em, transparent 0.55em 0.65em);
+}
+
+/* --- Badge: a coloured word with a dot, as a console prints state --------- */
 
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 5px;
   color: var(--ink-2);
   white-space: nowrap;
 }
 .badge-icon {
-  font-size: 10px;
-  width: 12px;
-  text-align: center;
-}
-.badge.good .badge-icon {
-  color: var(--good);
+  font-size: 0.75em;
 }
 .badge.good {
-  color: var(--good-ink);
+  color: var(--good);
 }
-.badge.warning .badge-icon {
+.badge.warning {
   color: var(--warning);
 }
-.badge.critical .badge-icon {
+.badge.critical {
   color: var(--critical);
 }
-.badge.critical {
-  color: var(--critical-ink);
-}
-.badge.neutral .badge-icon {
+.badge.neutral {
   color: var(--muted);
 }
 
 /* --- ErrorNote, Skeleton ------------------------------------------------- */
 
 .error-note {
-  background: var(--critical-wash);
-  color: var(--critical-ink);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
+  color: var(--critical);
+  border: 1px solid var(--critical);
+  padding: 6px 10px;
+}
+.error-note::before {
+  content: 'error: ';
 }
 
-/* a placeholder bar for a value that hasn't arrived yet (Skeleton.tsx) */
+/* a value that hasn't arrived yet: a run of dim blocks, as a terminal would print a placeholder */
 .skeleton {
   display: inline-block;
   max-width: 100%;
   height: 0.9em;
   vertical-align: middle;
-  border-radius: 6px;
-  background: var(--surface-2);
-  animation: skeleton-pulse 1.4s ease-in-out infinite;
+  background: repeating-linear-gradient(90deg, var(--grid) 0 0.55em, transparent 0.55em 0.65em);
+  animation: skeleton-pulse 1.2s steps(2) infinite;
 }
 
 @keyframes skeleton-pulse {
   50% {
-    opacity: 0.45;
+    opacity: 0.4;
   }
 }
 
@@ -187,24 +184,19 @@
 /* --- tag and key/value list (plain markup, no component) ----------------- */
 
 .tag {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--ink-2);
-  background: var(--surface-2);
-  border-radius: 4px;
-  padding: 1px 6px;
+  color: var(--on-accent);
+  background: var(--accent);
+  padding: 0 4px;
   margin-left: 6px;
-  vertical-align: 2px;
 }
 dl.kv {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 6px 20px;
+  gap: 1px 24px;
   margin: 0;
 }
 dl.kv dt {
-  color: var(--ink-2);
+  color: var(--muted);
 }
 dl.kv dd {
   margin: 0;
@@ -212,12 +204,6 @@ dl.kv dd {
 }
 dl.kv .kv-row {
   display: contents;
-}
-
-@media (max-width: 640px) {
-  .card-actions {
-    width: 100%;
-  }
 }
 
 /* --- fit-screen: a card with a log ------------------------------------------ */
@@ -272,14 +258,8 @@ dl.kv .kv-row {
 /* The page is exactly as tall as the screen between the bars, and its .fit-screen card (a log) stretches
    over what the cards above leave, so the page doesn't scroll at all: only the log does. */
 .page.fill-screen {
-  height: calc(100vh - 125px);
-  height: calc(100dvh - 125px);
-}
-@media (max-width: 860px) {
-  .page.fill-screen {
-    height: calc(100vh - 173px - env(safe-area-inset-bottom));
-    height: calc(100dvh - 173px - env(safe-area-inset-bottom));
-  }
+  height: calc(100vh - 124px - env(safe-area-inset-bottom));
+  height: calc(100dvh - 124px - env(safe-area-inset-bottom));
 }
 .page.fill-screen > .card.fit-screen {
   flex: 1 1 0;
@@ -292,20 +272,18 @@ dl.kv .kv-row {
 dialog.confirm {
   width: min(420px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: 18px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--page);
   color: var(--ink);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  box-shadow: none;
 }
 dialog.confirm:focus {
   outline: none;
 }
 dialog.confirm::backdrop {
-  background: rgba(0, 0, 0, 0.5);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.55);
 }
 dialog.confirm[open] {
   animation: confirm-in 0.16s ease-out;
@@ -322,7 +300,7 @@ dialog.confirm[open] {
   }
 }
 dialog.confirm h2 {
-  font-size: 17px;
+  color: var(--cyan);
   margin: 0 0 8px;
 }
 .confirm-message {
@@ -366,29 +344,26 @@ dialog.confirm h2 {
 }
 button.danger-solid {
   background: var(--critical);
-  border-color: transparent;
+  border-color: var(--critical);
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
 }
 button.danger-solid:hover:not(:disabled) {
   filter: brightness(1.08);
   background: var(--critical);
 }
 
-/* BrandMark: drawn like the header's buttons, an outline icon, the accent only on its strokes */
+/* BrandMark: the server in a yellow square, as the status line's name is yellow */
 .brand-mark {
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--accent);
+  width: 30px;
+  height: 30px;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .brand-mark.large {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
+  width: 44px;
+  height: 44px;
 }

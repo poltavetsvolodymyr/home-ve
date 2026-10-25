@@ -14,7 +14,7 @@ export function ThemeToggle() {
       title={dark ? 'Light theme' : 'Dark theme'}
       aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
     >
-      <Icon size={18} aria-hidden />
+      <Icon size={15} aria-hidden />
     </button>
   )
 }
