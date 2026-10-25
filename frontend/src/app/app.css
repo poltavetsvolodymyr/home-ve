@@ -103,8 +103,11 @@
 .tabs a.on .tab-label {
   color: var(--accent);
 }
-.tabs a:hover .tab-label {
-  text-decoration: underline;
+/* only with a real pointer: on a phone a tap leaves :hover stuck on the tab */
+@media (hover: hover) {
+  .tabs a:hover .tab-label {
+    text-decoration: underline;
+  }
 }
 .tabs-hint {
   margin-left: auto;
