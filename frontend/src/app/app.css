@@ -64,8 +64,11 @@
   background: transparent;
   color: inherit;
 }
-.icon-button:hover {
-  background: rgba(127, 127, 127, 0.25);
+/* only with a real pointer: on a phone a tap leaves :hover stuck on the button */
+@media (hover: hover) {
+  .icon-button:hover {
+    background: rgba(127, 127, 127, 0.25);
+  }
 }
 
 /* --- function-key tabs along the bottom ----------------------------------- */
