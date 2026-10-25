@@ -18,7 +18,9 @@ a {
   color: var(--cyan);
   text-decoration: none;
 }
-a:hover {
+/* only a plain text link: one with a class (a whole card, a button, a port) has a look of its own, and an
+   underline would run under every line of text inside it */
+a:not([class]):hover {
   text-decoration: underline;
 }
 code,
