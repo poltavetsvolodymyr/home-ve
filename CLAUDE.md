@@ -66,6 +66,7 @@ bash -n <script> && shellcheck <script>     # every shell script touched
 
 ## Working with the maintainer
 
+- Talk to the maintainer informally: in Russian, «ты», never «вы».
 - A question is a question: answer it, change nothing unless asked.
 - Explain configs and commands line by line.
 - Never ask for or handle tokens or keys.
