@@ -192,6 +192,14 @@ button.danger {
   font-family: var(--mono);
   height: min(70vh, 640px);
   padding: 4px;
+  /* a swipe here scrolls the terminal (touchScroll in VmTerminal.tsx), never the page */
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+/* the mouse wheel at the end of the scrollback doesn't go on to the page either */
+.vm-term-screen .xterm-viewport,
+.vm-term-screen .xterm-scrollable-element {
+  overscroll-behavior: contain;
 }
 .vm-term-tools {
   display: flex;

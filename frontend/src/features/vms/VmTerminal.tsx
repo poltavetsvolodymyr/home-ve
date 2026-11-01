@@ -16,7 +16,7 @@ const statusBadge: Record<Status, BadgeStatus> = { connecting: 'warning', connec
 /** As for the screen: after a lost connection (a reboot), try again every 2 s for a minute. */
 const retryMs = 2000
 const maxRetries = 30
-/** Nothing new from the VM this long after connecting: it may not use its serial port at all. */
+/** Nothing from the VM, in its log or since, this long after connecting: it may not use its serial port at all. */
 const silentMs = 3000
 
 const fontSizes = { min: 9, max: 22, default: 13 }
@@ -33,6 +33,68 @@ function savedFontSize(): number {
 }
 
 const encoder = new TextEncoder()
+
+/**
+ * One finger moves the terminal's scrollback, as a list in any app does, and keeps moving a little after it lets go;
+ * the page stays where it is (touch-action: none on the box). xterm.js leaves touch alone: without this a swipe over
+ * the terminal scrolled the page. Returns what removes it.
+ */
+function touchScroll(el: HTMLElement, t: Terminal): () => void {
+  let lastY: number | null = null
+  let lastTime = 0
+  let velocity = 0 // px per ms, + is towards the end
+  let rest = 0 // px not yet a whole line
+  let glide = 0
+  const lineHeight = () => (el.querySelector('.xterm-screen')?.clientHeight || el.clientHeight) / t.rows
+  const scrollBy = (px: number) => {
+    rest += px
+    const lines = Math.trunc(rest / lineHeight())
+    if (!lines) return
+    t.scrollLines(lines)
+    rest -= lines * lineHeight()
+  }
+  const start = (e: TouchEvent) => {
+    cancelAnimationFrame(glide)
+    if (e.touches.length !== 1) return (lastY = null)
+    lastY = e.touches[0].clientY
+    lastTime = e.timeStamp
+    velocity = 0
+    rest = 0
+  }
+  const move = (e: TouchEvent) => {
+    if (lastY === null || e.touches.length !== 1) return
+    e.preventDefault()
+    const y = e.touches[0].clientY
+    velocity = (lastY - y) / Math.max(1, e.timeStamp - lastTime)
+    scrollBy(lastY - y)
+    lastY = y
+    lastTime = e.timeStamp
+  }
+  const end = () => {
+    if (lastY === null) return
+    lastY = null
+    // the swipe's speed, slowing down frame by frame
+    let px = velocity * 16
+    const step = () => {
+      if (Math.abs(px) < 0.5) return
+      scrollBy(px)
+      px *= 0.95
+      glide = requestAnimationFrame(step)
+    }
+    glide = requestAnimationFrame(step)
+  }
+  el.addEventListener('touchstart', start, { passive: true })
+  el.addEventListener('touchmove', move, { passive: false })
+  el.addEventListener('touchend', end)
+  el.addEventListener('touchcancel', end)
+  return () => {
+    cancelAnimationFrame(glide)
+    el.removeEventListener('touchstart', start)
+    el.removeEventListener('touchmove', move)
+    el.removeEventListener('touchend', end)
+    el.removeEventListener('touchcancel', end)
+  }
+}
 
 /**
  * The VM's serial console as a terminal (xterm.js over /api/vms/{name}/terminal), next to its screen: text that can
@@ -102,9 +164,11 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
     // as many columns and rows as fit the box: the window, a phone turned, full screen, the font size
     const resize = new ResizeObserver(() => f.fit())
     resize.observe(box.current)
+    const stopTouch = touchScroll(box.current, t)
     term.current = t
     fit.current = f
     return () => {
+      stopTouch()
       resize.disconnect()
       typing.dispose()
       t.dispose()
@@ -142,6 +206,8 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
     let leaving = false
     // the backend sends the end of the log, then an empty message; after that, what the VM says now
     let live = false
+    // anything at all from the VM, in the log or now: its serial port works, a shell waiting is just quiet
+    let heard = false
     s.onopen = () => {
       failures.current = 0
       setStatus('connected')
@@ -155,10 +221,11 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
         live = true
         // xterm.js draws what it's given a little later: done with the log once everything before is drawn
         term.current?.write('', () => (replaying.current = false))
-        silence = window.setTimeout(() => setSilent(true), silentMs)
+        if (!heard) silence = window.setTimeout(() => setSilent(true), silentMs)
         return
       }
-      if (live) {
+      if (!heard && bytes.length > 0) {
+        heard = true
         window.clearTimeout(silence)
         setSilent(false)
       }
