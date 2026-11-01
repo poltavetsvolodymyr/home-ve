@@ -20,8 +20,14 @@ public sealed class HomeBackendOptions
     /// <summary>One <c>&lt;name&gt;.conf</c> per VM; vm@&lt;name&gt;.service runs it (deploy/vm/vm-run).</summary>
     public string VmConfigDir { get; set; } = "/etc/vm";
 
-    /// <summary>Where a running VM keeps its sockets: <c>&lt;dir&gt;/vm-&lt;name&gt;/vnc.sock</c>.</summary>
+    /// <summary>Where a running VM keeps its sockets: <c>&lt;dir&gt;/vm-&lt;name&gt;/vnc.sock</c>, <c>console.sock</c>.</summary>
     public string VmRuntimeDir { get; set; } = "/run";
+
+    /// <summary>
+    /// The VMs' serial console logs, <c>&lt;dir&gt;/&lt;name&gt;.console.log</c>: QEMU writes them (deploy/vm/vm-run),
+    /// the Terminal tab starts with their end.
+    /// </summary>
+    public string ConsoleLogDir { get; set; } = "/var/log/vm";
 
     /// <summary>
     /// ISO images for the VMs' CD drives. vm-run only takes images from /var/lib/home-backend/iso, so on the

@@ -8,11 +8,13 @@ browser on the LAN or through a VPN
    ▼
 nginx (on the host)
    ├── /          → files from /var/www/home          (frontend, built by Vite)
-   └── /api/      → http://127.0.0.1:5000             (backend, Kestrel; console over WebSocket)
+   └── /api/      → http://127.0.0.1:5000             (backend, Kestrel; console and terminal over WebSocket)
                         │
                         ├── /etc/vm/*.conf               VM settings: reads and writes
                         ├── systemctl show/start/stop    VM state and actions, via polkit
                         ├── /run/vm-<name>/vnc.sock      VM screen for the console
+                        ├── /run/vm-<name>/console.sock  VM serial console for the terminal
+                        ├── /var/log/vm/<name>.console.log   what the serial console said (QEMU writes it)
                         ├── /proc, /sys                  load of the host and of each VM, temperature, bridges
                         └── journalctl -o json           log of vm@<name>.service
 
@@ -23,9 +25,9 @@ vm@<name>.service (root)
 ```
 
 - **Frontend**: a static React application. It gets data only from `/api/...` and re-fetches it every few
-  seconds (`usePoll`). The console is noVNC over WebSocket.
+  seconds (`usePoll`). The console is noVNC over WebSocket, the terminal xterm.js over WebSocket.
 - **Backend**: a single self-contained binary `deploy/app/home-backend` (.NET included). It serves only JSON
-  (and the console WebSocket), listens only on loopback, runs as the user `home-backend` without root,
+  (and the console and terminal WebSockets), listens only on loopback, runs as the user `home-backend` without root,
   in a systemd sandbox.
 - **VMs are started by systemd, not by the backend**: `vm@<name>.service` → `vm-run` → QEMU. The backend only asks
   systemd (start/stop/restart/kill) and edits the `.conf`. If the backend crashes or is stopped, the VMs do not notice.
@@ -45,7 +47,7 @@ The backend has to manage VMs without being root. So permissions are granted nar
 | Update button | the same polkit rule: only `restart` for `home-update.service`. The unit runs `update.sh` as root | choosing what to run: the command is fixed in the unit, the backend can only restart the unit |
 | ISO images | the folder `/var/lib/home-backend/iso` belongs to the backend; it downloads files there from a URL itself | slipping a host file to a VM: `vm-run` opens the ISO itself and checks the opened file (see below) |
 | VM settings | `/etc/vm` is owned by `root:home-backend` with mode 0775, the unit has `ReadWritePaths=/etc/vm` | writing anywhere else: `ProtectSystem=strict` |
-| console | after the VM starts, `vnc.sock` gets the group `home-backend` and mode 0660 (`ExecStartPost` in `vm@.service`) | `qmp.sock`, `qga.sock`, `console.sock`: 0600, root only. QMP can do almost anything, up to reading host files |
+| console and terminal | after the VM starts, `vnc.sock` and `console.sock` get the group `home-backend` and mode 0660 (`ExecStartPost` in `vm@.service`); `vm-run` makes `/var/log/vm` (0750) and `<name>.console.log` (0640) `root:home-backend` | `qmp.sock`, `qga.sock`: 0600, root only. QMP can do almost anything, up to reading host files. Writing the console logs |
 | VM addresses | `vm-guest-net.service` (root) asks each running VM's guest agent `guest-network-get-interfaces` every 15 s and leaves the answer in `/run/vm-guest-net/<name>.json` (root:home-backend, 0640). The backend checks every address in it before showing it (`GuestNetwork.cs`): it is the guest's word | `qga.sock` itself: whoever holds it can run commands in the guest as root (`guest-exec`) |
 | VM log | the group `systemd-journal` | — |
 
@@ -133,7 +135,7 @@ Infrastructure/
 | `Auth` | login, first-run setup | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `GET`/`POST /api/auth/setup` | `PasswordStore`: the hash in `/var/lib/home-backend/password`; without it, the setup with the code from `setup-code` |
 | `Host` | Host | `GET /api/host` | assembled from SystemStatus |
 | `SystemStatus` | (on Host) | — | `LinuxSystemSource`: /proc, /etc; `CpuMonitor`; `CpuTemperatureMonitor` + `HwmonCpuTemperatureSource` (k10temp/coretemp from /sys/class/hwmon) |
-| `Vms` | VMs, VM page, New VM | `POST /api/vms` (create), `DELETE /api/vms/{name}[?disk=true]` (delete), `GET /api/vms`, `GET /api/vms/{name}`, `POST /api/vms/{name}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{name}/config`, `GET /api/vms/{name}/logs`, `GET /api/vms/{name}/console` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
+| `Vms` | VMs, VM page, New VM | `POST /api/vms` (create), `DELETE /api/vms/{name}[?disk=true]` (delete), `GET /api/vms`, `GET /api/vms/{name}`, `POST /api/vms/{name}/{start\|shutdown\|reboot\|poweroff}`, `PUT /api/vms/{name}/config`, `GET /api/vms/{name}/logs`, `GET /api/vms/{name}/console` (WebSocket), `GET /api/vms/{name}/terminal` (WebSocket), `GET /api/bridges` | `LinuxVmHost`: /etc/vm, systemctl, /proc/&lt;pid&gt;, /sys/class/net; `MockVmHost` |
 | `Isos` | Images (ISO and qcow2) | `GET /api/isos`, `POST /api/isos` (download from a URL), `DELETE /api/isos/{name}` (delete or cancel a download) | `IsoStore`: the `IsoDir` folder, background downloads via `.<name>.part`, `.xz` unpacked by `xz -dc` on the way; a qcow2's disk size from its header |
 | `Backups` | Backups tab of a VM | `GET/POST /api/vms/{name}/backups` (list / Back up now), `POST /api/vms/{name}/backups/{time}/restore`, `DELETE /api/vms/{name}/backups/{time}` | `LinuxBackupHost`: list of files in `BackupDir`, `systemctl` for the units `vm-backup@`/`vm-restore@`/`vm-backup-delete@` and their log; `BackupRestores` keeps a running restore in memory; `MockBackupHost` |
 | `Offsite` | Settings | `GET /api/host/offsite`, `POST /api/host/offsite` | `SystemctlOffsiteRunner`: `systemctl restart/show vm-offsite.service`, its log, whether `/etc/vm-offsite/rclone.conf` exists; `MockOffsiteRunner` |
@@ -159,6 +161,11 @@ Inside `Vms`:
 - **`VmConsole`**: a bridge WebSocket ⇄ unix socket `vnc.sock`. VNC bytes are passed as is (subprotocol `binary`);
   the protocol is parsed by noVNC in the browser. VM not running → 404, no socket → 502. Each direction
   closes on its own: if the VM closes, the browser gets a normal close; if the browser closes, the socket to the VM is closed.
+- **`VmTerminals`**: the same for the serial console `console.sock`, with a difference: QEMU takes one client at a
+  time there, so the backend holds one connection per VM for all its open tabs (a phone and a laptop see the same
+  thing, either can type). The first tab opens it, the last closes it. A new tab first gets the last 64 KB of
+  `/var/log/vm/<name>.console.log`, from the first line break in them: QEMU writes everything the guest says there
+  (`logfile=` in `vm-run`), also when no one is watching. A tab more than 1024 chunks behind is let go.
 
 ### Background measurements
 
@@ -176,7 +183,7 @@ The order is set in `Hosting/HomeBackendPipeline.cs`:
 4. **RateLimiter**: for login: no more than 10 attempts per 5 minutes from one IP.
 5. **Authentication**: cookie `home-backend`, lives 7 days, extended on use.
 6. **Authorization**: everything under `/api` except login and logout requires a login. Without a session the response is 401.
-7. **WebSockets**: for the console; the same cookie, the same allowlist.
+7. **WebSockets**: for the console and the terminal; the same cookie, the same allowlist.
 8. **Endpoint**. If systemctl or journalctl fails, the response is 502 with the error text.
 
 ### Trimming: what not to do
@@ -214,16 +221,18 @@ features/
                           ISO, cards; "start and open console"
     VmDelete.tsx          deleting a stopped VM; with the disk, only after typing its name
     NetsEditor.tsx, CdromField.tsx, ImageField.tsx   shared parts of the new VM and settings forms
-    VmPage.tsx            one VM: action buttons + tabs ?tab=summary|console|settings|logs
+    VmPage.tsx            one VM: action buttons + tabs ?tab=summary|console|terminal|settings|backups|logs
     VmActions.tsx         Start / Shut down / Reboot / Power off, with confirmation for the disruptive ones
     VmSummary.tsx, VmMeters.tsx
     VmSettingsForm.tsx    cores, memory, firmware, network cards, autostart; after saving offers a reboot
     VmConsole.tsx         noVNC (loaded only when the tab is opened): scaling, Ctrl+Alt+Del, full screen,
                           input line for phones (letters are sent as key presses)
-    VmKeys.tsx            key panel under the screen: Esc, Tab, arrows (repeat while held), Home/End,
+    VmTerminal.tsx        xterm.js (loaded only when the tab is opened) on the serial console: text size, Size
+                          (types stty rows/cols into the VM), Copy (the selection or the screen), Paste, full screen
+    VmKeys.tsx            key panel under the screen and the terminal: Esc, Tab, arrows (repeat while held), Home/End,
                           PgUp/PgDn, F1–F12, sticky Ctrl/Alt/Shift for the next key or line
     VmLogs.tsx            log of vm@<name>.service
-    settings.ts, vmState.ts, keysyms.ts, logLevel.ts   pure functions with tests
+    settings.ts, vmState.ts, keysyms.ts, termKeys.ts, logLevel.ts   pure functions with tests
 shared/                   HTTP client, usePoll, session, formatting, UI kit
 styles/                   tokens.css (theme colors), base.css, index.css
 ```

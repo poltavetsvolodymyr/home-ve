@@ -20,8 +20,11 @@ public sealed class TestApp : IAsyncLifetime
 
     public Uri BaseAddress { get; private set; } = null!;
 
-    /// <summary>Where the "running" mock VMs keep their sockets (vm-&lt;name&gt;/vnc.sock), for console tests.</summary>
+    /// <summary>Where the "running" mock VMs keep their sockets (vm-&lt;name&gt;/vnc.sock, console.sock), for console and terminal tests.</summary>
     public string RuntimeDir => Path.Combine(_dataDir, "run");
+
+    /// <summary>The VMs' console logs (&lt;name&gt;.console.log), for terminal tests.</summary>
+    public string ConsoleLogDir => Path.Combine(_dataDir, "log");
 
     /// <summary>The ISO directory; tests drop files into it.</summary>
     public string IsoDir => Path.Combine(_dataDir, "iso");
@@ -41,6 +44,7 @@ public sealed class TestApp : IAsyncLifetime
             ["HomeBackend:DataDir"] = _dataDir,
             ["HomeBackend:VmRuntimeDir"] = RuntimeDir,
             ["HomeBackend:IsoDir"] = IsoDir,
+            ["HomeBackend:ConsoleLogDir"] = ConsoleLogDir,
         });
         builder.AddHomeBackend();
 

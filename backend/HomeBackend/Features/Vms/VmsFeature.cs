@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 namespace HomeBackend.Features.Vms;
 
 /// <summary>
-/// The VMs: list, state and usage, the buttons, the settings, the log and the console, creating and deleting.
+/// The VMs: list, state and usage, the buttons, the settings, the log, console and terminal, creating and deleting.
 /// Pages: VMs, VM, New VM. Endpoints under <c>/api/vms</c>, plus <c>GET /api/bridges</c>.
 /// </summary>
 public static class VmsFeature
@@ -21,6 +21,7 @@ public static class VmsFeature
     {
         services.AddDataSource<IVmHost, LinuxVmHost, MockVmHost>(useMockData);
         services.AddSingleton<VmMonitor>();
+        services.AddSingleton<VmTerminals>();
         services.AddHostedService(sp => sp.GetRequiredService<VmMonitor>());
         return services;
     }
@@ -37,6 +38,7 @@ public static class VmsFeature
         api.MapGet("/vms/{name}/logs", ReadLogs);
         api.Map("/vms/{name}/console", (HttpContext http, string name, IOptions<HomeBackendOptions> options, VmMonitor monitor) =>
             VmConsole.HandleAsync(http, name, options, monitor));
+        api.Map("/vms/{name}/terminal", (HttpContext http, string name, VmTerminals terminals) => terminals.HandleAsync(http, name));
         api.MapGet("/bridges", (IVmHost host) => host.ReadBridges().ToArray());
         return api;
     }

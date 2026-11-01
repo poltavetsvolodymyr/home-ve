@@ -8,13 +8,14 @@ After=systemd-networkd.service
 Type=exec
 # /run/vm-<name>: the VM's sockets, gone when it stops
 RuntimeDirectory=vm-%i
-# sockets for root only; the console one is handed to the web UI below
+# sockets for root only; the console ones (screen and serial) are handed to the web UI below
 UMask=0077
 ExecStart=/usr/local/sbin/vm-run %i
 # QEMU makes vnc.sock a moment after it starts (after vm-run created a new disk: a few seconds; made it
-# from an image: as long as writing the image takes): wait for it, then let home-backend connect. Stops
-# waiting when vm-run gives up. "-" = should that fail, the VM still runs, just without a console in the web UI.
-ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 18000 ] && kill -0 "$$MAINPID" 2>/dev/null; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"'
+# from an image: as long as writing the image takes): wait for it, then let home-backend connect, to it and to
+# console.sock (the serial console, made before it), each on its own. Stops waiting when vm-run gives up.
+# "-" = should that fail, the VM still runs, just without a console or terminal in the web UI.
+ExecStartPost=-/bin/sh -c 's=/run/vm-%i/vnc.sock; t=/run/vm-%i/console.sock; n=0; while [ ! -S "$$s" ] && [ $$n -lt 18000 ] && kill -0 "$$MAINPID" 2>/dev/null; do sleep 0.1; n=$$((n + 1)); done; chgrp home-backend "$$s" && chmod 0660 "$$s"; chgrp home-backend "$$t" && chmod 0660 "$$t"'
 # the VM is "starting" until then, and writing a big image takes minutes, not the default 90 s
 TimeoutStartSec=30min
 # press the power button, wait up to 120 s for the guest, then pull the plug (deploy/vm/vm-stop)

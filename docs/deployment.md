@@ -460,11 +460,11 @@ Open `https://home.example.com`.
 
 ### What is in `home.conf`
 
-- `map $http_upgrade $connection_upgrade` and `location ~ ^/api/vms/[^/]+/console$`: the console works
-  over WebSocket. By default nginx talks to the backend over HTTP/1.0 and drops the `Upgrade`/`Connection`
+- `map $http_upgrade $connection_upgrade` and `location ~ ^/api/vms/[^/]+/(console|terminal)$`: the console and the
+  terminal work over WebSocket. By default nginx talks to the backend over HTTP/1.0 and drops the `Upgrade`/`Connection`
   headers; here it passes them through, so the connection is "upgraded" to WebSocket.
 - `proxy_read_timeout 1h`: without it nginx closes the console after 60 seconds of no activity on the screen.
-- A regex `location ~` takes priority over the plain `/api/` prefix, so the console requests go to it.
+- A regex `location ~` takes priority over the plain `/api/` prefix, so the console and terminal requests go to it.
 - `location /` with `try_files $uri $uri/ /index.html`: a file if there is one, otherwise the app's page, so an address
   like `/vms/router` opens the app (it is a single-page app: the browser, not nginx, knows its addresses).
 - `location = /index.html` with `Cache-Control: no-cache`: every address of the app ends up here (through the
@@ -534,8 +534,11 @@ The next update brings the host forward again to the latest version of its chann
   [architecture.md](architecture.md#permissions-who-can-do-what).
 - `vm-run` runs as root and does not trust `.conf` files: it parses them rather than executing them, and accepts only
   thin volumes of the `data` pool as disks.
-- The console is the VM's keyboard and screen. Anyone logged in to the web UI can log in to a VM if they know its password,
-  or reboot it into single-user mode. The web UI password should be at least as strong as the root passwords of your VMs.
+- The console is the VM's keyboard and screen, the terminal its serial line. Anyone logged in to the web UI can log in
+  to a VM if they know its password, or reboot it into single-user mode. The web UI password should be at least as
+  strong as the root passwords of your VMs.
+- The serial console log (`/var/log/vm/<name>.console.log`) has everything a VM printed there, also what you ran in the
+  terminal and its output (not passwords: a login prompt doesn't echo them). Readable by root and the web UI.
 
 ## Settings
 
@@ -549,6 +552,7 @@ File `/etc/home-backend/config.json` (template: `deploy/config.example.json`). A
 | `DiskGroup` | — (found by `install.sh`) | LVM volume group with the `data` thin pool: a new VM's disk is `/dev/<group>/<name>` |
 | `VmConfigDir` | `/etc/vm` | where the `.conf` files are (vm-run always reads `/etc/vm`) |
 | `VmRuntimeDir` | `/run` | where the `vm-<name>` folders with sockets are |
+| `ConsoleLogDir` | `/var/log/vm` | the VMs' serial console logs, `<name>.console.log` (`vm-run` sets it up) |
 | `DataDir` | `/var/lib/home-backend` | cookie keys |
 The web UI password is not in this file: the first-run setup keeps its hash (PBKDF2) in
 `/var/lib/home-backend/password`, readable by the backend and root only. To change it, or reset a forgotten one,
@@ -600,6 +604,32 @@ media path" for that.
 
 **Deleting**: VM → Settings → Delete VM, only when the VM is stopped. Without the checkbox only the `.conf` is deleted; the disk stays,
 and a new VM with the same name picks it up as is. With the checkbox the disk is deleted too; for that you must type the VM's name.
+
+## Terminal (serial console)
+
+The VM page has two ways in without SSH: **Console**, the VM's screen and keyboard (VNC), and **Terminal**, its serial
+console as text: it can be scrolled back, copied, resized, and `htop`, `nano` or `vim` work in it. Both can be open
+at once. The terminal starts with the end of what the VM printed there (`/var/log/vm/<name>.console.log`), so a boot
+or a kernel panic is there even if no one was watching. A VM gets its serial console in the web UI on its next
+start (`systemctl restart vm@<name>` after an update).
+
+The guest has to use its serial port; a Debian VM, once (as root):
+
+```bash
+sed -i 's/^GRUB_CMDLINE_LINUX="/&console=tty0 console=ttyS0,115200 /' /etc/default/grub   # kernel messages on both
+update-grub
+systemctl enable --now serial-getty@ttyS0.service   # a login prompt on the serial line, right away
+```
+
+- `console=tty0 console=ttyS0,115200`: the kernel writes to the screen and to the serial port; the last one listed is
+  where the boot messages of systemd go. 115200 is the speed of the line (QEMU's serial port ignores it, getty doesn't).
+- `update-grub` writes it into the boot menu; it takes effect on the next boot.
+- `serial-getty@ttyS0`: the login prompt. With `console=ttyS0` systemd starts it by itself at boot; enabling it gives
+  one now, without rebooting.
+
+In the terminal, **Size** tells the shell how big the terminal is (it types `stty rows … cols …`): a serial line has no
+way to say it by itself, and without it `ls`, `htop` and editors draw for 80×24. Again after turning the phone or
+changing the text size. The log is rotated at 1 MB, three old ones kept (`/etc/logrotate.d/vm-console`).
 
 ## Backups
 
@@ -733,4 +763,6 @@ pkcheck --action-id org.freedesktop.systemd1.manage-units --process $(systemctl 
 - The buttons give "Interactive authentication required" → the polkit rule is missing or `polkitd` is not installed:
   `ls /etc/polkit-1/rules.d/`, `systemctl status polkit`.
 - Console: "Failed to connect" and 502 → the VM was started by an old `vm-run` without the VNC socket: `systemctl restart vm@<name>`.
+- Terminal: stays "closed" (502) → the VM was started by an old `vm-run`, whose serial console the web UI may not open:
+  `systemctl restart vm@<name>`. Connected but black → the guest doesn't use its serial port: "Terminal" below.
 - Saving settings: "Permission denied" → `/etc/vm` has the wrong group: `bash /opt/home-ve/deploy/install.sh`.

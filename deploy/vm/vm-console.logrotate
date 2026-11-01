@@ -1,0 +1,11 @@
+# The VMs' serial console logs (vm-run). QEMU keeps the file open and appends: copied and emptied, not moved.
+# Checked daily (logrotate.timer); the Terminal tab shows only the end of the current file.
+/var/log/vm/*.console.log {
+  size 1M
+  rotate 3
+  copytruncate
+  compress
+  delaycompress
+  missingok
+  notifempty
+}

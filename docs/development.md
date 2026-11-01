@@ -53,9 +53,10 @@ is enabled in `global.json` at the repository root.
   random loopback port. Login and logout, 401 without a session, the VM list, actions (400 for an unknown one, 404 for
   a nonexistent VM), saving settings with validation, the VM log, dropping the connection for a foreign network, the login
   limit, security headers. `ConsoleTests` starts a fake VNC server on a unix socket and pushes bytes
-  through a real WebSocket in both directions; for a stopped VM it expects 404.
+  through a real WebSocket in both directions; for a stopped VM it expects 404. `TerminalTests` does the same for the
+  serial console: two tabs on one connection, the log's end first, 502 without the socket.
 - **Frontend** (`*.test.ts` next to the code): formatting, the temperature tile, VM states and actions,
-  validation of the settings form and the random MAC, mapping characters to key presses for the console, log levels.
+  validation of the settings form and the random MAC, mapping characters to key presses for the console and keys to terminal sequences, log levels.
 - **`deploy/vm/vm-run`** has no automated tests; when you change it, run `shellcheck deploy/vm/vm-run` (CI does it too) and
   check by hand on the host with `systemctl restart vm@<name>` + `journalctl -u vm@<name> -n 20`.
 
@@ -68,6 +69,14 @@ any QEMU with VNC on this socket will do:
 ```bash
 mkdir -p backend/HomeBackend/.data/run/vm-router
 qemu-system-x86_64 -m 128 -display vnc=unix:backend/HomeBackend/.data/run/vm-router/vnc.sock
+```
+
+The Terminal tab looks for `.data/run/vm-router/console.sock` and starts with `.data/log/router.console.log`
+(`HomeBackend:ConsoleLogDir`). A local shell on that socket stands in for the VM's serial console:
+
+```bash
+mkdir -p backend/HomeBackend/.data/run/vm-router
+socat UNIX-LISTEN:backend/HomeBackend/.data/run/vm-router/console.sock,fork EXEC:'bash -i',pty,stderr,setsid,sigint,sane
 ```
 
 ### Installer page locally

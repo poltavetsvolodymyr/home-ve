@@ -201,6 +201,17 @@ done <<NETS
 $nets
 NETS
 
+# The guest's serial console, for the Terminal tab, also goes to a file: what the VM said there, even with no one
+# watching (a boot, a kernel panic). The web UI reads it, nothing else of /var/log/vm; QEMU only appends, and
+# logrotate (vm-console.logrotate) keeps it small. Should that fail, the VM still starts, just without the log.
+log=/var/log/vm/$name.console.log
+logging=
+if install -d -m 0750 -g home-backend /var/log/vm && touch "$log" && chgrp home-backend "$log" && chmod 0640 "$log"; then
+  logging=",logfile=$log,logappend=on"
+else
+  echo "vm-run: no console log for $name" >&2
+fi
+
 # qga: guest agent channel; qmp: control socket (qmp <vm> <command>); serial: the guest's serial console
 # PCI devices get slots in the order they come here, and a guest names its network cards after their slot
 # (enp0s3, enp0s4): a device added before the cards renames them, and the guest's network settings no longer
@@ -210,7 +221,8 @@ exec qemu-system-x86_64 "$@" \
   -chardev "socket,id=qga,path=$run/qga.sock,server=on,wait=off" \
   -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 \
   -qmp "unix:$run/qmp.sock,server=on,wait=off" \
-  -serial "unix:$run/console.sock,server=on,wait=off" \
+  -chardev "socket,id=serial0,path=$run/console.sock,server=on,wait=off$logging" \
+  -serial chardev:serial0 \
   -device virtio-balloon-pci,id=balloon0,free-page-reporting=on
 # the balloon (last, see above) only for free page reporting: the guest tells QEMU which pages it freed, and
 # QEMU gives them back to the host. Without it a VM keeps all memory it ever touched until it is restarted.

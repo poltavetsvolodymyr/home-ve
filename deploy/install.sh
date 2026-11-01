@@ -51,10 +51,10 @@ note_unusual_location() {
 # UEFI firmware, xz unpacks downloaded images (.qcow2.xz); polkitd lets the backend start and stop them without
 # being root. systemctl run by a non-root user talks to systemd over the system D-Bus, which a minimal
 # (debootstrap) Debian may not have yet: dbus provides it. nginx serves the UI, openssl makes its first
-# certificate; curl (with the CA certificates) fetches rclone.
+# certificate; curl (with the CA certificates) fetches rclone. logrotate keeps the VMs' console logs small.
 install_packages() {
   local missing=()
-  for p in qemu-system-x86 qemu-utils ovmf xz-utils socat lvm2 thin-provisioning-tools dbus polkitd zstd curl ca-certificates nginx openssl; do
+  for p in qemu-system-x86 qemu-utils ovmf xz-utils socat lvm2 thin-provisioning-tools dbus polkitd zstd curl ca-certificates nginx openssl logrotate; do
     dpkg -s "$p" &>/dev/null || missing+=("$p")
   done
   if (( ${#missing[@]} )); then
@@ -181,6 +181,7 @@ install_vm_tools() {
     "$DEPLOY_DIR/vm/vm-backup-delete@.service" "$DEPLOY_DIR/vm/vm-backup-all.service" "$DEPLOY_DIR/vm/vm-backup-all.timer" \
     "$DEPLOY_DIR/vm/vm-guest-net.service" /etc/systemd/system/
   install -m 0644 "$DEPLOY_DIR/vm/50-home-backend.rules" /etc/polkit-1/rules.d/
+  install -m 0644 "$DEPLOY_DIR/vm/vm-console.logrotate" /etc/logrotate.d/vm-console
   # the backend writes the VM settings (temp file + rename, so it needs the directory)
   install -d -m 0775 -o root -g home-backend "$VM_DIR"
   systemctl daemon-reload

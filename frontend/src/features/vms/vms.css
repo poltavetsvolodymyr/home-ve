@@ -186,6 +186,36 @@ button.danger {
   font-size: 13px;
   padding-inline: 8px;
 }
+/* the terminal: black like the screen, as high; its tools in a row under it */
+.vm-term-screen {
+  background: #000;
+  font-family: var(--mono);
+  height: min(70vh, 640px);
+  padding: 4px;
+}
+.vm-term-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.vm-term-tools button {
+  font-size: 13px;
+  padding-inline: 8px;
+  touch-action: manipulation;
+}
+/* full screen: the terminal takes what the tools and keys leave */
+.vm-term:fullscreen {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background: var(--page);
+}
+.vm-term:fullscreen .vm-term-screen {
+  flex: 1;
+  height: auto;
+}
+
 /* the on-screen keys: six columns, arrows as an inverted T on the right */
 .vm-keys {
   display: grid;
@@ -235,6 +265,9 @@ button.danger {
   }
   .vm-screen {
     height: 56vw;
+  }
+  .vm-term-screen {
+    height: 60vh;
   }
 }
 

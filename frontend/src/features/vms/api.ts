@@ -84,6 +84,10 @@ export const deleteVm = (name: string, disk: boolean) => del(`${vmPath(name)}${d
 export const fetchBridges = () => get<string[]>('/api/bridges')
 export const fetchVmLogs = (name: string, lines: number) => get<LogEntry[]>(`${vmPath(name)}/logs?lines=${lines}`)
 
+/** The WebSocket the terminal (xterm.js) talks to the VM's serial console over. */
+export const terminalUrl = (name: string) =>
+  `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${vmPath(name)}/terminal`
+
 /** The WebSocket the console (noVNC) talks VNC over. */
 export const consoleUrl = (name: string) =>
   `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${vmPath(name)}/console`

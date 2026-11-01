@@ -13,19 +13,21 @@ import { VmSummary } from './VmSummary'
 import { hasScreen, stateBadge } from './vmState'
 import './vms.css'
 
-// noVNC is big (and only needed here): loaded when the console tab opens
+// noVNC and xterm.js are big (and only needed here): loaded when their tab opens
 const VmConsole = lazy(() => import('./VmConsole'))
+const VmTerminal = lazy(() => import('./VmTerminal'))
 
 const tabs = [
   { value: 'summary', label: 'Summary' },
   { value: 'console', label: 'Console' },
+  { value: 'terminal', label: 'Terminal' },
   { value: 'settings', label: 'Settings' },
   { value: 'backups', label: 'Backups' },
   { value: 'logs', label: 'Logs' },
 ] as const
 type Tab = (typeof tabs)[number]['value']
 
-/** `/vms/:name?tab=console`: one VM, with its buttons and five tabs. The tab is in the URL, so a reload keeps it. */
+/** `/vms/:name?tab=console`: one VM, with its buttons and six tabs. The tab is in the URL, so a reload keeps it. */
 export function VmPage() {
   const { name = '' } = useParams()
   const [params, setParams] = useSearchParams()
@@ -72,6 +74,24 @@ export function VmPage() {
           <Card title="Console">
             <p className="muted">
               {vm ? 'The VM is not running. Start it to see its screen.' : <Skeleton width="16em" />}
+            </p>
+          </Card>
+        ))}
+      {tab === 'terminal' &&
+        (vm && hasScreen(vm.state) ? (
+          <Suspense
+            fallback={
+              <Card title="Terminal">
+                <Skeleton width="10em" />
+              </Card>
+            }
+          >
+            <VmTerminal name={name} />
+          </Suspense>
+        ) : (
+          <Card title="Terminal">
+            <p className="muted">
+              {vm ? 'The VM is not running. Start it to use its serial console.' : <Skeleton width="16em" />}
             </p>
           </Card>
         ))}
