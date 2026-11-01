@@ -165,7 +165,8 @@ Inside `Vms`:
   time there, so the backend holds one connection per VM for all its open tabs (a phone and a laptop see the same
   thing, either can type). The first tab opens it, the last closes it. A new tab first gets the last 64 KB of
   `/var/log/vm/<name>.console.log`, from the first line break in them: QEMU writes everything the guest says there
-  (`logfile=` in `vm-run`), also when no one is watching. A tab more than 1024 chunks behind is let go.
+  (`logfile=` in `vm-run`), also when no one is watching. Then an empty message, before what the VM says now: the
+  page shows "Nothing from the VM yet" when nothing follows it. A tab more than 1024 chunks behind is let go.
 
 ### Background measurements
 
@@ -228,7 +229,9 @@ features/
     VmConsole.tsx         noVNC (loaded only when the tab is opened): scaling, Ctrl+Alt+Del, full screen,
                           input line for phones (letters are sent as key presses)
     VmTerminal.tsx        xterm.js (loaded only when the tab is opened) on the serial console: text size, Size
-                          (types stty rows/cols into the VM), Copy (the selection or the screen), Paste, full screen
+                          (types stty rows/cols into the VM), Copy (the selection or the screen), Paste, full screen;
+                          a silent VM gets "Set up from the screen": ?tab=console&setup=serial, where VmConsole
+                          types serialSetup.ts's commands on the VM's keyboard, once confirmed
     VmKeys.tsx            key panel under the screen and the terminal: Esc, Tab, arrows (repeat while held), Home/End,
                           PgUp/PgDn, F1–F12, sticky Ctrl/Alt/Shift for the next key or line
     VmLogs.tsx            log of vm@<name>.service

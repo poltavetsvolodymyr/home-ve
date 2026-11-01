@@ -613,10 +613,15 @@ at once. The terminal starts with the end of what the VM printed there (`/var/lo
 or a kernel panic is there even if no one was watching. A VM gets its serial console in the web UI on its next
 start (`systemctl restart vm@<name>` after an update).
 
-The guest has to use its serial port; a Debian VM, once (as root):
+The guest has to use its serial port. The screen works on any VM as it is (QEMU draws it, the guest needn't know);
+text on the serial port only comes if the guest's system writes it there, and Linux doesn't by default. When the
+terminal stays black, the tab says so and offers **Set up from the screen**: on the Console tab, once you are logged in
+as root on the screen, it types these into the VM on its keyboard (shown first, and editable). By hand, a Debian VM,
+once (as root):
 
 ```bash
-sed -i 's/^GRUB_CMDLINE_LINUX="/&console=tty0 console=ttyS0,115200 /' /etc/default/grub   # kernel messages on both
+grep -q console=ttyS0 /etc/default/grub ||   # already done: not twice
+  sed -i 's/^GRUB_CMDLINE_LINUX="/&console=tty0 console=ttyS0,115200 /' /etc/default/grub   # kernel messages on both
 update-grub
 systemctl enable --now serial-getty@ttyS0.service   # a login prompt on the serial line, right away
 ```

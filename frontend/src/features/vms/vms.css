@@ -204,6 +204,27 @@ button.danger {
   padding-inline: 8px;
   touch-action: manipulation;
 }
+/* the terminal is connected but the VM says nothing; and its set-up on the Console tab */
+.vm-term-silent,
+.vm-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--rule);
+}
+.vm-term-silent p,
+.vm-setup p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+.vm-term-silent button,
+.vm-setup button {
+  font-size: 13px;
+}
+
 /* full screen: the terminal takes what the tools and keys leave */
 .vm-term:fullscreen {
   display: flex;

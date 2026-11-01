@@ -11,7 +11,8 @@ namespace HomeBackend.Features.Vms;
 /// QEMU serves it on /run/vm-&lt;name&gt;/console.sock and takes one client at a time, so this holds that one
 /// connection for every tab open on the VM: what the VM writes goes to all of them, what any of them types goes to
 /// the VM. The connection is opened by the first tab and closed with the last. A tab starts with the end of the
-/// console's log, which QEMU itself writes (deploy/vm/vm-run): the VM's last words before anyone looked.
+/// console's log, which QEMU itself writes (deploy/vm/vm-run): the VM's last words before anyone looked. An empty
+/// message follows it, before what the VM says now: the page tells a silent VM by nothing coming after it.
 /// </summary>
 public sealed class VmTerminals(IOptions<HomeBackendOptions> options, VmMonitor monitor)
 {
@@ -44,6 +45,7 @@ public sealed class VmTerminals(IOptions<HomeBackendOptions> options, VmMonitor 
             var tail = ReadLogTail(name);
             if (tail.Length > 0)
                 await ws.SendAsync(tail, WebSocketMessageType.Binary, endOfMessage: true, http.RequestAborted);
+            await ws.SendAsync(ReadOnlyMemory<byte>.Empty, WebSocketMessageType.Binary, endOfMessage: true, http.RequestAborted);
 
             var toBrowser = PumpAsync(tab.Reader, ws, http.RequestAborted);
             var toVm = PumpAsync(ws, session, http.RequestAborted);

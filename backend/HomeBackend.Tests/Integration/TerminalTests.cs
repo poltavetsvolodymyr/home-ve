@@ -46,7 +46,8 @@ public class TerminalTests(TestApp app) : IClassFixture<TestApp>
         var server = listener.AcceptAsync(Ct).AsTask();
 
         using var ws = await OpenAsync("router", "192.168.178.72");
-        Assert.Equal("boot ok\r\nlogin: ", await ReceiveText(ws));
+        Assert.Equal("boot ok\r\nlogin: ", await ReceiveText(ws, skipEmpty: false));
+        Assert.Equal("", await ReceiveText(ws, skipEmpty: false)); // the end of the log: what follows is live
         (await server).Dispose();
         await ClosedWith(ws);
         File.Delete(Path.Combine(app.ConsoleLogDir, "router.console.log"));
@@ -109,10 +110,14 @@ public class TerminalTests(TestApp app) : IClassFixture<TestApp>
         return ws.CloseStatusDescription;
     }
 
-    private static async Task<string> ReceiveText(ClientWebSocket ws)
+    /// <summary>The next message; by default past the empty one that ends the log.</summary>
+    private static async Task<string> ReceiveText(ClientWebSocket ws, bool skipEmpty = true)
     {
         var buffer = new byte[64];
-        var r = await ws.ReceiveAsync(buffer, Ct);
-        return Encoding.ASCII.GetString(buffer, 0, r.Count);
+        while (true)
+        {
+            var r = await ws.ReceiveAsync(buffer, Ct);
+            if (r.Count > 0 || !skipEmpty) return Encoding.ASCII.GetString(buffer, 0, r.Count);
+        }
     }
 }

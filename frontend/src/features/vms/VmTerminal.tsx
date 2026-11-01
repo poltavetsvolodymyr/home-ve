@@ -1,7 +1,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { AArrowDown, AArrowUp, ClipboardPaste, Copy, Maximize, MoveHorizontal, RotateCcw } from 'lucide-react'
+import { AArrowDown, AArrowUp, ClipboardPaste, Copy, Maximize, Monitor, MoveHorizontal, RotateCcw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Card, confirmEdit, type Status as BadgeStatus } from '@/shared/ui'
 import { terminalUrl } from './api'
@@ -16,6 +16,8 @@ const statusBadge: Record<Status, BadgeStatus> = { connecting: 'warning', connec
 /** As for the screen: after a lost connection (a reboot), try again every 2 s for a minute. */
 const retryMs = 2000
 const maxRetries = 30
+/** Nothing new from the VM this long after connecting: it may not use its serial port at all. */
+const silentMs = 3000
 
 const fontSizes = { min: 9, max: 22, default: 13 }
 const fontSizeKey = 'home-ve.terminal.fontSize'
@@ -38,7 +40,7 @@ const encoder = new TextEncoder()
  * guest has to use its serial port for that (console=ttyS0, a getty on ttyS0; docs/deployment.md). A phone lacks
  * Esc, Ctrl and arrows: the same panel of keys as the screen has, here sending what a terminal sends.
  */
-export default function VmTerminal({ name }: { name: string }) {
+export default function VmTerminal({ name, onSetup }: { name: string; onSetup: () => void }) {
   const frame = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const term = useRef<Terminal | null>(null)
@@ -52,6 +54,8 @@ export default function VmTerminal({ name }: { name: string }) {
   const modsNow = useRef<Modifier[]>([])
   const [fontSize, setFontSize] = useState(savedFontSize)
   const [copied, setCopied] = useState(false)
+  // connected, but the VM has said nothing since (only its log came)
+  const [silent, setSilent] = useState(false)
 
   const send = (text: string) => {
     const s = socket.current
@@ -128,15 +132,32 @@ export default function VmTerminal({ name }: { name: string }) {
     const s = new WebSocket(terminalUrl(name))
     s.binaryType = 'arraybuffer'
     let retry: number | undefined
+    let silence: number | undefined
     let leaving = false
+    // the backend sends the end of the log, then an empty message; after that, what the VM says now
+    let live = false
     s.onopen = () => {
       failures.current = 0
       setStatus('connected')
       // the backend starts with the end of the log: from a clean screen, not after what the last connection left
       term.current?.reset()
     }
-    s.onmessage = e => term.current?.write(new Uint8Array(e.data as ArrayBuffer))
+    s.onmessage = e => {
+      const bytes = new Uint8Array(e.data as ArrayBuffer)
+      if (!live && bytes.length === 0) {
+        live = true
+        silence = window.setTimeout(() => setSilent(true), silentMs)
+        return
+      }
+      if (live) {
+        window.clearTimeout(silence)
+        setSilent(false)
+      }
+      term.current?.write(bytes)
+    }
     s.onclose = () => {
+      window.clearTimeout(silence)
+      setSilent(false)
       if (leaving) return
       setStatus('closed')
       if (++failures.current <= maxRetries) retry = window.setTimeout(reconnect, retryMs)
@@ -145,6 +166,7 @@ export default function VmTerminal({ name }: { name: string }) {
     return () => {
       leaving = true
       window.clearTimeout(retry)
+      window.clearTimeout(silence)
       s.close()
       socket.current = null
     }
@@ -230,6 +252,17 @@ export default function VmTerminal({ name }: { name: string }) {
     >
       <div ref={frame} className="vm-term">
         <div ref={box} className="vm-term-screen" onClick={() => term.current?.focus()} />
+        {silent && connected && (
+          <div className="vm-term-silent">
+            <p>
+              Nothing from the VM yet. Press Enter to wake it. If it stays silent, its system doesn't use the serial
+              port: that can be switched on from its screen, in a root shell.
+            </p>
+            <button onClick={onSetup}>
+              <Monitor size={15} aria-hidden /> Set up from the screen
+            </button>
+          </div>
+        )}
         <div className="vm-term-tools">
           <button
             className="icon-button"

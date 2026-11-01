@@ -1,5 +1,5 @@
 import RFB from '@novnc/novnc'
-import { CornerDownLeft, Keyboard, Maximize, RotateCcw, X } from 'lucide-react'
+import { CornerDownLeft, Keyboard, Maximize, RotateCcw, SquareTerminal, X } from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -34,12 +34,18 @@ const maxRetries = 30
 const KEYS_PER_BATCH = 16
 const BATCH_PAUSE_MS = 15
 
+/** Commands to type into the VM for the Terminal tab (serialSetup.ts), and where to go when done or not wanted. */
+export interface ConsoleSetup {
+  commands: string
+  onDone: () => void
+}
+
 /**
  * The VM's screen (noVNC over /api/vms/{name}/console). Scaled to fit; click it to type with a real keyboard.
  * A phone has none that noVNC can capture, so there's a panel of keys (arrows, Esc, F-keys, Ctrl…) and a
  * text box that types into the VM as you type in it: every change to the box goes out as keys at once.
  */
-export default function VmConsole({ name }: { name: string }) {
+export default function VmConsole({ name, setup }: { name: string; setup?: ConsoleSetup }) {
   const screen = useRef<HTMLDivElement>(null)
   const rfb = useRef<RFB | null>(null)
   const [status, setStatus] = useState<Status>('connecting')
@@ -48,6 +54,7 @@ export default function VmConsole({ name }: { name: string }) {
   const failures = useRef(0)
   const [text, setText] = useState('')
   const [mods, setMods] = useState<Modifier[]>([])
+  const [setupTyped, setSetupTyped] = useState(false)
 
   useEffect(() => {
     if (!screen.current) return
@@ -178,6 +185,24 @@ export default function VmConsole({ name }: { name: string }) {
     setText(lines.length ? rest : text + rest)
   }
 
+  // The Terminal tab's set-up: typed here, on the VM's keyboard, as it works on any VM. Blind, so shown first, and only
+  // once the person says the screen shows a root shell.
+  const typeSetup = async () => {
+    if (!setup) return
+    const edited = await confirmEdit({
+      title: 'Type these into the VM?',
+      message:
+        'Each line is typed and Enter pressed after it. The screen has to show a root shell (Debian or Ubuntu), ' +
+        'not a login prompt or an editor. The terminal works right after; kernel messages in it after a reboot.',
+      editText: setup.commands,
+      confirmLabel: 'Type',
+    })
+    if (edited === null) return
+    const lines = edited.split('\n').filter(l => l.trim())
+    send(lines.flatMap(l => [...textEvents(l), ...panelKeyEvents(panelKeys.enter)]))
+    setSetupTyped(true)
+  }
+
   // the phone keyboard's Return and the Enter button: Enter in the VM, a fresh line in the box
   const enter = (e?: FormEvent) => {
     e?.preventDefault()
@@ -220,6 +245,29 @@ export default function VmConsole({ name }: { name: string }) {
         </>
       }
     >
+      {setup && (
+        <div className="vm-setup">
+          <p>
+            {setupTyped
+              ? 'Typed. Look at the screen for errors, then open the terminal.'
+              : 'Switching on the Terminal tab: log in as root on the screen below, then type the commands into it.'}
+          </p>
+          {setupTyped ? (
+            <button onClick={setup.onDone}>
+              <SquareTerminal size={15} aria-hidden /> Open the terminal
+            </button>
+          ) : (
+            <>
+              <button disabled={status !== 'connected'} onClick={() => void typeSetup()}>
+                <Keyboard size={15} aria-hidden /> Type the commands
+              </button>
+              <button onClick={setup.onDone}>
+                <X size={15} aria-hidden /> Cancel
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div ref={screen} className="vm-screen" onClick={() => rfb.current?.focus()} />
       <VmKeys disabled={status !== 'connected'} mods={mods} onToggle={toggle} onKey={pressKey} />
       <form className="vm-type" onSubmit={enter}>

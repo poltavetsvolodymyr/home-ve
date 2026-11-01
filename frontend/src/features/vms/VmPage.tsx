@@ -10,6 +10,7 @@ import { VmLogs } from './VmLogs'
 import { VmDelete } from './VmDelete'
 import { VmSettingsForm } from './VmSettingsForm'
 import { VmSummary } from './VmSummary'
+import { serialSetupCommands } from './serialSetup'
 import { hasScreen, stateBadge } from './vmState'
 import './vms.css'
 
@@ -32,6 +33,9 @@ export function VmPage() {
   const { name = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const tab: Tab = tabs.find(t => t.value === params.get('tab'))?.value ?? 'summary'
+  // ?tab=console&setup=serial: the Terminal tab sent the person here to switch the serial console on
+  const setup = tab === 'console' && params.get('setup') === 'serial'
+  const openTerminal = () => setParams({ tab: 'terminal' }, { replace: true })
   const { data: vm, error, refresh } = usePoll(() => fetchVm(name), 2000, name)
   const [status, label] = vm ? stateBadge(vm.state) : ['neutral' as const, '']
 
@@ -68,7 +72,10 @@ export function VmPage() {
               </Card>
             }
           >
-            <VmConsole name={name} />
+            <VmConsole
+              name={name}
+              setup={setup ? { commands: serialSetupCommands, onDone: openTerminal } : undefined}
+            />
           </Suspense>
         ) : (
           <Card title="Console">
@@ -86,7 +93,7 @@ export function VmPage() {
               </Card>
             }
           >
-            <VmTerminal name={name} />
+            <VmTerminal name={name} onSetup={() => setParams({ tab: 'console', setup: 'serial' }, { replace: true })} />
           </Suspense>
         ) : (
           <Card title="Terminal">
