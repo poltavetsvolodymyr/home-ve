@@ -18,13 +18,13 @@
   align-items: center;
   gap: 12px;
 }
-/* the yellow block fills the bar's height and runs to its left edge; the word stays where it was */
+/* the yellow block fills the bar's height and runs to its left edge, the word in its middle (clear of the notch) */
 .brand {
   align-self: stretch;
   display: flex;
   align-items: center;
   margin-left: calc(-1 * max(12px, env(safe-area-inset-left)));
-  padding: 0 7px 0 calc(max(12px, env(safe-area-inset-left)) + 7px);
+  padding: 0 12px 0 max(12px, env(safe-area-inset-left));
   background: var(--accent);
   color: var(--on-accent);
   font-weight: 700;
