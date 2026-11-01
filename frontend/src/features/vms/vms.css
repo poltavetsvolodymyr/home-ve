@@ -327,6 +327,17 @@ button.danger {
   }
 }
 
+/* the list of VMs takes the rest of the screen and scrolls in it (the page is .fill-screen); the padding keeps
+   the first card's title, set into its top line, from being cut off */
+.page.fill-screen > .vms-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-top: 12px;
+  margin-top: -12px;
+}
+
 /* New VM and ISO images, above the list */
 .vms-toolbar {
   display: flex;

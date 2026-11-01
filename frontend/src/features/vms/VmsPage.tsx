@@ -13,7 +13,8 @@ export function VmsPage() {
   const { data, error } = usePoll(fetchVms, 2000)
 
   return (
-    <div className="page">
+    // the page fits the screen; with more VMs than fit, only their list scrolls, the buttons stay
+    <div className="page fill-screen">
       <div className="vms-toolbar">
         <Link className="button primary" to="/vms/new">
           <Plus size={16} aria-hidden /> New VM
@@ -23,7 +24,7 @@ export function VmsPage() {
         </Link>
       </div>
       <ErrorNote error={error} />
-      <div className="grid-cards">
+      <div className="grid-cards vms-scroll">
         {!data && [0, 1].map(i => <VmCard key={i} />)}
         {data?.map(vm => (
           <VmCard key={vm.name} vm={vm} />
