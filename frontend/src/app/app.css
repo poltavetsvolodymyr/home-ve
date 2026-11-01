@@ -18,8 +18,13 @@
   align-items: center;
   gap: 12px;
 }
+/* the yellow block fills the bar's height and runs to its left edge; the word stays where it was */
 .brand {
-  padding: 1px 7px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin-left: calc(-1 * max(12px, env(safe-area-inset-left)));
+  padding: 0 7px 0 calc(max(12px, env(safe-area-inset-left)) + 7px);
   background: var(--accent);
   color: var(--on-accent);
   font-weight: 700;
