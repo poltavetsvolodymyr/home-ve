@@ -57,7 +57,7 @@ export function VmSettingsForm({ vm, onSaved }: { vm: Vm; onSaved: () => void })
   }
 
   return (
-    <Card title="Settings">
+    <Card title="Configuration">
       {/* our own checks (settings.ts) say what's wrong; the browser's would block silently, e.g. on memory
           that isn't a multiple of the step */}
       <form className="vm-form" onSubmit={save} noValidate>

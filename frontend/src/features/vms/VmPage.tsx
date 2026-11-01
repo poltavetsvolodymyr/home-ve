@@ -28,11 +28,19 @@ const tabs = [
 ] as const
 type Tab = (typeof tabs)[number]['value']
 
-/** `/vms/:name?tab=console`: one VM, with its buttons and six tabs. The tab is in the URL, so a reload keeps it. */
+// Settings has two parts: what to do with the VM (power, delete) and how it is set up
+const settingsSections = [
+  { value: 'actions', label: 'Actions' },
+  { value: 'configuration', label: 'Configuration' },
+] as const
+type SettingsSection = (typeof settingsSections)[number]['value']
+
+/** `/vms/:name?tab=console`: one VM, with Start (when stopped) and six tabs; `?tab=settings&section=configuration`. The tab is in the URL, so a reload keeps it. */
 export function VmPage() {
   const { name = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const tab: Tab = tabs.find(t => t.value === params.get('tab'))?.value ?? 'summary'
+  const section: SettingsSection = settingsSections.find(s => s.value === params.get('section'))?.value ?? 'actions'
   // ?tab=console&setup=serial: the Terminal tab sent the person here to switch the serial console on
   const setup = tab === 'console' && params.get('setup') === 'serial'
   const openTerminal = () => setParams({ tab: 'terminal' }, { replace: true })
@@ -52,7 +60,8 @@ export function VmPage() {
             {name} {vm ? <Badge status={status}>{label}</Badge> : <Skeleton width="4em" />}
           </>
         }
-        actions={vm && <VmActions vm={vm} onDone={() => refresh()} />}
+        // only Start up here, for a stopped VM: shutting down, rebooting and powering off are in Settings › Actions
+        actions={vm && <VmActions vm={vm} only={['start']} onDone={() => refresh()} />}
       >
         <Segmented
           label="Section"
@@ -104,8 +113,24 @@ export function VmPage() {
         ))}
       {tab === 'settings' && vm && (
         <>
-          <VmSettingsForm vm={vm} onSaved={() => refresh()} />
-          <VmDelete vm={vm} />
+          <Segmented
+            label="Settings"
+            value={section}
+            options={[...settingsSections]}
+            onChange={s =>
+              setParams(s === 'actions' ? { tab: 'settings' } : { tab: 'settings', section: s }, { replace: true })
+            }
+          />
+          {section === 'actions' ? (
+            <>
+              <Card title="Power">
+                <VmActions vm={vm} onDone={() => refresh()} />
+              </Card>
+              <VmDelete vm={vm} />
+            </>
+          ) : (
+            <VmSettingsForm vm={vm} onSaved={() => refresh()} />
+          )}
         </>
       )}
       {tab === 'backups' && vm && <VmBackups vm={vm} />}

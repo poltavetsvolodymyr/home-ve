@@ -7,8 +7,11 @@ import { actionLabels, availableActions, confirmAction } from './vmState'
 
 const icons: Record<VmAction, LucideIcon> = { start: Play, shutdown: Power, reboot: RotateCcw, poweroff: Zap }
 
-/** The power buttons that make sense for the VM's state. Asks before interrupting a running VM. */
-export function VmActions({ vm, onDone }: { vm: Vm; onDone: (vm: Vm) => void }) {
+/**
+ * The power buttons that make sense for the VM's state, or (`only`) those of them that are listed. Asks before
+ * interrupting a running VM.
+ */
+export function VmActions({ vm, onDone, only }: { vm: Vm; onDone: (vm: Vm) => void; only?: VmAction[] }) {
   const [busy, setBusy] = useState<VmAction | null>(null)
   const [error, setError] = useState<string>()
 
@@ -28,19 +31,21 @@ export function VmActions({ vm, onDone }: { vm: Vm; onDone: (vm: Vm) => void }) 
 
   return (
     <div className="vm-actions">
-      {availableActions(vm.state).map(action => {
-        const Icon = icons[action]
-        return (
-          <button
-            key={action}
-            className={action === 'start' ? 'primary' : action === 'poweroff' ? 'danger' : ''}
-            disabled={busy !== null}
-            onClick={() => run(action)}
-          >
-            <Icon size={15} aria-hidden /> {busy === action ? '…' : actionLabels[action]}
-          </button>
-        )
-      })}
+      {availableActions(vm.state)
+        .filter(action => !only || only.includes(action))
+        .map(action => {
+          const Icon = icons[action]
+          return (
+            <button
+              key={action}
+              className={action === 'start' ? 'primary' : action === 'poweroff' ? 'danger' : ''}
+              disabled={busy !== null}
+              onClick={() => run(action)}
+            >
+              <Icon size={15} aria-hidden /> {busy === action ? '…' : actionLabels[action]}
+            </button>
+          )
+        })}
       {error && <div className="error-note">{error}</div>}
     </div>
   )

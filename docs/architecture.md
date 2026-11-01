@@ -222,8 +222,9 @@ features/
                           ISO, cards; "start and open console"
     VmDelete.tsx          deleting a stopped VM; with the disk, only after typing its name
     NetsEditor.tsx, CdromField.tsx, ImageField.tsx   shared parts of the new VM and settings forms
-    VmPage.tsx            one VM: action buttons + tabs ?tab=summary|console|terminal|settings|backups|logs
-    VmActions.tsx         Start / Shut down / Reboot / Power off, with confirmation for the disruptive ones
+    VmPage.tsx            one VM: Start (when stopped) + tabs ?tab=summary|console|terminal|settings|backups|logs;
+                          Settings has Actions (power buttons, delete) and Configuration (&section=configuration)
+    VmActions.tsx         Start / Shut down / Reboot / Power off, with confirmation for the disruptive ones (`only`: some)
     VmSummary.tsx, VmMeters.tsx
     VmSettingsForm.tsx    cores, memory, firmware, network cards, autostart; after saving offers a reboot
     VmConsole.tsx         noVNC (loaded only when the tab is opened): scaling, Ctrl+Alt+Del, full screen,
