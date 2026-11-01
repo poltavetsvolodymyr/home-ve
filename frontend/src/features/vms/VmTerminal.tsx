@@ -1,11 +1,22 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { AArrowDown, AArrowUp, ClipboardPaste, Copy, Maximize, Monitor, MoveHorizontal, RotateCcw } from 'lucide-react'
+import {
+  AArrowDown,
+  AArrowUp,
+  ClipboardPaste,
+  Copy,
+  Maximize,
+  Minimize,
+  Monitor,
+  MoveHorizontal,
+  RotateCcw,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Card, confirmEdit, type Status as BadgeStatus } from '@/shared/ui'
 import { terminalUrl } from './api'
 import type { Modifier, PanelKey } from './keysyms'
+import { useFullScreen } from './fullScreen'
 import { isTerminalReport, keyBytes, typed } from './termKeys'
 import { VmKeys } from './VmKeys'
 
@@ -104,6 +115,7 @@ function touchScroll(el: HTMLElement, t: Terminal): () => void {
  */
 export default function VmTerminal({ name, onSetup }: { name: string; onSetup: () => void }) {
   const frame = useRef<HTMLDivElement>(null)
+  const fullScreen = useFullScreen(frame)
   const box = useRef<HTMLDivElement>(null)
   const term = useRef<Terminal | null>(null)
   const fit = useRef<FitAddon | null>(null)
@@ -315,18 +327,21 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
               <RotateCcw size={15} aria-hidden /> Reconnect
             </button>
           )}
-          <button
-            className="icon-button"
-            title="Full screen"
-            aria-label="Full screen"
-            onClick={() => frame.current?.requestFullscreen?.()}
-          >
+          <button className="icon-button" title="Full screen" aria-label="Full screen" onClick={fullScreen.enter}>
             <Maximize size={16} aria-hidden />
           </button>
         </>
       }
     >
-      <div ref={frame} className="vm-term">
+      <div ref={frame} className={fullScreen.overlay ? 'vm-term full-overlay' : 'vm-term'} style={fullScreen.style}>
+        {fullScreen.full && (
+          <div className="full-bar">
+            <span>{name} · terminal</span>
+            <button onClick={fullScreen.exit}>
+              <Minimize size={15} aria-hidden /> Exit
+            </button>
+          </div>
+        )}
         <div ref={box} className="vm-term-screen" onClick={() => term.current?.focus()} />
         {silent && connected && (
           <div className="vm-term-silent">

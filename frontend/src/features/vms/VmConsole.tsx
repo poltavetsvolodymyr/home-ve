@@ -1,5 +1,5 @@
 import RFB from '@novnc/novnc'
-import { CornerDownLeft, Keyboard, Maximize, RotateCcw, SquareTerminal, X } from 'lucide-react'
+import { CornerDownLeft, Keyboard, Maximize, Minimize, RotateCcw, SquareTerminal, X } from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { Badge, Card, confirmEdit, type Status as BadgeStatus } from '@/shared/ui'
 import { consoleUrl } from './api'
+import { useFullScreen } from './fullScreen'
 import {
   lineEdit,
   panelKeyEvents,
@@ -47,6 +48,9 @@ export interface ConsoleSetup {
  */
 export default function VmConsole({ name, setup }: { name: string; setup?: ConsoleSetup }) {
   const screen = useRef<HTMLDivElement>(null)
+  // the screen with its keys and the text box: on a phone they're what you type with
+  const frame = useRef<HTMLDivElement>(null)
+  const fullScreen = useFullScreen(frame)
   const rfb = useRef<RFB | null>(null)
   const [status, setStatus] = useState<Status>('connecting')
   const [attempt, setAttempt] = useState(0)
@@ -234,12 +238,7 @@ export default function VmConsole({ name, setup }: { name: string; setup?: Conso
               Ctrl+Alt+Del
             </button>
           )}
-          <button
-            className="icon-button"
-            title="Full screen"
-            aria-label="Full screen"
-            onClick={() => screen.current?.requestFullscreen?.()}
-          >
+          <button className="icon-button" title="Full screen" aria-label="Full screen" onClick={fullScreen.enter}>
             <Maximize size={16} aria-hidden />
           </button>
         </>
@@ -268,39 +267,49 @@ export default function VmConsole({ name, setup }: { name: string; setup?: Conso
           )}
         </div>
       )}
-      <div ref={screen} className="vm-screen" onClick={() => rfb.current?.focus()} />
-      <VmKeys disabled={status !== 'connected'} mods={mods} onToggle={toggle} onKey={pressKey} />
-      <form className="vm-type" onSubmit={enter}>
-        <Keyboard size={16} aria-hidden className="muted" />
-        <input
-          className="mono"
-          placeholder={mods.length ? `${mods.join('+')} + …` : 'Type into the VM'}
-          value={text}
-          onChange={edit}
-          onKeyDown={keyDown}
-          onPaste={paste}
-          autoCapitalize="off"
-          autoCorrect="off"
-          autoComplete="off"
-          spellCheck={false}
-          enterKeyHint="enter"
-          disabled={status !== 'connected'}
-        />
-        {text && (
-          <button
-            type="button"
-            className="icon-button"
-            title="Clear the box (the VM keeps what was typed)"
-            aria-label="Clear the box"
-            onClick={() => setText('')}
-          >
-            <X size={16} aria-hidden />
-          </button>
+      <div ref={frame} className={fullScreen.overlay ? 'vm-con full-overlay' : 'vm-con'} style={fullScreen.style}>
+        {fullScreen.full && (
+          <div className="full-bar">
+            <span>{name} · screen</span>
+            <button onClick={fullScreen.exit}>
+              <Minimize size={15} aria-hidden /> Exit
+            </button>
+          </div>
         )}
-        <button disabled={status !== 'connected'}>
-          <CornerDownLeft size={15} aria-hidden /> Enter
-        </button>
-      </form>
+        <div ref={screen} className="vm-screen" onClick={() => rfb.current?.focus()} />
+        <VmKeys disabled={status !== 'connected'} mods={mods} onToggle={toggle} onKey={pressKey} />
+        <form className="vm-type" onSubmit={enter}>
+          <Keyboard size={16} aria-hidden className="muted" />
+          <input
+            className="mono"
+            placeholder={mods.length ? `${mods.join('+')} + …` : 'Type into the VM'}
+            value={text}
+            onChange={edit}
+            onKeyDown={keyDown}
+            onPaste={paste}
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            enterKeyHint="enter"
+            disabled={status !== 'connected'}
+          />
+          {text && (
+            <button
+              type="button"
+              className="icon-button"
+              title="Clear the box (the VM keeps what was typed)"
+              aria-label="Clear the box"
+              onClick={() => setText('')}
+            >
+              <X size={16} aria-hidden />
+            </button>
+          )}
+          <button disabled={status !== 'connected'}>
+            <CornerDownLeft size={15} aria-hidden /> Enter
+          </button>
+        </form>
+      </div>
     </Card>
   )
 }

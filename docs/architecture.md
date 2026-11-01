@@ -232,6 +232,8 @@ features/
                           (types stty rows/cols into the VM), Copy (the selection or the screen), Paste, full screen;
                           a silent VM gets "Set up from the screen": ?tab=console&setup=serial, where VmConsole
                           types serialSetup.ts's commands on the VM's keyboard, once confirmed
+    fullScreen.ts         full screen for the console and the terminal: the browser's own, or laid over the page
+                          where there is none (Safari on an iPhone has it only for video)
     VmKeys.tsx            key panel under the screen and the terminal: Esc, Tab, arrows (repeat while held), Home/End,
                           PgUp/PgDn, F1–F12, sticky Ctrl/Alt/Shift for the next key or line
     VmLogs.tsx            log of vm@<name>.service

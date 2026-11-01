@@ -234,15 +234,42 @@ button.danger {
 }
 
 /* full screen: the terminal takes what the tools and keys leave */
-.vm-term:fullscreen {
+/* full screen: the browser's own, or (an iPhone) laid over the page, above its bars, as high as the keyboard leaves
+   (fullScreen.ts sets top and height); the screen or terminal takes what the bar, tools and keys leave */
+.vm-term:fullscreen,
+.vm-con:fullscreen,
+.full-overlay {
   display: flex;
   flex-direction: column;
   padding: 8px;
   background: var(--page);
+  overflow: auto;
 }
-.vm-term:fullscreen .vm-term-screen {
+.full-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100dvh;
+  z-index: 20;
+}
+.vm-term:fullscreen .vm-term-screen,
+.vm-term.full-overlay .vm-term-screen,
+.vm-con:fullscreen .vm-screen,
+.vm-con.full-overlay .vm-screen {
   flex: 1;
   height: auto;
+  min-height: 120px;
+}
+.full-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.full-bar button {
+  font-size: 13px;
 }
 
 /* the on-screen keys: six columns, arrows as an inverted T on the right */
