@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge, Card, confirmEdit, type Status as BadgeStatus } from '@/shared/ui'
 import { terminalUrl } from './api'
 import type { Modifier, PanelKey } from './keysyms'
-import { keyBytes, typed } from './termKeys'
+import { isTerminalReport, keyBytes, typed } from './termKeys'
 import { VmKeys } from './VmKeys'
 
 type Status = 'connecting' | 'connected' | 'closed'
@@ -52,6 +52,8 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
   const [mods, setMods] = useState<Modifier[]>([])
   // the terminal's own keyboard input reads the modifiers from here: its handler is set up once
   const modsNow = useRef<Modifier[]>([])
+  // the end of the log is being drawn: nothing from the terminal goes to the VM meanwhile (see onData)
+  const replaying = useRef(false)
   const [fontSize, setFontSize] = useState(savedFontSize)
   const [copied, setCopied] = useState(false)
   // connected, but the VM has said nothing since (only its log came)
@@ -82,8 +84,12 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
     t.open(box.current)
     f.fit()
     // typed on a keyboard (a phone's too): with Ctrl or Alt switched on in the panel, the next character is a
-    // shortcut (Ctrl+C); escape sequences (a real keyboard's arrows) go out as they are
+    // shortcut (Ctrl+C); escape sequences (a real keyboard's arrows) go out as they are.
+    // xterm.js also answers what programs ask the terminal (where the cursor is, what it is) through here. Those
+    // answers stay here: in the log they answer questions long gone, and with two tabs open both would answer, so
+    // they'd land in the VM's input as text (R;135R). A program asking just waits a moment and does without.
     const typing = t.onData(data => {
+      if (replaying.current || isTerminalReport(data)) return
       const m = modsNow.current
       if (m.length && !data.startsWith('\x1b')) {
         modsNow.current = []
@@ -141,11 +147,14 @@ export default function VmTerminal({ name, onSetup }: { name: string; onSetup: (
       setStatus('connected')
       // the backend starts with the end of the log: from a clean screen, not after what the last connection left
       term.current?.reset()
+      replaying.current = true
     }
     s.onmessage = e => {
       const bytes = new Uint8Array(e.data as ArrayBuffer)
       if (!live && bytes.length === 0) {
         live = true
+        // xterm.js draws what it's given a little later: done with the log once everything before is drawn
+        term.current?.write('', () => (replaying.current = false))
         silence = window.setTimeout(() => setSilent(true), silentMs)
         return
       }

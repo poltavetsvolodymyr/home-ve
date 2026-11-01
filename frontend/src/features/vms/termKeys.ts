@@ -64,3 +64,17 @@ export function typed(text: string, mods: Modifier[] = []): string {
   if (mods.includes('alt')) chars = chars.map(ch => ESC + ch)
   return chars.join('')
 }
+
+/**
+ * Whether what xterm.js sends is its own answer to a program's question, not something typed: where the cursor is
+ * (Esc [ row ; col R, also Esc [ ? row ; col ; page R), its status (Esc [ 0 n), what terminal it is (Esc [ ? … c,
+ * Esc [ > … c, Esc P … Esc \), the state of a mode (Esc [ ? … $ y), its window (Esc [ … t), its colours (Esc ] … BEL).
+ * Ctrl or Shift+F3 from a real keyboard looks like a cursor report (Esc [ 1 ; 5 R) and goes too; the panel's doesn't.
+ */
+export function isTerminalReport(data: string): boolean {
+  // escape sequences are what it matches
+  // eslint-disable-next-line no-control-regex
+  return /^\x1b(\[\??\d+;\d+(;\d+)?R|\[0n|\[[?>][\d;]*c|\[\??[\d;]*\$y|\[[\d;]+t|P[\s\S]*\x1b\\|\][\s\S]*(\x07|\x1b\\))$/.test(
+    data,
+  )
+}
