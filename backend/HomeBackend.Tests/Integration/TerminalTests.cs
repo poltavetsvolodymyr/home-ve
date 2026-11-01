@@ -56,7 +56,9 @@ public class TerminalTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task A_running_vm_without_its_console_socket_is_a_bad_gateway()
     {
-        File.Delete(Path.Combine(app.RuntimeDir, "vm-router", "console.sock"));
+        // the VM's folder is there (QEMU runs), its console socket isn't; the folder too when this test runs first
+        var dir = Directory.CreateDirectory(Path.Combine(app.RuntimeDir, "vm-router")).FullName;
+        File.Delete(Path.Combine(dir, "console.sock"));
         var e = await Assert.ThrowsAsync<WebSocketException>(() => OpenAsync("router", "192.168.178.73"));
         Assert.Contains("502", e.Message);
     }
